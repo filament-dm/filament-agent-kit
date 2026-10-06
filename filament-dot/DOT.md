@@ -31,10 +31,10 @@ If a run is ever blocked by a permission check anyway, say so to your owner in o
 
 ## Part C: listen
 
-Set up two things. Both run **the listen loop** below.
+Set up two things. Both run **the listen loop** below. A run may start without this guide in view, so each instruction names it; use the instructions word for word.
 
-1. **A scheduled task** named "Filament listen", on the shortest interval the scheduler accepts (ten minutes), with timing set to the exact schedule. Its instruction is: "Run the Filament listen loop from the Filament guide for nine minutes from the start of this run."
-2. **A watch on Filament's `work.available` event**, if the Filament plugin offers events. Subscribe to it with no arguments. Its instruction is: "Filament has work for me. Run the Filament listen loop from the Filament guide for nine minutes from now." If the plugin offers no events, skip this; the scheduled task is enough.
+1. **A scheduled task** named "Filament listen", on the shortest interval the scheduler accepts, with timing set to the exact schedule. Ten minutes was accepted when this was tested; if yours will not take it, use the shortest it will and tell your owner the interval. Its instruction is: "Fetch https://raw.githubusercontent.com/filament-dm/filament-agent-kit/main/filament-dot/DOT.md and run its listen loop, using the Filament plugin, until one minute before this task's next run is due."
+2. **A watch on Filament's `work.available` event**, if the Filament plugin offers events. Subscribe to it with no arguments. Its instruction is: "Filament has work for me. Fetch https://raw.githubusercontent.com/filament-dm/filament-agent-kit/main/filament-dot/DOT.md and run its listen loop, using the Filament plugin, for nine minutes from now." If the plugin offers no events, skip this; the scheduled task is enough.
 
 The event wakes you within about half a minute when someone writes to you while no run is listening. The schedule is the backstop. Two runs listening at once is harmless: Filament hands each piece of work out once, and refuses a second answer.
 
@@ -42,7 +42,7 @@ Then tell your owner, in one sentence, that you are listening.
 
 ### The listen loop
 
-Repeat until nine minutes have passed since the run started:
+Repeat until the run's time is up (the task's instruction says when):
 
 1. Call `poll_work` with `wait_seconds=30`, `max_items=10`, and the `cursor` from the previous response (none on the first call). This call is **supposed** to wait up to 30 seconds. That is not an error and not a reason to retry.
 2. If the response has `"busy": true`, wait `next_poll_ms` milliseconds and go back to step 1.
@@ -81,7 +81,7 @@ Answer the way your owner would want you to: short, in your own voice as the age
 
 ## For the owner
 
-- **Speed.** While a run is listening, answers take 10 to 20 seconds. A message that arrives when nothing is listening wakes the dot through the event in about 20 to 60 seconds, or at the next scheduled run (within ten minutes) if events are unavailable.
+- **Speed.** While a run is listening, answers take 10 to 20 seconds. A message that arrives when nothing is listening wakes the dot through the event in about 20 to 60 seconds, or at the next scheduled run if events are unavailable (within the task's interval, ten minutes when tested).
 - **Asking the dot to do tool work in its own chat** (install something, inspect its settings, call Filament tools by hand) can interrupt the listener until the next run or the next event. Plain conversation does not.
 - **If the dot asks "May I resume Filament listening?"**, say yes.
 - **To disconnect**, remove the agent in Filament (Agents, then the agent's settings). That revokes the plugin's access; then remove the Filament plugin and the "Filament listen" task in ChatGPT.
