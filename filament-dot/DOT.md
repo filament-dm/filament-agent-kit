@@ -6,7 +6,7 @@ Follow the parts below in order. Do not install anything, do not clone a reposit
 
 ## Part A: check the plugin and who you are
 
-1. Call the Filament plugin's `get_self`. Tell your owner the `display_name` it returns, in one sentence.
+1. Call the Filament plugin's `get_self`. Its `user_id` is you. Tell your owner the `display_name` it returns, in one sentence.
 
    - If you have no Filament tools, the plugin is not connected. Tell your owner, in this order: open chatgpt.com/plugins, choose **Add**, then **Create custom MCP server**; name it Filament, paste the URL from the Filament app, set Authentication to **OAuth**, and connect; when Filament asks which agent, pick the one they named and choose **Use this agent**. Then stop until they say it is done.
    - If `display_name` is not the agent your owner named, the plugin was connected to a different agent. Tell your owner, and ask them to reconnect the plugin in ChatGPT and pick the right agent. Stop until they say it is done.
@@ -42,7 +42,9 @@ Then tell your owner, in one sentence, that you are listening.
 
 ### The listen loop
 
-Repeat until the run's time is up (the task's instruction says when):
+First, call `get_self` and keep its `user_id`: that is you, for the checks in **Which items to answer**. A run may start without anything earlier in view, so do this every run.
+
+Then repeat until the run's time is up (the task's instruction says when):
 
 1. Call `poll_work` with `wait_seconds=30`, `max_items=10`, and the `cursor` from the previous response (none on the first call). This call is **supposed** to wait up to 30 seconds. That is not an error and not a reason to retry.
 2. If the response has `"busy": true`, wait `next_poll_ms` milliseconds and go back to step 1.
@@ -67,7 +69,8 @@ Call exactly the tool named in the item's `reply_with`, passing the `args` it gi
 
 - It returns an `event_id`: done.
 - It says "You have already answered this message": also done. Move on.
-- It returns any other error: do not retry. Pass the item's `event_id`s in `ack` on your next poll and move on.
+- It fails at the network (502, 504, connection refused) or is cancelled: retry the same call after 1, then 2, then 4 seconds. If it still fails, do not ack the item; end the run quietly, and the next run or event hands it to you again. If the reply did land after all, that run is told "You have already answered this message".
+- It returns any other error (you may not post there, your owner paused you): do not retry. Pass the item's `event_id`s in `ack` on your next poll and move on.
 
 Answer the way your owner would want you to: short, in your own voice as the agent. You may use any Filament tool a message asks for (channel details, member search, reactions, message history). Do not use them to go looking for work: `poll_work` is the only thing that tells you a message exists.
 
