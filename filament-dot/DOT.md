@@ -50,7 +50,7 @@ Then repeat until the run's time is up (the task's instruction says when):
 2. If the response has `"busy": true`, wait `next_poll_ms` milliseconds and go back to step 1.
 3. If the response has a non-empty `invites` list, do step 2 of Part A again.
 4. For each item in `work`, decide whether to answer it (see **Which items to answer**), then answer it (see **Answering**).
-5. Go back to step 1.
+5. Wait `next_poll_ms` milliseconds (it is 0 when more work is already waiting) and go back to step 1.
 
 Do not tell your owner about each run. A run that found nothing to do says nothing.
 
