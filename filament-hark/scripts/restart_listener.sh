@@ -18,7 +18,7 @@ classify_error() (
 # Embedded JSON helpers shared by the scripts.
 json_helper() {
     python3 - "$STATE" "$@" <<'PY'
-import json, math, os, pathlib, shutil, sys, time
+import datetime, json, math, os, pathlib, re, shutil, subprocess, sys, time
 S = pathlib.Path(sys.argv[1])
 action, *args = sys.argv[2:]
 def read(p):
@@ -93,9 +93,8 @@ try:
         def ids(messages):
             return [m['event_id'] for m in messages if isinstance(m.get('event_id'), str) and m['event_id']]
         def not_for_us(m):
-            sender, body = m.get('sender', ''), m.get('body', '')
-            return (bool(self_id) and sender == self_id) or (isinstance(sender, str) and sender.startswith('@filament_god:')) or (
-                bool(self_id) and m.get('sender_is_agent') is True and m.get('is_mention') is not True and self_id not in str(body))
+            sender = m.get('sender', '')
+            return (bool(self_id) and sender == self_id) or (isinstance(sender, str) and sender.startswith('@filament_god:'))
         for item in d.get('work', []):
             if not isinstance(item, dict): raise ValueError('invalid item')
             if item.get('reply_with') is None: continue
@@ -124,8 +123,26 @@ try:
     elif action == 'deliver':
         run = pathlib.Path(args[0])
         d = read(run / 'filtered')
-        stage = run / 'items'
-        stage.mkdir()
+        directory = S / 'items'
+        directory.mkdir(exist_ok=True)
+        seen = set(seen_ids())
+        for old in directory.glob('*.json'):
+            if not old.stem.isdigit(): continue
+            expired = time.time() - old.stat().st_mtime > 86400
+            try:
+                messages = read(old)['messages']
+                answered = all(m.get('event_id') in seen for m in messages)
+            except (ValueError, KeyError, TypeError):
+                answered = False
+            if expired or answered: old.unlink()
+        counter = directory / 'next'
+        if not counter.exists(): write(counter, 1)
+        number = int(counter.read_text())
+        if number < 1: raise ValueError('invalid items/next')
+        try: owner = read(S / 'self.json').get('owner_id')
+        except (ValueError, OSError, AttributeError): owner = None
+        tag_order = ('PRINCIPAL', 'AGENT', 'SYSTEM', 'MENTIONED', 'IMPLIED', 'REPLY_EXPECTED', 'NO_REPLY_EXPECTED')
+        summaries = []
         for n, item in enumerate(d['work'], 1):
             response = run / ('media-' + str(n))
             if response.exists():
@@ -134,18 +151,107 @@ try:
                     rows = recent if isinstance(recent, list) else recent['messages']
                     if not isinstance(rows, list): raise ValueError('invalid messages')
                     matches = {m['event_id']: m for m in rows if isinstance(m, dict)
-                               and isinstance(m.get('event_id'), str) and isinstance(m.get('media'), list)}
+                               and isinstance(m.get('event_id'), str)}
                     for m in item['messages']:
                         match = matches.get(m.get('event_id'))
                         if match is not None:
-                            m['media'] = match['media']
-                            if 'msgtype' in match: m['msgtype'] = match['msgtype']
+                            for key in ('media', 'msgtype', 'is_from_principal', 'is_implicitly_mentioned',
+                                        'reply_expected', 'is_from_agent', 'is_system'):
+                                if key in match: m[key] = match[key]
                 except (ValueError, OSError, TypeError, KeyError) as e:
                     print(('MEDIA-ENRICH-FAILED ' + str(e))[:2000], file=sys.stderr)
-            write(stage / (str(n) + '.json'), item)
-        write(stage / 'wake.json', d)
-        if (S / 'items').exists(): shutil.rmtree(S / 'items')
-        os.replace(stage, S / 'items')
+            union = set()
+            for m in item['messages']:
+                flags = (bool(owner) and m.get('sender') == owner or m.get('is_from_principal') is True,
+                         m.get('sender_is_agent') is True or m.get('is_from_agent') is True,
+                         m.get('is_system') is True, m.get('is_mention') is True,
+                         m.get('is_implicitly_mentioned') is True, m.get('reply_expected') is True,
+                         m.get('reply_expected') is False)
+                tags = [tag for tag, applies in zip(tag_order, flags) if applies]
+                m['tags'] = ' '.join(tags)
+                union.update(tags)
+            item['tags'] = ('BACKCHANNEL' if item.get('is_backchannel') else 'ROOM') + (
+                ' ANSWER' if union.intersection(('PRINCIPAL', 'MENTIONED', 'IMPLIED', 'REPLY_EXPECTED')) else ' QUIET')
+            item['number'] = number
+            # Reserve before writing: a crash can leave gaps, never reused numbers.
+            write(counter, number + 1)
+            write(directory / (str(number) + '.json'), item)
+            summaries.append('ITEM {} {} channel={} messages={} {}'.format(
+                number, item['tags'], item['channel_id'], len(item['messages']),
+                ' '.join(t for t in tag_order if t in union)).rstrip())
+            number += 1
+        write(directory / 'wake.json', d)
+        # Private output survives a later wake replacing the shared wake.json.
+        (run / 'delivery').write_text('\n'.join(summaries) + '\n' + json.dumps(d, ensure_ascii=True, separators=(',', ':')) + '\n')
+    elif action == 'lineage':
+        p = S / 'lineage.json'
+        if args[0] == 'reset':
+            write(p, {'started': int(time.time()), 'count': 0})
+        else:
+            d = read(p) if p.exists() else {'started': int(time.time()), 'count': 0}
+            d['count'] += 1
+            write(p, d)
+            try: raw = (S / 'rotate_after').read_text().strip()
+            except FileNotFoundError: raw = ''
+            limit = int(raw) if re.fullmatch(r'[0-9]{1,3}', raw) and 2 <= int(raw) <= 200 else 12
+            print(d['count'], limit)
+    elif action == 'reclaim':
+        path, pid = pathlib.Path(args[0]), args[1]
+        renamed = pathlib.Path(str(path) + '.reclaim.' + pid)
+        def owner(p):
+            try: value = (p / 'pid').read_text().strip()
+            except FileNotFoundError: value = ''
+            if not value: return '', time.time() - p.stat().st_mtime <= 5
+            if value.isdigit() and int(value) > 1:
+                try:
+                    os.kill(int(value), 0)
+                    command = subprocess.run(['ps', '-o', 'args=', '-p', value], capture_output=True, text=True).stdout
+                    return value, ('listen.sh' if path.name == 'listener.lock.d' else '.sh') in command
+                except ProcessLookupError: pass
+                except PermissionError: return value, True
+            return value, False
+        # Avoid moving a known live lock or its PID-publication window.
+        _, protected = owner(path)
+        if protected: sys.exit(1)
+        os.rename(path, renamed)  # Not mv: never nest into another directory.
+        value, protected = owner(renamed)
+        if protected:
+            os.rename(renamed, path)
+            sys.exit(1)
+        shutil.rmtree(renamed)
+        print(value or 'NONE')
+    elif action == 'backstop-check':
+        p = S / 'backstop.log'
+        if p.exists(): p.write_text(''.join(p.read_text().splitlines(keepends=True)[-200:]))
+        now = time.time()
+        try: started = int((S / 'listener.lock.d/started').read_text())
+        except (OSError, ValueError): started = 0
+        fresh = 0 <= now - started < 180
+        try: lines = (S / 'listen.log').read_text().splitlines()
+        except FileNotFoundError: lines = []
+        for line in reversed(lines):
+            if ' POLL ' not in line: continue
+            try:
+                # New logs carry a date; accept old HH:MM:SS across midnight.
+                stamp = line.split(' POLL ', 1)[0]
+                if len(stamp) == 8:
+                    dt = datetime.datetime.combine(datetime.date.today(), datetime.time.fromisoformat(stamp))
+                    when = dt.timestamp()
+                    if when > now: when -= 86400
+                else: when = datetime.datetime.strptime(stamp, '%Y-%m-%dT%H:%M:%S%z').timestamp()
+                fresh = fresh or 0 <= now - when < 180
+            except ValueError: pass
+            break
+        print('RUNNING' if fresh else 'WEDGED')
+    elif action == 'quota':
+        percent, resets = args
+        if not re.fullmatch(r'[0-9]{1,3}', percent) or not 0 <= int(percent) <= 100:
+            print('BAD_PERCENT'); sys.exit(1)
+        p = S / 'quota_warned'
+        if p.exists() and time.time() - p.stat().st_mtime < 20 * 3600:
+            print('ALREADY_WARNED')
+        else:
+            print(json.dumps({'markdown_body': "Heads up: I have used {}% of today's Hark tokens. If I go quiet, that is why; the allowance resets at {}.".format(int(percent), resets)}))
     elif action == 'validate':
         run, number, mode = pathlib.Path(args[0]), args[1], args[2]
         try:
@@ -218,10 +324,27 @@ live_listener() { live_pid "$1" && [[ $(ps -o args= -p "$1" 2>/dev/null) == *lis
 release_lock() {
     if [ "$(cat "$1/pid" 2>/dev/null)" = "$$" ]; then rm -rf "$1"; fi
 }
+reclaim_stale() {
+    local owner
+    owner=$(json_helper reclaim "$1" "$$" 2>/dev/null) || return 1
+    log_event "LOCK-RECLAIMED $1 $owner"
+}
+rotate_logs() {
+    # media.sh uses this without init_job; give its rotation a local budget.
+    local DEADLINE=${DEADLINE:-$(($(date +%s) + 60))} rc
+    take_lock "$STATE/rotate.lock.d" 5 || return 0
+    json_helper rotate; rc=$?
+    release_lock "$STATE/rotate.lock.d"
+    return "$rc"
+}
 take_lock() {
-    local path=$1 tries=$2 i=0 stop now
+    local path=$1 tries=$2 i=0 stop now reclaimed=0
     stop=$(wait_limit "$(((tries + 4) / 5))")
     while ! mkdir "$path" 2>/dev/null; do
+        if [ "$reclaimed" -eq 0 ]; then
+            reclaimed=1
+            reclaim_stale "$path" && continue
+        fi
         now=$(date +%s)
         [ "$i" -lt "$tries" ] && [ "$now" -lt "$stop" ] && [ "$now" -lt "$DEADLINE" ] || return 1
         i=$((i + 1)); sleep_for 0.2
@@ -268,23 +391,40 @@ paused() {
 init_job() {
     STATE=${FILAMENT_STATE:-/workspace/filament}
     mkdir -p "$STATE" || return 1
-    json_helper rotate || return 1
     local start=${FILAMENT_JOB_START:-}
     if ! [[ $start =~ ^[0-9]{1,12}$ ]]; then start=$(date +%s); fi
     start=$((10#$start))
     DEADLINE=$((start + ${1:-480}))
     CPID=
+    rotate_logs || return 1
+}
+
+stop_listener() {
+    local old i=0 stop
+    old=$(cat "$STATE/listener.lock.d/pid" 2>/dev/null)
+    live_listener "$old" || return 1
+    kill -TERM "$old" 2>/dev/null || :
+    stop=$(wait_limit 10)
+    while live_listener "$old" && [ "$i" -lt 100 ] && [ "$(date +%s)" -lt "$stop" ]; do
+        sleep_for 0.1; i=$((i + 1))
+    done
+    if live_listener "$old"; then kill -KILL "$old" 2>/dev/null || :; fi
+    log_event "LISTENER-KILLED $old"
+    # Reclaim only stale ownership, never blindly remove a replacement.
+    reclaim_stale "$STATE/listener.lock.d" || :
+    if [ "$(cat "$STATE/listener.pid" 2>/dev/null)" = "$old" ]; then rm -f "$STATE/listener.pid"; fi
+    return 0
 }
 
 restart_main() {
     init_job 480 || { echo RESTART_BUSY; exit 3; }
-    paused && exit 2
+    if [ "${1:-}" != --stop ]; then paused && exit 2; fi
     if ! take_lock "$STATE/restart.lock.d" 100; then echo RESTART_BUSY; exit 3; fi
-    trap 'release_lock "$STATE/restart.lock.d"' EXIT
+    trap 'release_lock "$STATE/reply.lock.d"; release_lock "$STATE/restart.lock.d"' EXIT
     trap 'echo KILLED; exit 3' TERM INT
     # A tiny handover record closes the release-before-exec race. Its owner is
     # this PID, which exec preserves; it is removed by the incoming listener.
-    local pending pending_args old started now stop i=0
+    local pending pending_args old stop i=0
     stop=$(wait_limit 20)
     pending=$(cat "$STATE/restart.pending" 2>/dev/null)
     while live_pid "$pending" && [ "$pending" != "$$" ] && [ -f "$STATE/restart.pending" ]; do
@@ -294,25 +434,21 @@ restart_main() {
         sleep_for 0.2; i=$((i + 1))
     done
     old=$(cat "$STATE/listener.lock.d/pid" 2>/dev/null)
-    started=$(cat "$STATE/listener.lock.d/started" 2>/dev/null)
-    now=$(date +%s)
+    if [ "${1:-}" = --stop ]; then
+        if stop_listener; then echo STOPPED; else echo NO_LISTENER; fi
+        exit 0
+    fi
     if live_listener "$old"; then
-        if [[ $started =~ ^[0-9]{1,12}$ ]] && [ "$((now - 10#$started))" -ge 0 ] && [ "$((now - 10#$started))" -lt 10 ]; then
+        if [ "${1:-}" != --replace ]; then
+            [ -z "${FILAMENT_JOB_START+x}" ] || log_event CHAIN-ALREADY-LISTENING
             echo ALREADY_LISTENING; exit 3
         fi
-        kill -TERM "$old" 2>/dev/null || :
-        i=0
-        stop=$(wait_limit 10)
-        while live_listener "$old" && [ "$i" -lt 100 ] && [ "$(date +%s)" -lt "$stop" ] && [ "$(remaining)" -gt 0 ]; do
-            sleep_for 0.1; i=$((i + 1))
-        done
-        if live_listener "$old"; then kill -KILL "$old" 2>/dev/null || :; fi
-        log_event "LISTENER-KILLED $old"
+        stop_listener || :
     fi
-    # Do not remove ownership published by a different listener meanwhile.
-    if [ "$(cat "$STATE/listener.lock.d/pid" 2>/dev/null)" = "$old" ]; then
-        rm -rf "$STATE/listener.lock.d"
-        if [ "$(cat "$STATE/listener.pid" 2>/dev/null)" = "$old" ]; then rm -f "$STATE/listener.pid"; fi
+    if [ -z "${FILAMENT_JOB_START+x}" ]; then
+        if ! take_lock "$STATE/reply.lock.d" 25; then echo RESTART_BUSY; exit 3; fi
+        if ! json_helper lineage reset; then echo RESTART_BUSY; exit 3; fi
+        release_lock "$STATE/reply.lock.d"
     fi
     printf '%s\n' "$$" > "$STATE/restart.pending"
     release_lock "$STATE/restart.lock.d"

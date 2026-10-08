@@ -2,7 +2,7 @@
 STATE=${FILAMENT_STATE:-/workspace/filament}
 # shellcheck source=package/scripts/restart_listener.sh
 source "$STATE/restart_listener.sh"
-if ! mkdir -p "$STATE" || ! json_helper rotate; then echo 'DOWNLOAD_FAILED initialisation'; exit 1; fi
+if ! mkdir -p "$STATE" || ! rotate_logs; then echo 'DOWNLOAD_FAILED initialisation'; exit 1; fi
 python3 - "$STATE" "$@" <<'PY'
 import hashlib, os, pathlib, subprocess, sys, tempfile
 from urllib.parse import quote

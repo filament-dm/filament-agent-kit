@@ -1,12 +1,12 @@
 # Filament connector tests
 
-From `package/` on a laptop:
+From `wt/filament-hark/` on a laptop:
 
 ```sh
 bash tests/run.sh
 ```
 
-The four production scripts use Bash 3.2-compatible syntax and
+The five production scripts use Bash 3.2-compatible syntax and
 `#!/usr/bin/env bash`; Linux Bash 5 is supported. Python 3.9+, curl, ps and the
 usual POSIX command-line utilities are required. The harness needs Python 3.9+
 and Bash, with no third-party Python packages. It substitutes both network
@@ -20,7 +20,7 @@ To select a particular Bash:
 FILAMENT_TEST_BASH=/bin/bash bash tests/run.sh
 ```
 
-Copy the complete `package/` directory to `/workspace/filament-test/` in Hark,
+Copy the complete `filament-hark/` directory to `/workspace/filament-test/` in Hark,
 then run the same suite there:
 
 ```sh
@@ -33,7 +33,7 @@ creates a private temporary directory for each test, under `FILAMENT_STATE`
 when supplied, and removes it afterwards. It copies the scripts into each
 directory: production scripts always resolve siblings through that state
 directory. It does not modify a live connector. Each scenario writes a
-`scenario.json` of canned responses into its private directory. The original test numbering is retained; tests 25-26 cover the added media scenario.
+`scenario.json` of canned responses into its private directory. The original test numbering is retained; tests 25-26 cover media and tests 27-38 cover tags, stable numbers, lineage rotation, lock reclaim and the backstop.
 Run a single group with, for example:
 
 ```sh
@@ -71,15 +71,14 @@ Production scripts always use ps; no production fallback is installed.
 
 ## Contract choices and limits
 
-- Success stdout is one compact JSON document then `ITEMS <n>`, as required
-  by listen step 6g and test 2. This conflicts with the overview's statement
-  that the last success line is JSON. The explicit delivery format wins.
+- Success stdout is ITEM summary lines, one compact JSON document, then
+  `ITEMS <count>`. Count is newly delivered items, not the highest number.
 - The delivered full envelope retains all top-level poll fields, with `work`
   replaced by the filtered items, both on stdout and in `items/wake.json`.
   Otherwise stripped old messages would still be shown to the agent. Delivery
   JSON is not truncated to 2,000 characters; that limit applies to log lines.
 - A single shared `classify_error` and the other shared helpers live in
-  `restart_listener.sh`, which is safe to source. Install all four scripts in
+  `restart_listener.sh`, which is safe to source. Install all five scripts in
   STATE together.
 - A short-lived `restart.pending` handover file closes the gap between
   releasing the restart lock and exec'ing the listener. It carries the PID
@@ -91,8 +90,7 @@ Production scripts always use ps; no production fallback is installed.
   additional blank lines, CRLF bytes, backslashes and all other content. A
   malformed reply target or non-UTF-8 body is `BAD_ITEM`. Corrupt replied state
   fails closed, with a diagnostic and no request, rather than risking a second
-  post. Reply and restart lock timeouts follow the spec; they do not steal
-  another job's lock.
+  post. Reply and restart lock timeouts follow the spec. Stale-owner locks are reclaimed by rename; live shell owners and missing-pid directories younger than five seconds are protected.
 - Startup invitation and vouch results accept a bare list, `invites` (also
   `pending_invites`) or `vouches` envelopes. The spec does not supply their
   exact response schemas; live Hark acceptance must confirm these shapes.
@@ -108,8 +106,18 @@ by this suite. The manual cold-install checklist in SPEC.md remains the release
 gate. The scripts deliberately retain the specified record-before-send policy:
 even a definite send failure is recorded and is not retried.
 
-In a multi-item wake, the first `reply.sh` becomes the listener and may
-re-deliver a still-outstanding second item before the agent's second
-`reply.sh` runs. That second command then exits with `BAD_ITEM` through the
-restart chain. The item is answered from the new wake; the replied-ids record
-prevents a double post.
+In a multi-item wake, later deliveries retain old outstanding numbered files.
+An old number still addresses its original reply target. Redelivered work gets
+a new number; after one posts, the other acks through the replied-ids guard.
+Overlapping message sets can both post if either contains new content. Pruning
+removes fully-replied or 24-hour-old numbered files without acking; items/next
+survives. Rotation leaves its item file outstanding for the next lineage.
+
+Backstop tests exercise PAUSED/RUNNING/WEDGED/NEED_START, the 200-line truncation
+before appending (201 afterwards), started, quota-body escaping and the 20-hour
+throttle. Lock fixtures use live .sh owners, as production identity checking
+requires. The media rotation test holds rotate.lock.d while downloading and
+verifies rotation is skipped, then succeeds after the owner dies. All network
+requests remain fake, including quota warnings. Hark's real job cap, withheld
+stdout and repeated-call limit need live acceptance; they are not simulated
+as guarantees by this suite.

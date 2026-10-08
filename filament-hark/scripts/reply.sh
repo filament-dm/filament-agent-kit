@@ -20,6 +20,23 @@ mode=reply
 if [ "${1:-}" = --ack ]; then mode=ack; shift; fi
 number=${1:-}
 log_event "REPLY-START item=$number"
+if ! take_lock "$STATE/reply.lock.d" 150; then log_event LOCK-TIMEOUT; chain; fi
+if ! json_helper lineage increment > "$STATE/.lineage-count.$$" 2>> "$STATE/reply.log"; then
+    rm -f "$STATE/.lineage-count.$$"; log_event STATE-ERROR; chain
+fi
+read -r count limit < "$STATE/.lineage-count.$$"
+rm -f "$STATE/.lineage-count.$$"
+if [ "$count" -ge "$limit" ]; then
+    # Never let a signal take the usual chain path after the rotation decision.
+    trap 'exit 3' TERM INT
+    stop_listener || :
+    log_event "ROTATE count=$count"
+    task=NONE
+    if [ -f "$STATE/backstop.task" ]; then task=$(cat "$STATE/backstop.task"); fi
+    cleanup
+    echo "ROTATE $task"
+    exit 3
+fi
 if [ "$#" -ne 1 ] || ! [[ $number =~ ^[1-9][0-9]*$ ]] || [ ! -f "$STATE/items/$number.json" ]; then
     log_event BAD-ITEM; echo BAD_ITEM; chain
 fi
@@ -31,9 +48,6 @@ case "$valid" in
     EMPTY_BODY) log_event EMPTY-BODY; echo EMPTY_BODY; chain;;
     NO_IDS) log_event NO-IDS; chain;;
 esac
-if ! take_lock "$STATE/reply.lock.d" 150; then log_event LOCK-TIMEOUT; chain; fi
-# Recheck after waiting: another worker may already have removed this item.
-if [ ! -f "$STATE/items/$number.json" ]; then log_event BAD-ITEM; echo BAD_ITEM; chain; fi
 if [ "$(remaining)" -lt 10 ]; then log_event DEADLINE; chain; fi
 plan=$(json_helper plan "$RUN" "$mode" 2>> "$STATE/reply.log") || { log_event STATE-ERROR; chain; }
 cap=60; word=REPLIED

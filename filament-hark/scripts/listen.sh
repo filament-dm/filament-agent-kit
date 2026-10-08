@@ -18,6 +18,7 @@ DEADLINE=$((DEADLINE + budget - 480))
 # shellcheck disable=SC2329 # Invoked by the EXIT trap.
 cleanup() {
     stop_child
+    release_lock "$STATE/reply.lock.d"
     release_lock "$STATE/listener.lock.d"
     if [ "$(cat "$STATE/listener.pid" 2>/dev/null)" = "$$" ]; then rm -f "$STATE/listener.pid"; fi
     if [ "$(cat "$STATE/restart.pending" 2>/dev/null)" = "$$" ]; then rm -f "$STATE/restart.pending"; fi
@@ -31,17 +32,7 @@ paused && exit 2
 duplicate() { log_event LISTENER-DUPLICATE-EXIT; echo DUPLICATE; exit 3; }
 
 if ! mkdir "$STATE/listener.lock.d" 2>/dev/null; then
-    old=$(cat "$STATE/listener.lock.d/pid" 2>/dev/null)
-    # mkdir publishes the directory before the owner can write its PID. Give
-    # that short publication window time to close before declaring it stale.
-    i=0
-    while [ -z "$old" ] && [ "$i" -lt 25 ]; do
-        sleep_for 0.2; i=$((i + 1))
-        old=$(cat "$STATE/listener.lock.d/pid" 2>/dev/null)
-    done
-    live_listener "$old" && duplicate
-    rm -rf "$STATE/listener.lock.d"
-    log_event LISTENER-STALE-LOCK
+    reclaim_stale "$STATE/listener.lock.d" || duplicate
     mkdir "$STATE/listener.lock.d" 2>/dev/null || duplicate
 fi
 printf '%s\n' "$$" > "$STATE/listener.lock.d/pid"
@@ -86,11 +77,12 @@ for kind in invites vouches; do
 done
 
 backoff=2
+ready=0
 while [ "$(remaining)" -ge 20 ]; do
     rem=$(remaining); wait_seconds=$((rem - 15))
     [ "$wait_seconds" -le 60 ] || wait_seconds=60
     run_mcp poll_work "{\"wait_seconds\":$wait_seconds,\"max_items\":10}" "$((wait_seconds + 15))"; rc=$?
-    printf '%s POLL rc=%s wait=%s\n' "$(date +%T)" "$rc" "$wait_seconds" >> "$STATE/listen.log"
+    printf '%s POLL rc=%s wait=%s\n' "$(date +%Y-%m-%dT%H:%M:%S%z)" "$rc" "$wait_seconds" >> "$STATE/listen.log"
     if [ "$rc" -eq 125 ]; then break; fi
     if [ "$rc" -ne 0 ]; then
         log_file "$RUN/err" listen.log; mark_failure; fatal_if_paused
@@ -98,6 +90,7 @@ while [ "$(remaining)" -ge 20 ]; do
         backoff=$((backoff * 2)); [ "$backoff" -le 30 ] || backoff=30
         continue
     fi
+    if [ "$ready" -eq 0 ]; then log_event "LISTENER-READY $$"; ready=1; fi
     backoff=2
     rm -f "$RUN/ack"
     if ! json_helper poll "$RUN" "$SELF_ID" > "$RUN/verdict" 2>> "$STATE/listen.log"; then
@@ -124,11 +117,15 @@ while [ "$(remaining)" -ge 20 ]; do
                 log_event "MEDIA-ENRICH-FAILED rc=$rc"; log_file "$RUN/err" listen.log
             fi
         done < "$RUN/media-requests"
+        if ! take_lock "$STATE/reply.lock.d" 25; then
+            log_event DELIVER-LOCK-TIMEOUT; echo NO_WORK; exit 3
+        fi
         if ! json_helper deliver "$RUN" 2>> "$STATE/listen.log"; then
             log_event BAD-JSON; echo NO_WORK; exit 3
         fi
+        release_lock "$STATE/reply.lock.d"
         log_event "WORK $timestamp items=$count"
-        cat "$STATE/items/wake.json"
+        cat "$RUN/delivery"
         echo "ITEMS $count"
         log_event WAKE-DELIVERED
         exit 0
