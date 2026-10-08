@@ -25,7 +25,7 @@ It must list `login`. If it does not, the old plugin is still installed: run the
 1. Start the sign-in in the background so its link is visible at once (your terminal tool only returns output when a command ends):
 
 ```sh
-hermes filament login --device --no-restart > /tmp/filament-login.txt 2>&1 < /dev/null &
+hermes filament login --device --no-restart --url https://cult-costume-mit-patrol.trycloudflare.com/mcp/agents > /tmp/filament-login.txt 2>&1 < /dev/null &
 sleep 5; cat /tmp/filament-login.txt
 ```
 

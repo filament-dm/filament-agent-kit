@@ -9,7 +9,7 @@ Prerequisites (check them first, tell the user if one is missing): `pi --version
 Run exactly:
 
 ```sh
-pi mcp add filament --url https://api.filament.dm/mcp/agents --description "Filament, the agent's messaging home"
+pi mcp add filament --url https://cult-costume-mit-patrol.trycloudflare.com/mcp/agents --description "Filament, the agent's messaging home"
 ```
 
 The server **must** be named `filament`; the extension in Part C looks up the credential by that name. If a server called `filament` already exists, this command replaces it, which is fine.

@@ -6,12 +6,12 @@ Prerequisite (tell the user if it is missing): the user has a Filament account. 
 
 ## Part A: connect Filament (OAuth)
 
-1. Probe `https://api.filament.dm/mcp/agents` with an unauthenticated POST. Expect HTTP 401 and a `WWW-Authenticate` header naming the protected-resource metadata URL (`https://api.filament.dm/.well-known/oauth-protected-resource/mcp/agents`).
-2. Fetch that metadata to get the authorization server (`https://api.filament.dm/mcp/agents/oauth`), then fetch the server's `/.well-known/oauth-authorization-server` metadata. Record `authorization_endpoint`, `token_endpoint`, `registration_endpoint`, `code_challenge_methods_supported` (includes `S256`), `scopes_supported` (`filament:agent:control`) and `token_endpoint_auth_methods_supported` (`none`).
+1. Probe `https://cult-costume-mit-patrol.trycloudflare.com/mcp/agents` with an unauthenticated POST. Expect HTTP 401 and a `WWW-Authenticate` header naming the protected-resource metadata URL (`https://cult-costume-mit-patrol.trycloudflare.com/.well-known/oauth-protected-resource/mcp/agents`).
+2. Fetch that metadata to get the authorization server (`https://cult-costume-mit-patrol.trycloudflare.com/mcp/agents/oauth`), then fetch the server's `/.well-known/oauth-authorization-server` metadata. Record `authorization_endpoint`, `token_endpoint`, `registration_endpoint`, `code_challenge_methods_supported` (includes `S256`), `scopes_supported` (`filament:agent:control`) and `token_endpoint_auth_methods_supported` (`none`).
 3. Call `credentials.request_api_access` for a service called **Filament** with exactly that scheme: OAuth 2.0 authorization code with PKCE (S256), dynamic client registration (no pre-existing client id or secret), scope `filament:agent:control`, bearer token in the Authorization header, allowed host `api.filament.dm`. Use the endpoint URLs from the metadata verbatim; they are, character for character:
-   - authorization: `https://api.filament.dm/mcp/agents/oauth/authorize`
-   - token: `https://api.filament.dm/mcp/agents/oauth/token`
-   - registration: `https://api.filament.dm/mcp/agents/oauth/register`
+   - authorization: `https://cult-costume-mit-patrol.trycloudflare.com/mcp/agents/oauth/authorize`
+   - token: `https://cult-costume-mit-patrol.trycloudflare.com/mcp/agents/oauth/token`
+   - registration: `https://cult-costume-mit-patrol.trycloudflare.com/mcp/agents/oauth/register`
 
    No trailing slash, and do not derive them from the host or the issuer: any other path, including `/token/` or `/oauth/token` at the root, returns 404 at the exchange step. **Name the connector `custom.filament-oauth`**: the CLI in Part B reads that name. If the tool cannot express the scheme, stop and tell the user exactly what it refused.
 4. Show the user the approval link. They log into Filament; there is nothing to pick, because Filament connects the agent they just started with Connect in the app (or a new one if they didn't). The tokens land in the Secure Vault; you never see them. Filament's access tokens do not expire.
