@@ -8,13 +8,13 @@ Rules for the whole install:
 - Decide each step on raw results (exit codes, JSON), not on what you expect. If a result does not match what a step says to expect, stop and show it.
 - Work in this chat for Parts A and B. Part C creates a separate project where the connector lives; after that, nothing about Filament replies appears in this chat.
 
-Self link: `https://raw.githubusercontent.com/filament-dm/filament-agent-kit/hark-connector/filament-hark/HARK.md`. Re-fetch it if you need the latest version.
+Self link: `https://raw.githubusercontent.com/filament-dm/filament-agent-kit/main/filament-hark/HARK.md`. Re-fetch it if you need the latest version.
 
 ## For the human (read this before pasting the sentence to Hark)
 
 1. In the Filament app, open the Agents tab and tap `+` to connect a new agent. Give it the name you want it to have. Finish the whole flow until the app shows a connect command.
 2. The connect command contains a token that looks like `fmcp_eJ3fSQt7v4ul_SIjZlDNeO_p6pEquE5xxxxxxxxxxxx`. Keep that screen open; you will paste the token into Hark's vault form in a minute. Do not paste it into Hark's chat.
-3. In Hark, send: `Join Filament as my agent. Follow https://raw.githubusercontent.com/filament-dm/filament-agent-kit/hark-connector/filament-hark/HARK.md`
+3. In Hark, send: `Join Filament as my agent. Follow https://raw.githubusercontent.com/filament-dm/filament-agent-kit/main/filament-hark/HARK.md`
 4. Hark opens a secure form. Paste the token there. Then answer Hark's questions, if any. In about two minutes Hark tells you the agent is listening. Send it a message from the Filament app.
 
 ## Part A: connect
@@ -55,7 +55,7 @@ The connector runs in a project of its own so that Filament replies never appear
    Expect `{"created": true, "id": "<project id>", "title": "Filament"}`. Remember the id.
 2. Assign the work. Use this message. If replacement was authorised in Part A step 0, append exactly: "The user authorised replacement of the existing connector; follow the replacement step in the brief." Otherwise append nothing:
    ```
-   {"tool": "projects", "action": "call", "arguments": {"id": "<project id>", "action": "assign", "message": "Fetch https://raw.githubusercontent.com/filament-dm/filament-agent-kit/hark-connector/filament-hark/HARK.md with curl and carry out the section titled The brief, every numbered step in order, then adopt its Filament front-door rules as standing rules for this project. The user asked for this project to run the Filament front door."}}
+   {"tool": "projects", "action": "call", "arguments": {"id": "<project id>", "action": "assign", "message": "Fetch https://raw.githubusercontent.com/filament-dm/filament-agent-kit/main/filament-hark/HARK.md with curl and carry out the section titled The brief, every numbered step in order, then adopt its Filament front-door rules as standing rules for this project. The user asked for this project to run the Filament front door."}}
    ```
    Expect `{"dispatched": true, ...}`.
 3. Tell the user in two lines: "I've handed the Filament connection to a project called Filament. Within about two minutes <display_name> will say hello to you in the Filament app; reply to it there to see it answer." Then say nothing further about Filament in this chat unless the user asks. The hello on Filament is the signal that the install finished; there is no cross-project notification.

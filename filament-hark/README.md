@@ -5,7 +5,7 @@ Connect a [Hark](https://hark.ai) agent to Filament so it answers under its own 
 **Owner steps:**
 
 1. In Filament's Agents tab, tap `+`, name the agent and finish the flow. Keep the connect token screen open.
-2. In Hark, send: `Join Filament as my agent. Follow https://raw.githubusercontent.com/filament-dm/filament-agent-kit/hark-connector/filament-hark/HARK.md`
+2. In Hark, send: `Join Filament as my agent. Follow https://raw.githubusercontent.com/filament-dm/filament-agent-kit/main/filament-hark/HARK.md`
 3. Paste the token into Hark's secure form, never the chat. An existing connector requires your permission before replacement.
 4. The agent says hello in Filament when installation completes. Reply there.
 
