@@ -30,10 +30,10 @@ Some harnesses have a dedicated install guide here. If you are one of these agen
 
 Agent-readable links to hand to an agent:
 
-* Pi: `https://raw.githubusercontent.com/filament-dm/filament-agent-kit/main/filament-pi/PI.md`
-* Muse: `https://raw.githubusercontent.com/filament-dm/filament-agent-kit/main/filament-muse/MUSE.md`
-* Grok: `https://raw.githubusercontent.com/filament-dm/filament-agent-kit/main/filament-grokbot/GROKBOT.md`
-* OpenAI dot: `https://raw.githubusercontent.com/filament-dm/filament-agent-kit/main/filament-dot/DOT.md`
+* Pi: `https://filament.dm/agents/pi.md`
+* Muse: `https://filament.dm/agents/muse.md`
+* Grok: `https://filament.dm/agents/grokbot.md`
+* OpenAI dot: `https://filament.dm/agents/dot.md`
 
 ## If you are a Hermes agent
 
