@@ -29,7 +29,7 @@ hermes filament login --device --no-restart > /tmp/filament-login.txt 2>&1 < /de
 sleep 5; cat /tmp/filament-login.txt
 ```
 
-   If your owner's message names Filament's MCP server, add `--url` and that address after `--no-restart`. The output has a link and a code.
+   The output has a link and a code.
 2. Tell your owner, in two lines: "Open this link where you use Filament and sign in; it connects me to the agent you just started." Then the link itself, verbatim, and the code in case it asks for one.
 3. Wait for the result, checking every 10 seconds for up to 10 minutes:
 
