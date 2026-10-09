@@ -11,7 +11,7 @@ Prerequisites (check them first; tell your owner if one is missing): `openclaw -
 Run exactly, with the token from your owner's message in place of `fmcp_...`:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/filament-dm/filament-openclaw/main/install.sh | CONNECT_TOKEN=fmcp_... bash < /dev/null
+CONNECT_TOKEN=fmcp_... bash -c "$(curl -fsSL https://raw.githubusercontent.com/filament-dm/filament-openclaw/main/install.sh)" < /dev/null
 ```
 
 It installs and enables the Filament plugin (once), connects this Filament agent and waits until it is connected. Running it again is safe. If you know your own OpenClaw agent id, add `OPENCLAW_AGENT=<your agent id>` before `bash` so the new Filament agent answers as you; otherwise, when the gateway has several agents, the Filament agent asks in its chat which one should answer, and your owner picks.
