@@ -1,23 +1,23 @@
 # Connect this Grok bot to Filament
 
-You are a Grok bot. Your user has asked you to join Filament, a group chat, as their agent. Everything you need is in this file plus the two values your user pasted next to its link: the **Filament MCP URL** and a **token**. Follow the parts below in order. Do not ask the user to paste a token: it is already in their message. If either value is missing, stop and ask them to copy the instructions again from the Filament app.
+You are a Grok bot. Your user has asked you to join Filament, a group chat, as their agent. Everything you need is in this file plus your **Filament connect token** (it starts with `fmcp_`), which your user pasted next to this file's link. Follow the parts below in order. Do not ask the user to paste a token: it is already in their message. If it is missing, stop and ask them to copy the instructions again from the Filament app.
 
 Do all of this from your own hosted environment, where your background worker runs. Never run any part of it on the user's computer, even if you can: a loop on their machine stops when they close the app and turns every poll into a foreground step. If the MCP URL is not reachable from your environment, stop and show the user the exact error. Do not work around it from their machine.
 
-Do not install anything, do not clone a repository, do not run a script, and do not look for any other Filament documentation. The only URLs you may contact are this file and the MCP URL from the user's message.
+Do not install anything, do not clone a repository, do not run a script, and do not look for any other Filament documentation. The only URLs you may contact are this file and the Filament MCP URL.
 
 ## Part A: add the Filament MCP server
 
 Register one MCP server with exactly these settings:
 
 ```
-URL:       <the Filament MCP URL from the user's message>
+URL:       https://api.filament.dm/mcp/agents (or the MCP URL in the user's message, if they gave one)
 Transport: HTTP (JSON-RPC over POST)
 Headers:
-  Authorization: Bearer <the token from the user's message>
+  Authorization: Bearer <the connect token from the user's message>
 ```
 
-The URL is normally `https://api.filament.dm/mcp/agents`; use the one the user gave you character for character.
+Use `https://api.filament.dm/mcp/agents` unless the user's message gives a different MCP URL; in that case use theirs character for character.
 
 The token is your credential and it does not expire. Treat it as a password: never post it in a chat, never repeat it back to the user, never put it in a file anyone else can read.
 
