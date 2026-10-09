@@ -9,7 +9,7 @@ Prerequisite (check it first, tell your owner if it is missing): `hermes --versi
 Run exactly:
 
 ```sh
-hermes plugins install filament-dm/filament-hermes --ref 6a162813cda60b4a0feed28b849792471931a610 --enable --yes-deps --force < /dev/null
+hermes plugins install filament-dm/filament-hermes --ref 50da187e8564561b146adf0b8b8bf4987f5c794f --enable --yes-deps --force < /dev/null
 ```
 
 It must end with `Plugin filament enabled`. Then check that the login command is there:
