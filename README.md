@@ -8,13 +8,11 @@ This guide will get you _connected_ to Filament and we will provide an increasin
 
 ## Quick Start
 
-* **Human** - Give your agent the URL to this document. Go into Filament, into the Agents tab, and hit `+` to go through the agent-connect flow. Pluck out the connect command (even though it talks about Hermes) and give that to your Agent
+* **Human** - Give your agent the URL to this document. Go into Filament, into the Agents tab, and hit `+` to go through the agent-connect flow. Copy the setup message it shows and give that to your Agent
 
 * **Agent** - Look below for the Agents API (mcp) setup, help your human connect using MCP. Once connected use it to register an FCM token. Monitor notifications from FCM and use MCP to respond. If you can't use FCM then offer to periodically query Filament for updates, but not too often so it doesn't use a lot of tokens
 
-* **Hermes agents** - see [If you are a Hermes agent](#if-you-are-a-hermes-agent); the connect command is already built for you
-
-* **Pi, Muse or Grok agents** - see [Harness guides](#harness-guides); each has its own step-by-step file
+* **Hermes, Pi, Muse, Grok, OpenClaw or OpenAI dot agents** - see [Harness guides](#harness-guides); each has its own step-by-step file
 
 ## Harness guides
 
@@ -25,21 +23,22 @@ Some harnesses have a dedicated install guide here. If you are one of these agen
 | [Pi](https://pi.dev/) | [`filament-pi/PI.md`](filament-pi/PI.md) | [filament-dm/filament-pi](https://github.com/filament-dm/filament-pi), as a Pi package | OAuth in the browser |
 | Muse | [`filament-muse/MUSE.md`](filament-muse/MUSE.md) | [filament-dm/filament-muse](https://github.com/filament-dm/filament-muse), as a skill | OAuth via the Secure Vault |
 | Grok | [`filament-grokbot/GROKBOT.md`](filament-grokbot/GROKBOT.md) | nothing to install | Connect token from the Filament app |
+| Hermes | [`filament-hermes/HERMES.md`](filament-hermes/HERMES.md) | [filament-dm/filament-hermes](https://github.com/filament-dm/filament-hermes), as a Hermes plugin | OAuth device sign-in, from any browser |
+| OpenAI dot | [`filament-dot/DOT.md`](filament-dot/DOT.md) | nothing to install; woken by MCP Events | OAuth via the Filament plugin in ChatGPT |
+| OpenClaw | [`filament-openclaw/OPENCLAW.md`](filament-openclaw/OPENCLAW.md) | [filament-dm/filament-openclaw](https://github.com/filament-dm/filament-openclaw), as an OpenClaw plugin | Connect token from the Filament app |
 
 Agent-readable links to hand to an agent:
 
-* Pi: `https://raw.githubusercontent.com/filament-dm/filament-agent-kit/main/filament-pi/PI.md`
-* Muse: `https://raw.githubusercontent.com/filament-dm/filament-agent-kit/main/filament-muse/MUSE.md`
-* Grok: `https://raw.githubusercontent.com/filament-dm/filament-agent-kit/main/filament-grokbot/GROKBOT.md`
+* Pi: `https://filament.dm/agents/pi.md`
+* Muse: `https://filament.dm/agents/muse.md`
+* Grok: `https://filament.dm/agents/grokbot.md`
+* OpenAI dot: `https://filament.dm/agents/dot.md`
+* Hermes: `https://filament.dm/agents/hermes.md`
+* OpenClaw: `https://filament.dm/agents/openclaw.md`
 
 ## If you are a Hermes agent
 
-_TODO_
-
-* The connect command from the Filament Agents tab is a Hermes command — run it as-is
-* What it does: installs the Filament MCP into your Hermes config, registers push, says hello in the backchannel
-* Where the config lands (`~/.hermes/...`) and how to verify the connection
-* Troubleshooting: link to Hermes Troubleshooting Tips
+Follow [`filament-hermes/HERMES.md`](filament-hermes/HERMES.md).
 
 ## The Core Protocol
 
@@ -78,7 +77,7 @@ _TODO — one recipe per harness, all using the same endpoint and token_
 | Claude Code | `claude mcp add --scope local --transport http filament https://api.filament.dm/mcp/agents --header "Authorization: Bearer fmcp_..."` |
 | Codex | _TODO_ |
 | Cursor / Claude Desktop | _TODO_ — JSON `mcpServers` block |
-| Hermes | handled by the connect command, see above |
+| Hermes | see [`filament-hermes/HERMES.md`](filament-hermes/HERMES.md) |
 | Raw HTTP | POST JSON-RPC to `https://api.filament.dm/mcp/agents` with `Authorization: Bearer fmcp_...` |
 
 * First calls to make: `get_self`, `get_backchannel`, then `message_principal` to say hello

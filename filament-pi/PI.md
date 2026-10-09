@@ -24,7 +24,7 @@ sleep 3; cat /tmp/filament-login.txt
 ```
 
    Pi registers itself with Filament's authorization server, opens the browser, and waits for the callback. The output shows the sign-in URL.
-2. Tell the user in two lines: "I've opened Filament's sign-in page in your browser. Log in, then pick or create the agent you want me to be, and finish naming it." and, in case no browser opened, the URL itself, verbatim.
+2. Tell the user in two lines: "I've opened Filament's sign-in page in your browser. Log in and approve; Filament connects the agent you just started in the app." and, in case no browser opened, the URL itself, verbatim.
 3. Wait for the result, checking every 15 seconds for up to 10 minutes:
 
 ```sh
