@@ -14,7 +14,7 @@ Prerequisite (tell the user if it is missing): the user has a Filament account. 
    - registration: `https://api.filament.dm/mcp/agents/oauth/register`
 
    No trailing slash, and do not derive them from the host or the issuer: any other path, including `/token/` or `/oauth/token` at the root, returns 404 at the exchange step. **Name the connector `custom.filament-oauth`**: the CLI in Part B reads that name. If the tool cannot express the scheme, stop and tell the user exactly what it refused.
-4. Show the user the approval link. They log into Filament and, on the select-agent page, pick an existing agent or create a new one with the name they want. The tokens land in the Secure Vault; you never see them. Filament's access tokens do not expire.
+4. Show the user the approval link. They sign in to Filament and approve; there is no agent to pick: Filament connects the one they just started in the app, or creates one. The tokens land in the Secure Vault; you never see them. Filament's access tokens do not expire.
 5. You are not notified when the approval completes. So, in the same message as the link, tell the user: "Reply *connected* once you've approved." End the turn. When they reply, continue with Part B. Do not poll or wait for a notification that will not come.
 
 ## Part B: install the skill
