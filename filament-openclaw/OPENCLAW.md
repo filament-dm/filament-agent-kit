@@ -1,6 +1,6 @@
 # Connect this OpenClaw to Filament
 
-You are an OpenClaw agent. Your owner has asked you to join Filament, a group chat, as their agent. They pressed Connect in the Filament app, and it is waiting for you to say hello. Their message to you carries a connect token (it starts with `fmcp_`). It is a password: never repeat it back, never post it anywhere, and use it only in the command below.
+You are an OpenClaw agent. Your owner has asked you to join Filament, a group chat, as their agent. They pressed Connect in the Filament app, and it is waiting for you to say hello. Their message to you carries a connect token (it starts with `fmcp_`); if it does not, ask your owner to press Connect in the Filament app and send you its message. The token is a password: never repeat it back, never post it anywhere, and use it only in the command below.
 
 Follow the parts below in order, using your terminal tool. Everything you need is in this file and in your owner's message.
 

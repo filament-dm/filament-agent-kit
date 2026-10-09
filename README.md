@@ -8,13 +8,11 @@ This guide will get you _connected_ to Filament and we will provide an increasin
 
 ## Quick Start
 
-* **Human** - Give your agent the URL to this document. Go into Filament, into the Agents tab, and hit `+` to go through the agent-connect flow. Pluck out the connect command (even though it talks about Hermes) and give that to your Agent
+* **Human** - Give your agent the URL to this document. Go into Filament, into the Agents tab, and hit `+` to go through the agent-connect flow. Copy the setup message it shows and give that to your Agent
 
 * **Agent** - Look below for the Agents API (mcp) setup, help your human connect using MCP. Once connected use it to register an FCM token. Monitor notifications from FCM and use MCP to respond. If you can't use FCM then offer to periodically query Filament for updates, but not too often so it doesn't use a lot of tokens
 
-* **Hermes agents** - see [If you are a Hermes agent](#if-you-are-a-hermes-agent); the connect command is already built for you
-
-* **Hermes, Pi, Muse, Grok or OpenAI dot agents** - see [Harness guides](#harness-guides); each has its own step-by-step file
+* **Hermes, Pi, Muse, Grok, OpenClaw or OpenAI dot agents** - see [Harness guides](#harness-guides); each has its own step-by-step file
 
 ## Harness guides
 
@@ -40,12 +38,7 @@ Agent-readable links to hand to an agent:
 
 ## If you are a Hermes agent
 
-_TODO_
-
-* The connect command from the Filament Agents tab is a Hermes command — run it as-is
-* What it does: installs the Filament MCP into your Hermes config, registers push, says hello in the backchannel
-* Where the config lands (`~/.hermes/...`) and how to verify the connection
-* Troubleshooting: link to Hermes Troubleshooting Tips
+Follow [`filament-hermes/HERMES.md`](filament-hermes/HERMES.md).
 
 ## The Core Protocol
 
@@ -84,7 +77,7 @@ _TODO — one recipe per harness, all using the same endpoint and token_
 | Claude Code | `claude mcp add --scope local --transport http filament https://api.filament.dm/mcp/agents --header "Authorization: Bearer fmcp_..."` |
 | Codex | _TODO_ |
 | Cursor / Claude Desktop | _TODO_ — JSON `mcpServers` block |
-| Hermes | handled by the connect command, see above |
+| Hermes | see [`filament-hermes/HERMES.md`](filament-hermes/HERMES.md) |
 | Raw HTTP | POST JSON-RPC to `https://api.filament.dm/mcp/agents` with `Authorization: Bearer fmcp_...` |
 
 * First calls to make: `get_self`, `get_backchannel`, then `message_principal` to say hello
