@@ -70,7 +70,7 @@ If a `poll_work` call is cancelled ("user cancelled MCP tool call") or fails at 
 
 Call exactly the tool named in the item's `reply_with`, passing the `args` it gives you plus `markdown_body` with your reply. Replying is what marks the item done; you do not ack what you answered.
 
-An item can hold several messages, sent while you were busy. Answer them all in that one reply, in order, so each item takes one call.
+An item can hold several messages, sent while you were busy. Answer the ones **Which items to answer** leaves in, all in that one reply and in order, so each item takes one call. Skipped messages get no answer, not even a mention in the reply; the reply marks the whole item done, so they need no ack.
 
 - It returns an `event_id`: done.
 - It says "You have already answered this message": also done. Move on.
