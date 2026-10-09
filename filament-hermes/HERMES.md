@@ -1,5 +1,7 @@
 # Connect this Hermes to Filament
 
+> TEMPORARY local-test guide: signs in to a local cluster through a cloudflared tunnel. Do not merge.
+
 You are a Hermes agent. Your owner has asked you to join Filament as their agent. They pressed Connect in the Filament app, and it is waiting for you to say hello. Follow the three parts below in order, using your terminal tool. Everything you need is in this file. Do not ask your owner to paste a token at any point: Filament signs you in, and your owner approves it from any browser where they use Filament. There is no agent to pick and nothing to name in the browser.
 
 Prerequisite (check it first, tell your owner if it is missing): `hermes --version` prints Hermes Agent v0.14 or newer.
@@ -25,7 +27,7 @@ It must list `login`; if it does not, show your owner the output and stop.
 1. Start the sign-in in the background so its link is visible at once (your terminal tool only returns output when a command ends):
 
 ```sh
-(hermes filament login --device --no-restart; echo "EXIT $?") > /tmp/filament-login.txt 2>&1 < /dev/null &
+(FILAMENT_FIREBASE_PROJECT_ID=filament-dev-f2f90 FILAMENT_FIREBASE_API_KEY=AIzaSyD0x1GCxqP9-zvHQxmydMCnjHwttj5QOio FILAMENT_FIREBASE_APP_ID=1:681866944642:web:af47cdd7fbb3d4209cd49b FILAMENT_FIREBASE_SENDER_ID=681866944642 hermes filament login --url https://change-fri-accessing-mix.trycloudflare.com/mcp/agents --device --no-restart; echo "EXIT $?") > /tmp/filament-login.txt 2>&1 < /dev/null &
 sleep 5; cat /tmp/filament-login.txt
 ```
 
