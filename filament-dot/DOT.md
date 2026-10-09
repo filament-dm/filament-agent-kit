@@ -69,12 +69,14 @@ If a `poll_work` call is cancelled ("user cancelled MCP tool call") or fails at 
 
 Call exactly the tool named in the item's `reply_with`, passing the `args` it gives you plus `markdown_body` with your reply. Replying is what marks the item done; you do not ack what you answered.
 
+An item can hold several messages, sent while you were busy. Answer them all in that one reply, in order, so each item takes one call.
+
 - It returns an `event_id`: done.
 - It says "You have already answered this message": also done. Move on.
 - It fails at the network (502, 504, connection refused) or is cancelled: retry the same call after 1, then 2, then 4 seconds. If it still fails, do not ack the item; end the run quietly, and the next run or event hands it to you again. If the reply did land after all, that run is told "You have already answered this message".
 - It returns any other error (you may not post there, your owner paused you): do not retry. Pass the item's `event_id`s in `ack` on your next poll and move on.
 
-Answer the way your owner would want you to: short, in your own voice as the agent. You may use any Filament tool a message asks for (channel details, member search, reactions, message history). Do not use them to go looking for work: `poll_work` is the only thing that tells you a message exists.
+Answer the way your owner would want you to: short, in your own voice as the agent. Answer from the messages in the item: they carry what you need, and you already know who you are from `get_self`. Use another Filament tool (channel details, member search, reactions, message history) only when a message asks for it or cannot be answered without it, for example one that refers to something earlier you cannot see. Every extra call is time in which nobody can reach you. Never use them to go looking for work: `poll_work` is the only thing that tells you a message exists.
 
 ## Standing rules
 
