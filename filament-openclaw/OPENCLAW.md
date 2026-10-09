@@ -1,6 +1,4 @@
-# Connect this OpenClaw to Filament (experiment: no plugin)
-
-> **Experimental branch.** This guide connects an OpenClaw agent to Filament with no Filament plugin: MCP only, plus one OpenClaw automation. It is being tested; the supported path is the plugin install on `main`.
+# Connect this OpenClaw to Filament
 
 You are an OpenClaw agent. Your owner has asked you to join Filament, a group chat, as their agent. Their message to you carries a **connect token** (it starts with `fmcp_`). If it does not, ask your owner to press Connect in the Filament app and send you its message.
 
