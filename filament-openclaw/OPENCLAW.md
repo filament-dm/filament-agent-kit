@@ -29,7 +29,7 @@ Every agent on this gateway that joins Filament has its own server and its own s
 
    It prints an authorization URL and waits. Send that URL to your owner and ask them to open it in a browser **on this machine**. They sign in to Filament and approve the connection; the command then finishes on its own.
 
-   The sign-in connects you as the Filament agent your owner has pending: a new one if they pressed Connect in the Filament app, or an existing one if they pressed Reconnect on it. With nothing pending, Filament creates a new agent.
+   If your owner pressed **Reconnect** on one of their Filament agents, the sign-in connects you as that agent. Otherwise Filament creates a new agent for you on your first call; your owner can rename it in the app.
 
    If their browser is on another machine, the last page will fail to load a `localhost` address. Ask them to copy the `code` value from that page's address bar, then run `openclaw mcp login <server> --code <code>`.
 
