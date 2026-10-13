@@ -186,15 +186,24 @@ try:
     elif action == 'lineage':
         p = S / 'lineage.json'
         if args[0] == 'reset':
-            write(p, {'started': int(time.time()), 'count': 0})
+            write(p, {'started': int(time.time()), 'jobs': 0, 'idle': 0})
         else:
-            d = read(p) if p.exists() else {'started': int(time.time()), 'count': 0}
-            d['count'] += 1
+            old = read(p) if p.exists() else {}
+            d = {'started': old.get('started', int(time.time())),
+                 'jobs': old.get('jobs', old.get('count', 0)), 'idle': old.get('idle', 0)}
+            if args[0] not in ('job', 'idle'): raise ValueError('invalid lineage action')
+            d['jobs' if args[0] == 'job' else 'idle'] += 1
             write(p, d)
             try: raw = (S / 'rotate_after').read_text().strip()
             except FileNotFoundError: raw = ''
-            limit = int(raw) if re.fullmatch(r'[0-9]{1,3}', raw) and 2 <= int(raw) <= 200 else 12
-            print(d['count'], limit)
+            limit = int(raw) if re.fullmatch(r'[0-9]{1,3}', raw) and 3 <= int(raw) <= 200 else 12
+            if args[0] == 'job':
+                print(d['jobs'], limit)
+            else:
+                try: raw = (S / 'rotate_idle').read_text().strip()
+                except FileNotFoundError: raw = ''
+                idle_limit = int(raw) if re.fullmatch(r'[0-9]{1,3}', raw) and 1 <= int(raw) <= 20 else 2
+                print(d['idle'], idle_limit, d['jobs'], limit)
     elif action == 'reclaim':
         path, pid = pathlib.Path(args[0]), args[1]
         renamed = pathlib.Path(str(path) + '.reclaim.' + pid)
@@ -447,7 +456,7 @@ restart_main() {
     fi
     if [ -z "${FILAMENT_JOB_START+x}" ]; then
         if ! take_lock "$STATE/reply.lock.d" 25; then echo RESTART_BUSY; exit 3; fi
-        if ! json_helper lineage reset; then echo RESTART_BUSY; exit 3; fi
+        if ! json_helper lineage job > /dev/null; then echo RESTART_BUSY; exit 3; fi
         release_lock "$STATE/reply.lock.d"
     fi
     printf '%s\n' "$$" > "$STATE/restart.pending"

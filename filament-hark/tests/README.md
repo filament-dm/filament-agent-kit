@@ -33,7 +33,7 @@ creates a private temporary directory for each test, under `FILAMENT_STATE`
 when supplied, and removes it afterwards. It copies the scripts into each
 directory: production scripts always resolve siblings through that state
 directory. It does not modify a live connector. Each scenario writes a
-`scenario.json` of canned responses into its private directory. The original test numbering is retained; tests 25-26 cover media and tests 27-38 cover tags, stable numbers, lineage rotation, lock reclaim and the backstop.
+`scenario.json` of canned responses into its private directory. The original test numbering is retained; tests 25-26 cover media and tests 27-38 cover tags, stable numbers, lineage rotation, lock reclaim and the backstop. Tests 39-48 cover idle rotation and the composed lifecycle, cumulative idle across work, limits, migration, job accounting, non-reset commands, uncounted failure paths, lock contention, reply progress after redelivery and lineage errors.
 Run a single group with, for example:
 
 ```sh
@@ -57,7 +57,7 @@ ten; it does not change the budget arithmetic or network delays. The empty
 poll test uses a real 60-second budget (the listener stops polling when less
 than 20 seconds remain). Inherited-start tests exercise a short real remaining
 budget, including a slow reply followed by the real restart and listener.
-Some reply tests substitute a tiny listener solely to observe the exec chain.
+Some reply tests substitute a tiny listener solely to observe the exec chain. Idle lifecycle tests use a wrapper that expires the budget only after the real restart counts its job, then executes the entire production listen.sh including its real idle tail. Deadline samples reset between independent scenarios; cumulative idle is checked separately.
 
 The harness probes native `ps`. If a restricted execution sandbox blocks it,
 the harness explicitly reports `native ps unverified` and installs a

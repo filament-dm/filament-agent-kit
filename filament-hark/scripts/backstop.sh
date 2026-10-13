@@ -5,7 +5,7 @@ source "$STATE/restart_listener.sh"
 init_job 480 || { echo NEED_START; exit 0; }
 RUN=
 # shellcheck disable=SC2329 # Invoked by EXIT.
-cleanup() { stop_child; [ -z "$RUN" ] || rm -rf "$RUN"; }
+cleanup() { stop_child; release_lock "$STATE/reply.lock.d"; [ -z "$RUN" ] || rm -rf "$RUN"; }
 trap cleanup EXIT
 trap 'exit 0' TERM INT
 stamp() { date +%Y-%m-%dT%H:%M:%S%z | sed 's/\([+-][0-9][0-9]\)\([0-9][0-9]\)$/\1:\2/'; } # Portable equivalent of date -Is.
@@ -16,6 +16,14 @@ case "${1:-}" in
             status=PAUSED
         elif ! live_listener "$(cat "$STATE/listener.lock.d/pid" 2>/dev/null)"; then
             status=NEED_START
+        fi
+        if [ "$status" = NEED_START ] || [ "$status" = WEDGED ]; then
+            if take_lock "$STATE/reply.lock.d" 100; then
+                json_helper lineage reset 2>> "$STATE/backstop.log" || log_event LINEAGE-RESET-SKIPPED
+                release_lock "$STATE/reply.lock.d"
+            else
+                log_event LINEAGE-RESET-SKIPPED
+            fi
         fi
         printf '%s %s\n' "$(stamp)" "$status" >> "$STATE/backstop.log"
         echo "$status"

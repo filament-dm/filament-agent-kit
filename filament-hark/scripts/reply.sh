@@ -21,7 +21,7 @@ if [ "${1:-}" = --ack ]; then mode=ack; shift; fi
 number=${1:-}
 log_event "REPLY-START item=$number"
 if ! take_lock "$STATE/reply.lock.d" 150; then log_event LOCK-TIMEOUT; chain; fi
-if ! json_helper lineage increment > "$STATE/.lineage-count.$$" 2>> "$STATE/reply.log"; then
+if ! json_helper lineage job > "$STATE/.lineage-count.$$" 2>> "$STATE/reply.log"; then
     rm -f "$STATE/.lineage-count.$$"; log_event STATE-ERROR; chain
 fi
 read -r count limit < "$STATE/.lineage-count.$$"

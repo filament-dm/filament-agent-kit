@@ -319,10 +319,13 @@ exit 3
         self.assertEqual(len(polls), 1)
         self.assertLessEqual(polls[0]['args']['wait_seconds'], 15)
         self.assertLessEqual(polls[0]['timeout'], 30)
+        # Each deadline sample starts a fresh reset window; cumulative idle is tested below.
+        self.run_script('backstop.sh', ['check'], rc=0, last='NEED_START')
         self.scenario(poll_work=[{'out': {'work': [], 'truncated': True}}])
         started = time.monotonic()
         self.run_script(age=458, timeout=5)
         self.assertLess(time.monotonic() - started, 5)
+        self.run_script('backstop.sh', ['check'], rc=0, last='NEED_START')
         self.write_item(item('slow'))
         self.scenario(send_reply=[{'delay': 11, 'out': {}, 'assert_recorded': ['slow']}])
         started = time.monotonic()
@@ -675,46 +678,52 @@ exit 3
 
     def test_32_lineage_rotation_kills_and_stays_rotated(self):
         (self.state / 'lineage.json').write_text('{"started":1,"count":99}')
-        (self.state / 'rotate_after').write_text('3\n')
+        (self.state / 'rotate_after').write_text('4\n')
         (self.state / 'backstop.task').write_text('task-123\n')
+        self.run_script('backstop.sh', ['check'], rc=0, last='NEED_START')
+        lineage = self.lineage()
+        self.assertEqual((lineage['jobs'], lineage['idle']), (0, 0))
+        self.assertGreater(lineage['started'], 1)
         self.scenario(poll_work=[dict(work(), delay=50)])
         listener = self.start('restart_listener.sh')
         self.wait_for(lambda: len(self.calls('poll_work')) == 1)
-        lineage = json.loads((self.state / 'lineage.json').read_text())
-        self.assertEqual(lineage['count'], 0); self.assertGreater(lineage['started'], 1)
+        self.assertEqual(self.lineage(), dict(lineage, jobs=1))
         for number in (1, 2):
             self.write_item(item(str(number)), number)
             self.run_script('reply.sh', [str(number)], body=b'answer', last='ALREADY_LISTENING')
-            self.assertEqual(json.loads((self.state / 'lineage.json').read_text())['count'], number)
+            self.assertEqual(self.lineage(), dict(lineage, jobs=number + 1))
         self.assertIn('CHAIN-ALREADY-LISTENING', self.log())
         self.run_script('restart_listener.sh', last='ALREADY_LISTENING')
-        self.assertEqual(json.loads((self.state / 'lineage.json').read_text())['count'], 2)
+        self.assertEqual(self.lineage(), dict(lineage, jobs=3))
         self.write_item(item('three'), 3)
         self.run_script('reply.sh', ['3'], body=b'unposted', last='ROTATE task-123')
         self.finish(listener, 3, 'KILLED')
         self.assertIn(f'LISTENER-KILLED {listener.pid}', self.log())
-        self.assertIn('ROTATE count=3', self.log())
+        self.assertIn('ROTATE count=4', self.log())
         self.assertTrue((self.state / 'items/3.json').exists())
         self.assertFalse((self.state / 'listener.lock.d').exists())
         (self.state / 'backstop.task').unlink()
         self.run_script('reply.sh', ['3'], body=b'straggler', last='ROTATE NONE')
-        self.assertEqual(json.loads((self.state / 'lineage.json').read_text())['count'], 4)
+        self.assertEqual(self.lineage(), dict(lineage, jobs=5))
         self.assertEqual(len(self.calls('send_reply')), 2)
         fresh = self.start('restart_listener.sh')
         self.wait_for(lambda: len(self.calls('poll_work')) == 2)
-        self.assertEqual(json.loads((self.state / 'lineage.json').read_text())['count'], 0)
+        self.assertEqual(self.lineage(), dict(lineage, jobs=6))
         fresh.terminate(); self.finish(fresh, 3, 'KILLED')
 
     def test_33_lineage_limits_and_missing_state(self):
         self.fake_listener(); self.write_item()
         self.run_script('reply.sh', ['1'], body=b'first')
-        self.assertEqual(json.loads((self.state / 'lineage.json').read_text())['count'], 1)
-        for raw, limit in [('2', 2), ('200', 200), ('1', 12), ('201', 12), ('x', 12), ('', 12)]:
+        self.assertEqual((self.lineage()['jobs'], self.lineage()['idle']), (1, 0))
+        for raw, limit in [('3', 3), ('200', 200), ('2', 12), ('1', 12),
+                           ('201', 12), ('x', 12), ('', 12), (' 003\n', 3), ('3.0', 12)]:
             with self.subTest(raw=raw):
                 (self.state / 'rotate_after').write_text(raw)
-                (self.state / 'lineage.json').write_text(json.dumps({'started': 1, 'count': limit - 1}))
+                self.seed_lineage(jobs=limit - 2, idle=1)
+                self.run_script('reply.sh', ['999'], body=b'ignored')
+                self.assertEqual(self.lineage(), dict(started=1, jobs=limit - 1, idle=1))
                 self.run_script('reply.sh', ['999'], body=b'ignored', last='ROTATE NONE')
-                self.assertEqual(json.loads((self.state / 'lineage.json').read_text())['count'], limit)
+                self.assertEqual(self.lineage(), dict(started=1, jobs=limit, idle=1))
         self.assertEqual(len(self.calls('send_reply')), 1)
 
     def test_34_reclaim_dead_live_and_missing_pid(self):
@@ -756,28 +765,41 @@ else echo BUSY; fi
         self.assertFalse(lock.exists())
 
     def test_36_backstop_states_log_and_started(self):
+        self.seed_lineage(jobs=9, idle=1)
         self.run_script('backstop.sh', ['check'], rc=0, last='NEED_START')
+        self.assertEqual((self.lineage()['jobs'], self.lineage()['idle']), (0, 0))
+        self.assertGreater(self.lineage()['started'], 1)
+        self.seed_lineage(jobs=9, idle=1)
         (self.state / 'auth_failed').write_text('auth')
         self.run_script('backstop.sh', ['check'], rc=0, last='PAUSED')
+        self.assertEqual(self.lineage(), dict(started=1, jobs=9, idle=1))
         (self.state / 'auth_failed').unlink()
         self.scenario(poll_work=[dict(work(), delay=50)])
         listener = self.start()
         self.wait_for(lambda: len(self.calls('poll_work')) == 1)
         self.run_script('backstop.sh', ['check'], rc=0, last='RUNNING')
+        self.assertEqual(self.lineage(), dict(started=1, jobs=9, idle=1))
         (self.state / 'listener.lock.d/started').write_text(str(int(time.time()) - 200))
         stamp = time.strftime('%Y-%m-%dT%H:%M:%S%z', time.localtime(time.time() - 200))
         (self.state / 'listen.log').write_text(f'{stamp} POLL rc=0 wait=60\n')
         self.run_script('backstop.sh', ['check'], rc=0, last='WEDGED')
+        self.assertEqual((self.lineage()['jobs'], self.lineage()['idle']), (0, 0))
+        self.assertGreater(self.lineage()['started'], 1)
+        self.seed_lineage(jobs=9, idle=1)
         stamp = time.strftime('%Y-%m-%dT%H:%M:%S%z')
         with (self.state / 'listen.log').open('a') as f: f.write(f'{stamp} POLL rc=0 wait=60\n')
         self.run_script('backstop.sh', ['check'], rc=0, last='RUNNING')
+        self.assertEqual(self.lineage(), dict(started=1, jobs=9, idle=1))
         (self.state / 'auth_failed').write_text('reserved')
         self.run_script('backstop.sh', ['check'], rc=0, last='PAUSED')
+        self.assertEqual(self.lineage(), dict(started=1, jobs=9, idle=1))
         self.run_script('backstop.sh', ['started'], rc=0, last=None)
+        self.assertEqual(self.lineage(), dict(started=1, jobs=9, idle=1))
         words = [line.split()[-1] for line in (self.state / 'backstop.log').read_text().splitlines()]
         self.assertEqual(words, ['NEED_START', 'PAUSED', 'RUNNING', 'WEDGED', 'RUNNING', 'PAUSED', 'STARTED'])
         (self.state / 'backstop.log').write_text(''.join(f'{n}\n' for n in range(250)))
         self.run_script('backstop.sh', ['check'], rc=0, last='PAUSED')
+        self.assertEqual(self.lineage(), dict(started=1, jobs=9, idle=1))
         lines = (self.state / 'backstop.log').read_text().splitlines()
         self.assertEqual(len(lines), 201); self.assertEqual(lines[0], '50')
         listener.terminate(); self.finish(listener, 3, 'KILLED')
@@ -817,6 +839,193 @@ else echo BUSY; fi
         self.run_script(last='NO_WORK')
         self.assertIn('DELIVER-LOCK-TIMEOUT', self.log())
         self.assertFalse((self.state / 'items').exists())
+
+    def lineage(self):
+        return json.loads((self.state / 'lineage.json').read_text())
+
+    def seed_lineage(self, jobs=0, idle=0):
+        (self.state / 'lineage.json').write_text(json.dumps(dict(started=1, jobs=jobs, idle=idle)))
+
+    def idle_listener(self):
+        # Accelerate only the listener's budget, after the real direct restart
+        # has counted its job. Execute the entire production listener and tail.
+        shutil.copy2(SCRIPTS / 'listen.sh', self.state / 'idle-listen.sh')
+        (self.state / 'listen.sh').write_text('''#!/usr/bin/env bash
+export FILAMENT_JOB_START=$(($(date +%s) - 480))
+exec bash "$FILAMENT_STATE/idle-listen.sh"
+''')
+
+    def test_39_composed_idle_rotation_reset_lifecycle(self):
+        self.idle_listener()
+        (self.state / 'backstop.task').write_text('idle-task\n')
+        (self.state / 'rotate_idle').write_text('2\n')
+        self.seed_lineage(jobs=99, idle=19)
+        self.run_script('backstop.sh', ['check'], rc=0, last='NEED_START')
+        initial = self.lineage()
+        self.assertEqual((initial['jobs'], initial['idle']), (0, 0))
+        self.run_script('restart_listener.sh')
+        self.assertEqual(self.lineage(), dict(initial, jobs=1, idle=1))
+        self.run_script('restart_listener.sh', last='ROTATE idle-task')
+        self.assertEqual(self.lineage(), dict(initial, jobs=2, idle=2))
+        self.assertIn('ROTATE idle=2 jobs=2', self.log())
+        self.run_script('backstop.sh', ['check'], rc=0, last='NEED_START')
+        self.assertEqual((self.lineage()['jobs'], self.lineage()['idle']), (0, 0))
+        self.run_script('restart_listener.sh')
+        self.assertEqual((self.lineage()['jobs'], self.lineage()['idle']), (1, 1))
+        self.assertEqual(self.calls(), [])
+
+    def test_40_idle_cumulative_across_work_and_job_limit(self):
+        self.run_script(age=480)
+        self.assertEqual((self.lineage()['jobs'], self.lineage()['idle']), (0, 1))
+        self.scenario(poll_work=[work(item())])
+        self.run_script('restart_listener.sh', rc=0, last='ITEMS 1')
+        self.assertEqual((self.lineage()['jobs'], self.lineage()['idle']), (1, 1))
+        self.idle_listener()
+        self.run_script('reply.sh', ['1'], body=b'answer', last='ROTATE NONE')
+        self.assertEqual((self.lineage()['jobs'], self.lineage()['idle']), (2, 2))
+        self.assertEqual(len(self.calls('send_reply')), 1)
+        self.assertIn('ROTATE idle=2 jobs=2', self.log())
+        # Availability wins even if ROTATE is ignored: no reset or launch veto.
+        self.run_script('restart_listener.sh', last='ROTATE NONE')
+        self.assertEqual((self.lineage()['jobs'], self.lineage()['idle']), (3, 3))
+        (self.state / 'rotate_after').write_text('3')
+        (self.state / 'rotate_idle').write_text('20')
+        self.seed_lineage(jobs=2)
+        self.run_script('restart_listener.sh', last='ROTATE NONE')
+        self.assertEqual(self.lineage(), dict(started=1, jobs=3, idle=1))
+        self.assertIn('ROTATE idle=1 jobs=3', self.log())
+
+    def test_41_idle_limits_and_defaults(self):
+        for raw, limit in [(None, 2), ('1', 1), ('2', 2), ('20', 20),
+                           ('0', 2), ('21', 2), ('-1', 2), ('x', 2), ('', 2),
+                           (' 002\n', 2), ('2.0', 2), ('0002', 2)]:
+            with self.subTest(raw=raw):
+                if raw is not None: (self.state / 'rotate_idle').write_text(raw)
+                self.seed_lineage(idle=limit - 1)
+                self.run_script(age=480, last='ROTATE NONE')
+                self.assertEqual(self.lineage(), dict(started=1, jobs=0, idle=limit))
+                if limit > 1:
+                    self.seed_lineage(idle=limit - 2)
+                    self.run_script(age=480)
+                    self.assertEqual(self.lineage(), dict(started=1, jobs=0, idle=limit - 1))
+
+    def test_42_migration_direct_chained_stop_and_started(self):
+        self.fake_listener()
+        (self.state / 'lineage.json').write_text('{"count":5}')
+        self.run_script('restart_listener.sh')
+        migrated = self.lineage()
+        self.assertEqual((migrated['jobs'], migrated['idle']), (6, 0))
+        self.assertGreater(migrated['started'], 1)
+        self.run_script('restart_listener.sh', age=0)
+        self.assertEqual(self.lineage(), migrated)
+        self.write_item()
+        self.run_script('reply.sh', ['1'], body=b'answer')
+        self.assertEqual(self.lineage(), dict(migrated, jobs=7))
+        self.run_script('restart_listener.sh', ['--stop'], rc=0, last='NO_LISTENER')
+        self.run_script('backstop.sh', ['started'], rc=0, last=None)
+        self.assertEqual(self.lineage(), dict(migrated, jobs=7))
+        self.scenario(poll_work=[dict(work(), delay=50)])
+        shutil.copy2(SCRIPTS / 'listen.sh', self.state / 'listen.sh')
+        listener = self.start('restart_listener.sh')
+        self.wait_for(lambda: len(self.calls('poll_work')) == 1)
+        self.run_script('restart_listener.sh', ['--stop'], rc=0, last='STOPPED')
+        self.finish(listener, 3, 'KILLED')
+        self.assertEqual(self.lineage(), dict(migrated, jobs=8))
+
+    def test_43_delivery_failures_do_not_count_idle(self):
+        self.seed_lineage(jobs=7, idle=1)
+        before = (self.state / 'lineage.json').read_bytes()
+        self.write_item()
+        (self.state / 'items/next').write_text('invalid')
+        self.scenario(poll_work=[work(item('new'))])
+        self.run_script()
+        self.assertIn('BAD-JSON', self.log())
+        self.assertEqual((self.state / 'lineage.json').read_bytes(), before)
+        self.hold_lock(self.state / 'reply.lock.d')
+        self.run_script()
+        self.assertIn('DELIVER-LOCK-TIMEOUT', self.log())
+        self.assertEqual((self.state / 'lineage.json').read_bytes(), before)
+
+    def test_44_idle_lock_timeout_rotates_without_counting(self):
+        self.seed_lineage(jobs=1)
+        self.hold_lock(self.state / 'reply.lock.d')
+        (self.state / 'backstop.task').write_text('locked-task\n')
+        for age, last in [(470, 'ROTATE locked-task'), (480, 'ROTATE NONE')]:
+            with self.subTest(age=age):
+                if age == 480: (self.state / 'backstop.task').unlink()
+                started = time.monotonic()
+                self.run_script(age=age, last=last, timeout=5)
+                self.assertLess(time.monotonic() - started, 5)
+                self.assertEqual(self.lineage(), dict(started=1, jobs=1, idle=0))
+        self.assertEqual(self.log().count('IDLE-LOCK-TIMEOUT'), 2)
+
+    def test_45_reset_skipped_and_direct_restart_busy(self):
+        self.fake_listener()
+        self.seed_lineage(jobs=8, idle=1)
+        lock = self.state / 'reply.lock.d'
+        holder = self.hold_lock(lock)
+        self.run_script('backstop.sh', ['check'], rc=0, last='NEED_START', timeout=5)
+        self.assertIn('LINEAGE-RESET-SKIPPED', self.log())
+        self.assertEqual(self.lineage(), dict(started=1, jobs=8, idle=1))
+        self.assertEqual((lock / 'pid').read_text(), str(holder.pid))
+        self.run_script('restart_listener.sh', last='RESTART_BUSY')
+        self.assertFalse((self.state / 'chained').exists())
+        self.assertEqual(self.lineage(), dict(started=1, jobs=8, idle=1))
+        holder.terminate(); holder.communicate(timeout=3)
+        self.run_script('backstop.sh', ['check'], rc=0, last='NEED_START')
+        self.assertEqual((self.lineage()['jobs'], self.lineage()['idle']), (0, 0))
+        self.assertFalse(lock.exists())
+
+    def test_46_reply_posts_after_rotation_reset_and_redelivery(self):
+        (self.state / 'rotate_after').write_text('3')
+        (self.state / 'backstop.task').write_text('reply-task')
+        self.seed_lineage(jobs=2)
+        self.scenario(poll_work=[work(item('outstanding'))])
+        self.run_script(rc=0, last='ITEMS 1')
+        self.run_script('reply.sh', ['1'], body=b'not yet', last='ROTATE reply-task')
+        self.assertTrue((self.state / 'items/1.json').exists())
+        self.assertEqual(self.calls('send_reply'), [])
+        self.run_script('backstop.sh', ['check'], rc=0, last='NEED_START')
+        output = self.run_script('restart_listener.sh', rc=0, last='ITEMS 1')
+        self.assertEqual(json.loads(output.splitlines()[-2])['work'][0]['number'], 2)
+        self.assertEqual(self.lineage()['jobs'], 1)
+        self.idle_listener()
+        self.run_script('reply.sh', ['2'], body=b'posted after reset')
+        posts = self.calls('send_reply')
+        self.assertEqual(len(posts), 1)
+        self.assertEqual(posts[0]['args'], dict(in_reply_to='outstanding', markdown_body='posted after reset'))
+        self.assertFalse((self.state / 'items/2.json').exists())
+        self.assertEqual((self.lineage()['jobs'], self.lineage()['idle']), (2, 1))
+
+    def test_47_init_and_mktemp_failures_remain_uncounted(self):
+        self.seed_lineage(jobs=4, idle=1)
+        before = (self.state / 'lineage.json').read_bytes()
+        library = self.state / 'restart_listener.sh'
+        with library.open('a') as f: f.write('\ninit_job() { return 1; }\n')
+        self.run_script()
+        self.run_script('backstop.sh', ['check'], rc=0, last='NEED_START')
+        self.assertEqual((self.state / 'lineage.json').read_bytes(), before)
+        shutil.copy2(SCRIPTS / 'restart_listener.sh', library)
+        fakebin = self.state / 'mktemp-bin'; fakebin.mkdir()
+        fake = fakebin / 'mktemp'; fake.write_text('#!/bin/sh\nexit 1\n'); fake.chmod(0o755)
+        self.env['PATH'] = str(fakebin) + os.pathsep + self.env['PATH']
+        self.run_script()
+        self.assertEqual((self.state / 'lineage.json').read_bytes(), before)
+        self.assertEqual(self.calls(), [])
+        self.assertFalse((self.state / 'listener.lock.d').exists())
+
+    def test_48_lineage_errors_rotate_or_skip_reset(self):
+        lineage = self.state / 'lineage.json'
+        lineage.write_text('invalid')
+        self.run_script(age=480, last='ROTATE NONE')
+        self.assertIn('STATE-ERROR', self.log())
+        self.assertEqual(lineage.read_text(), 'invalid')
+        self.assertFalse((self.state / 'reply.lock.d').exists())
+        lineage.unlink(); lineage.mkdir()
+        self.run_script('backstop.sh', ['check'], rc=0, last='NEED_START')
+        self.assertIn('LINEAGE-RESET-SKIPPED', self.log())
+        self.assertFalse((self.state / 'reply.lock.d').exists())
+        self.assertTrue(lineage.is_dir())
 
 if __name__ == '__main__':
     print('Bash: ' + subprocess.check_output([BASH, '-c', 'printf "%s" "$BASH_VERSION"'], text=True), flush=True)
