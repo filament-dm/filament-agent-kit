@@ -17,6 +17,8 @@ import signal
 import sys
 import tempfile
 import time
+import urllib.error
+import urllib.parse
 import urllib.request
 
 # PINNED_BEGIN
@@ -264,6 +266,110 @@ def stop():
     return 0
 
 
+def oauth_post(path, fields, as_json=False):
+    base = EP + '/oauth'
+    if as_json:
+        data = json.dumps(fields).encode()
+        headers = {'Content-Type': 'application/json', 'Accept': 'application/json'}
+    else:
+        data = urllib.parse.urlencode(fields).encode()
+        headers = {'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json'}
+    req = urllib.request.Request(base + path, data=data, method='POST', headers=headers)
+    try:
+        with urllib.request.urlopen(req, timeout=20) as r:
+            return json.loads(r.read().decode())
+    except urllib.error.HTTPError as e:
+        try:
+            return json.loads(e.read().decode())
+        except ValueError:
+            return {'error': 'http_{}'.format(e.code)}
+    except (urllib.error.URLError, OSError, ValueError):
+        return {'error': 'network'}
+
+
+def login(wait):
+    """OAuth device flow. `--login` starts it and prints the approval link;
+    `--login --wait` polls for up to 90 s and stores the token like --token."""
+    pending = STATE / 'login.json'
+    if not wait:
+        client_id = rd('oauth_client').strip()
+        if not client_id:
+            # redirect_uris is unused by the device grant but the server requires one.
+            reg = oauth_post('/register', {
+                'client_name': 'Instinct agent',
+                'token_endpoint_auth_method': 'none',
+                'grant_types': ['urn:ietf:params:oauth:grant-type:device_code'],
+                'redirect_uris': ['http://127.0.0.1:8765/callback']}, as_json=True)
+            client_id = reg.get('client_id')
+            if not client_id:
+                print('LOGIN_FAILED register {}'.format(reg.get('error', 'no client_id')))
+                return 2
+            with state_guard():
+                wr('oauth_client', client_id, mode=0o600)
+        dev = oauth_post('/device_authorization', {'client_id': client_id, 'scope': 'filament:agent:control'})
+        if dev.get('error') == 'invalid_client':
+            remove('oauth_client')
+            print('LOGIN_FAILED stale client; run --login again')
+            return 2
+        if not dev.get('device_code'):
+            print('LOGIN_FAILED device {}'.format(dev.get('error', 'no device_code')))
+            return 2
+        with state_guard():
+            wr('login.json', json.dumps({'client_id': client_id, 'device_code': dev['device_code'],
+                                         'interval': dev.get('interval', 5),
+                                         'expires_at': time.time() + dev.get('expires_in', 600)}), mode=0o600)
+        print('APPROVE {} code={} expires_in={}s'.format(
+            dev.get('verification_uri_complete') or dev.get('verification_uri'), dev.get('user_code'), dev.get('expires_in')))
+        print('Send the user that link now, then run: bash ~/.filament/poll.sh --login --wait')
+        return 0
+    try:
+        st = json.loads(pending.read_text())
+    except (OSError, ValueError):
+        print('LOGIN_FAILED no login in progress; run --login first')
+        return 2
+    def same_login(snap):
+        try:
+            return json.loads(pending.read_text()).get('device_code') == snap['device_code']
+        except (OSError, ValueError):
+            return False
+    deadline = time.time() + 90
+    while time.time() < min(deadline, st['expires_at']):
+        res = oauth_post('/token', {'grant_type': 'urn:ietf:params:oauth:grant-type:device_code',
+                                    'device_code': st['device_code'], 'client_id': st['client_id']})
+        if res.get('access_token'):
+            with state_guard():
+                wr('token', res['access_token'], mode=0o600)
+                remove('token_dead')
+                if same_login(st):
+                    remove('login.json')
+            print('TOKEN_SET')
+            return 0
+        err = res.get('error')
+        if err == 'network':
+            time.sleep(max(st.get('interval', 5), 5))
+            continue
+        if err not in ('authorization_pending', 'slow_down'):
+            print('LOGIN_FAILED {}'.format(err))
+            with state_guard():
+                if same_login(st):
+                    remove('login.json')
+            return 2
+        if err == 'slow_down':
+            st['interval'] = max(st.get('interval', 5), 5) + 5
+            with state_guard():
+                if same_login(st):
+                    wr('login.json', json.dumps(st), mode=0o600)
+        time.sleep(max(st.get('interval', 5), 5))
+    if time.time() >= st['expires_at']:
+        with state_guard():
+            if same_login(st):
+                remove('login.json')
+        print('LOGIN_EXPIRED run --login again')
+        return 2
+    print('LOGIN_PENDING run --login --wait again')
+    return 0
+
+
 def main():
     rotate_logs()
     if not args:
@@ -283,9 +389,13 @@ def main():
             remove('token_dead')
         print('TOKEN_SET')
         return 0
+    if args == ['--login']:
+        return login(False)
+    if args == ['--login', '--wait']:
+        return login(True)
     if args == ['--stop']:
         return stop()
-    print('BAD_ARGS: --token reads stdin; see README.md')
+    print('BAD_ARGS: --token reads stdin, --login [--wait] uses OAuth; see README.md')
     return 2
 
 
