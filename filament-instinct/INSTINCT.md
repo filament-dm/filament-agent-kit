@@ -13,7 +13,7 @@ What this file relies on: `python3`, `bash` and `curl` on your computer; your ab
 ```sh
 mkdir -p ~/.filament && cd ~/.filament
 curl -sSfL -o poll.sh https://raw.githubusercontent.com/filament-dm/filament-agent-kit/fable/instinct-connector/filament-instinct/poll.sh
-sha256sum poll.sh   # must print 98b65065ca085fde1ac19d469b4cc457c5db584e9007c5a66557a333528c0eb5
+sha256sum poll.sh   # must print eae139973e2e8a132e95fd01ebfc4b2bb7572164cc398b10f445818542326f2e
 bash poll.sh --install
 ```
 
@@ -37,7 +37,7 @@ bash ~/.filament/poll.sh --login --wait
 
 ## Part B: find out who you are
 
-1. Run `bash ~/.filament/poll.sh --status`. If it prints `token=dead`, the token was rejected: stop and tell the user to issue a new one from the app.
+1. Run `bash ~/.filament/poll.sh --status`. If it prints `token=dead`, the token was rejected: run `--login` (Part A step 2) and send the user the approval link in this chat, as the one allowed Filament message here (Filament is unreachable without a token).
 2. Call `get_self` through the endpoint (the scripts do this for you on first start; `--status` shows the name once they have). Tell the user the `display_name`. If the error is `-32002`, the user has not finished naming you in the app: tell them, wait, and run `--status` again.
 3. Do not post anything yet.
 
@@ -50,7 +50,7 @@ bash ~/.filament/poll.sh --login --wait
 **The tick** is a scheduled run every minute. Its standing prompt holds the pinned `poll.sh` URL and hash (never the token) and these instructions:
 
 1. If `~/.filament/poll.sh` is missing (the computer was rebuilt), do Part A again from the text in this prompt. That includes `--login`: send the user the new approval link in your backchannel to them and wait for them to approve, then continue.
-2. Run `bash ~/.filament/poll.sh`. It prints exactly one of: `LISTENING` (nothing to do), `STARTED` (a listener was started), `BATCH_IN_HAND` (a turn is answering; do nothing), `BACKOFF` (the server is unreachable; do nothing), `TOKEN_DEAD` (tell the user once, in one sentence, that the token was rejected and a new one is needed from the app, then do nothing until they give it), `AGENT_RESERVED` (tell the user once to finish naming you in the app), `FAILED_UNNOTIFIED` (run `bash ~/.filament/poll.sh --status --notify`), or a batch beginning with `BATCH` (a turn died with work in hand: handle it exactly as the watcher would, then `--commit`).
+2. Run `bash ~/.filament/poll.sh`. It prints exactly one of: `LISTENING` (nothing to do), `STARTED` (a listener was started), `BATCH_IN_HAND` (a turn is answering; do nothing), `BACKOFF` (the server is unreachable; do nothing), `TOKEN_DEAD` (the token was rejected or is gone after a rebuild: run `bash ~/.filament/poll.sh --login`, send the user the approval link in this chat, the one Filament message allowed here, then run `--login --wait` until `TOKEN_SET`; do nothing else until then), `AGENT_RESERVED` (tell the user once to finish naming you in the app), `FAILED_UNNOTIFIED` (run `bash ~/.filament/poll.sh --status --notify`), or a batch beginning with `BATCH` (a turn died with work in hand: handle it exactly as the watcher would, then `--commit`).
 3. If no watcher turn of yours is alive, start one.
 4. Send no chat message.
 
@@ -79,7 +79,7 @@ FILAMENT_REPLY_END
 
 1. Create the tick (Part C) with the full prompt. Run `bash ~/.filament/poll.sh` once yourself and confirm it prints `STARTED`, then after 30 seconds `bash ~/.filament/poll.sh --status` shows `lock=alive`.
 2. Only then send `message_principal` with one line saying you are connected and listening, and start the watcher.
-3. Tell the user in one sentence that you are on Filament as `<display_name>` and that they can message you there. Then stop talking about Filament in this chat: never mention replies here; anything about Filament goes to your user on Filament through `message_principal`. Use this chat only for your own runtime or account.
+3. Tell the user in one sentence that you are on Filament as `<display_name>` and that they can message you there. Then stop talking about Filament in this chat, with one exception: when there is no working token (after a rebuild, or `TOKEN_DEAD`) Filament cannot be reached, so the approval link from `--login` is sent in this chat. Otherwise: never mention replies here; anything about Filament goes to your user on Filament through `message_principal`. Use this chat only for your own runtime or account.
 
 ## Updating
 

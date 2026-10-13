@@ -283,6 +283,8 @@ def oauth_post(path, fields, as_json=False):
             return json.loads(e.read().decode())
         except ValueError:
             return {'error': 'http_{}'.format(e.code)}
+    except (urllib.error.URLError, OSError, ValueError):
+        return {'error': 'network'}
 
 
 def login(wait):
@@ -290,20 +292,30 @@ def login(wait):
     `--login --wait` polls for up to 90 s and stores the token like --token."""
     pending = STATE / 'login.json'
     if not wait:
-        reg = oauth_post('/register', {
-            'client_name': 'Instinct agent',
-            'token_endpoint_auth_method': 'none',
-            'grant_types': ['urn:ietf:params:oauth:grant-type:device_code'],
-            'redirect_uris': ['http://127.0.0.1:8765/callback']}, as_json=True)
-        if not reg.get('client_id'):
-            print('LOGIN_FAILED register {}'.format(reg.get('error', 'no client_id')))
+        client_id = rd('oauth_client').strip()
+        if not client_id:
+            # redirect_uris is unused by the device grant but the server requires one.
+            reg = oauth_post('/register', {
+                'client_name': 'Instinct agent',
+                'token_endpoint_auth_method': 'none',
+                'grant_types': ['urn:ietf:params:oauth:grant-type:device_code'],
+                'redirect_uris': ['http://127.0.0.1:8765/callback']}, as_json=True)
+            client_id = reg.get('client_id')
+            if not client_id:
+                print('LOGIN_FAILED register {}'.format(reg.get('error', 'no client_id')))
+                return 2
+            with state_guard():
+                wr('oauth_client', client_id, mode=0o600)
+        dev = oauth_post('/device_authorization', {'client_id': client_id, 'scope': 'filament:agent:control'})
+        if dev.get('error') == 'invalid_client':
+            remove('oauth_client')
+            print('LOGIN_FAILED stale client; run --login again')
             return 2
-        dev = oauth_post('/device_authorization', {'client_id': reg['client_id'], 'scope': 'filament:agent:control'})
         if not dev.get('device_code'):
             print('LOGIN_FAILED device {}'.format(dev.get('error', 'no device_code')))
             return 2
         with state_guard():
-            wr('login.json', json.dumps({'client_id': reg['client_id'], 'device_code': dev['device_code'],
+            wr('login.json', json.dumps({'client_id': client_id, 'device_code': dev['device_code'],
                                          'interval': dev.get('interval', 5),
                                          'expires_at': time.time() + dev.get('expires_in', 600)}), mode=0o600)
         print('APPROVE {} code={} expires_in={}s'.format(
@@ -331,7 +343,11 @@ def login(wait):
             print('LOGIN_FAILED {}'.format(err))
             remove('login.json')
             return 2
-        time.sleep(max(st.get('interval', 5), 5) + (5 if err == 'slow_down' else 0))
+        if err == 'slow_down':
+            st['interval'] = max(st.get('interval', 5), 5) + 5
+            with state_guard():
+                wr('login.json', json.dumps(st), mode=0o600)
+        time.sleep(max(st.get('interval', 5), 5))
     if time.time() >= st['expires_at']:
         remove('login.json')
         print('LOGIN_EXPIRED run --login again')
