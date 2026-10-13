@@ -42,8 +42,9 @@ your user.
    ```
    On DOWN, start it and wait for registration:
    ```bash
-   cd <checkout> && nohup .venv/bin/python -u push_tailer.py > tailer.log 2>&1 &
-   for i in $(seq 1 24); do grep -q "registered with Filament" tailer.log && echo READY && break; sleep 5; done
+   cd <checkout>
+   nohup .venv/bin/python -u push_tailer.py > tailer.log 2>&1 &
+   for i in $(seq 1 24); do grep -q "registered with Filament" <checkout>/tailer.log && echo READY && break; sleep 5; done
    ```
    If not READY, show the user the last 20 lines of `tailer.log` and stop.
 
@@ -96,7 +97,9 @@ your user.
 5. **Keep the watch alive.** Never end a turn without the Monitor running.
    A session that is not waiting on the inbox is not the agent, however good
    its last answer was. If the Monitor expired or died, re-arm it from the
-   current line count before anything else.
+   last line you handled, not the file's current length, before anything
+   else: lines appended in between are messages you have not answered, and
+   the tailer will not deliver them again.
 
 6. **Remember corrections.** When your user corrects you or gives a standing
    instruction, append a dated line under "What my user has told me" in the

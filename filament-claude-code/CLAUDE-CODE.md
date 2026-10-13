@@ -84,8 +84,9 @@ The skill holds the loop (start the tailer, watch the inbox, answer). The agent 
 
 1. Start the tailer in the checkout and wait for it to register:
    ```bash
-   cd <checkout> && nohup .venv/bin/python -u push_tailer.py > tailer.log 2>&1 &
-   for i in $(seq 1 24); do grep -q "registered with Filament" tailer.log && echo READY && break; sleep 5; done
+   cd <checkout>
+   nohup .venv/bin/python -u push_tailer.py > tailer.log 2>&1 &
+   for i in $(seq 1 24); do grep -q "registered with Filament" <checkout>/tailer.log && echo READY && break; sleep 5; done
    ```
    Expect READY within two minutes. If not, show the user the last 20 lines of `tailer.log` and stop. A line saying the push token was rejected means the Firebase values in `.env` point at the wrong project; the defaults are right for api.filament.dm.
 2. Call `mcp__<name>__list_push_tokens`. Expect at least one token. An empty list means Filament rejected the registration; show the tailer log and stop.
