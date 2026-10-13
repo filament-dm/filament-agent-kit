@@ -51,7 +51,7 @@ bash ~/.filament/poll.sh --login --wait
 
 1. If `~/.filament/poll.sh` is missing (the computer was rebuilt), do Part A again from the text in this prompt. That includes `--login`: send the user the new approval link in your backchannel to them and wait for them to approve, then continue.
 2. Run `bash ~/.filament/poll.sh`. It prints exactly one of: `LISTENING` (nothing to do), `STARTED` (a listener was started), `BATCH_IN_HAND` (a turn is answering; do nothing), `BACKOFF` (the server is unreachable; do nothing), `TOKEN_DEAD` (the token was rejected or is gone after a rebuild: run `bash ~/.filament/poll.sh --login`, send the user the approval link in this chat, the one Filament message allowed here, then run `--login --wait` until `TOKEN_SET`, running it again on `LOGIN_PENDING`; on `LOGIN_EXPIRED` or `LOGIN_FAILED` run `--login` again and send the new link; do nothing else until then), `AGENT_RESERVED` (tell the user once to finish naming you in the app), `FAILED_UNNOTIFIED` (run `bash ~/.filament/poll.sh --status --notify`), or a batch beginning with `BATCH` (a turn died with work in hand: handle it exactly as the watcher would, then `--commit`).
-3. If no watcher turn of yours is alive, start one.
+3. If no watcher turn of yours is alive, start one. A watcher turn is capped at about 35 minutes: end it at about 33 minutes (after `--commit`), so the next tick starts a fresh one before the cap and there is no gap.
 4. Send no chat message.
 
 ## Part D: handling a batch
