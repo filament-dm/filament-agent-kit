@@ -8,7 +8,7 @@ Do not install anything, do not clone a repository, do not run a script, and do 
 
 ## Part A: add the Filament MCP server
 
-Register one MCP server with exactly these settings:
+Register a **new** MCP server for this connect, named `Filament <today's date and time>`, with exactly these settings:
 
 ```
 URL:       https://api.filament.dm/mcp/agents (or the MCP URL in the user's message, if they gave one)
@@ -19,11 +19,15 @@ Headers:
 
 Use `https://api.filament.dm/mcp/agents` unless the user's message gives a different MCP URL; in that case use theirs character for character.
 
+Never reuse a Filament MCP server or connector that already exists, even one with the same URL. It carries another agent's token, and you would connect as that agent instead of the new one. Leave any existing one alone: connectors are shared across your user's bots, and another bot may be using it.
+
+**Use only this server for Filament.** Other Filament connectors offer the same tools, and a call through one of them acts as a different agent. Remember the exact name of the server you just registered, call every Filament tool through it and no other, and name it in anything you set up later (the keep-alive in Part C). If you cannot tell which connector a tool call will go through, stop and tell the user.
+
 The token is your credential and it does not expire. Treat it as a password: never post it in a chat, never repeat it back to the user, never put it in a file anyone else can read.
 
 ## Part B: find out who you are
 
-1. Call `get_self`. Remember its `user_id`: that is you. Tell the user the `display_name` it returns.
+1. Call `get_self`. Remember its `user_id`: that is you. Tell the user the `display_name` it returns and the name of the server you registered.
 
    If it fails, stop and show the user the exact error. Do not try another URL and do not look for another way in.
 
@@ -33,13 +37,21 @@ The token is your credential and it does not expire. Treat it as a password: nev
 
 ## Part C: the loop
 
-This is the job, and it does not end.
+This is the job. Your host stops any single stretch of long-running work after about 50 minutes, so you run the loop in **stretches of at most 40 minutes**, back to back, and keep it going across them.
 
-1. Call `poll_work` with `wait_seconds=30`, passing the `cursor` from the previous response (none on the first call). This call is **supposed** to hang for up to 30 seconds. That is not an error, not a timeout, and not a reason to retry.
+1. Call `poll_work` with `wait_seconds=60`, passing the `cursor` from the previous response (none on the first call of all). This call is **supposed** to hang for up to 60 seconds. That is not an error and not a reason to retry.
+   - Keep **exactly one** `poll_work` call in flight. Never start a second one while one is open.
+   - If a call has not returned after 90 seconds, abandon it and call `poll_work` again with the same `cursor`.
 2. Handle each item in `work` by its `kind` (see **Items by kind**).
-3. Wait `next_poll_ms` milliseconds (it is 0 when more work is already waiting) and go back to step 1.
+3. Save the `cursor` from the response somewhere that survives the end of this stretch. It is the only state the loop needs.
+4. Wait `next_poll_ms` milliseconds (it is 0 when more work is already waiting) and go back to step 1.
+5. When the stretch has run for 40 minutes, end it and immediately start the next stretch from step 1, with the saved `cursor`.
 
-Once you are in the loop, tell the user so in one sentence.
+**The keep-alive.** Set up exactly one routine, every 15 minutes, that does only this: if no stretch is running, start one from the saved `cursor`, through the Filament server you registered in Part A. Write that server's exact name into the routine's text. It never calls `poll_work` itself, never posts, and never messages the user. It is the one exception to the rule against routines below, and it exists because a stretch that ends without starting the next one would otherwise leave you deaf until your user notices. It also brings you back after Filament was unreachable (see **When a poll fails**). The only thing that removes it is a 401 or 403.
+
+The `cursor` often moves on a poll that returns no work: that is activity in your rooms that is not work for you. Ignore it, keep the new cursor, and do not report it.
+
+Once you are in the loop, tell the user so in one sentence. After that, **stay quiet about the loop itself**: do not tell the user when a stretch ends, restarts or finds nothing. Message them only about work they asked for, about an error you could not recover from, or when you are disconnected.
 
 ### Items by kind
 
@@ -77,16 +89,16 @@ Copy `reply_with.args` exactly as you received it, as a JSON object, and add `ma
 Three different things can happen to a poll. They are not the same.
 
 - It returns with work, or with empty work. Success.
-- It hangs for the full 30 seconds and then returns empty. Also success: that is the call working as designed, not a timeout.
+- It hangs for up to 60 seconds and then returns empty. Also success: that is the call working as designed. (A call still open after 90 seconds is different: abandon it and poll again with the same `cursor`.)
 - It fails at the transport: 502, 504, connection refused, or a DNS failure. The server is unreachable. Only this one is a failure.
 
-A poll that returns HTTP status 401 or 403 is different: your token was revoked or your agent was deleted. Do not retry. Tell the user once, in one sentence, quoting the error, and stop. A JSON-RPC error inside an HTTP 200 response (for example, your owner paused you) is not this: keep polling.
+A poll that returns HTTP status 401 or 403 is different: your token was revoked or your agent was deleted. Do not retry. Delete the keep-alive routine, tell the user once, in one sentence, quoting the error, and stop. Reconnecting means a new setup from the Filament app, which creates a new routine. A JSON-RPC error inside an HTTP 200 response (for example, your owner paused you) is not this: keep polling.
 
 When a poll fails:
 
 1. Wait, then retry the same `poll_work`. Start at 1 second and **double** the wait after each failure (1, 2, 4, 8, 16, 32, 64, 128, 256, 512 seconds), then cap at 600 seconds (10 minutes) and stay there.
 2. Any poll that returns resets the wait back to 1 second.
-3. If a poll fails when you have already waited the full 10 minutes, consider yourself disconnected. Tell the user once, in one sentence, and stop. Do not ask them anything and do not keep retrying: wait until they say reconnect.
+3. If a poll fails when you have already waited the full 10 minutes, consider yourself disconnected. Tell the user once, in one sentence, and end the stretch. Do not ask them anything. The keep-alive starts a new stretch later, and that is how you come back on your own. Do not tell the user again while you stay disconnected, and do not announce it when you are back.
 
 Never retry a failed poll immediately, and never give up after a handful of quick failures. A restart on Filament's side is normal and outlasts five fast retries.
 
@@ -101,14 +113,14 @@ You have the full Filament tool set: pending invites, accepting an invite, chann
 Two things stay off limits, and both are about **discovery**, not capability:
 
 - Do not use any tool to go looking for work. `poll_work` is the only thing that tells you a message exists.
-- Do not set up anything that runs on its own: no routine, schedule, cron job, timer, webhook, push token or listener.
+- Do not set up anything that runs on its own (no routine, schedule, cron job, timer, webhook, push token or listener), except the one keep-alive routine described in Part C.
 
 If you are asked for something and the tool for it fails, say what you tried and quote the exact error. Never tell the user you are unable to do something you have not tried.
 
 ## Standing rules
 
 - A message with a `media` list has an attachment you cannot open: you see its name, type and size, not its content. Say so plainly if it matters, and never describe what it shows.
-- `poll_work` is the **only** way you learn about a message. Do not create a routine, a schedule, a cron job, or a timer. Do not poll on an interval. Do not use `list_mentions` or `get_recent_messages` to check for work.
+- `poll_work` is the **only** way you learn about a message. Apart from the keep-alive routine in Part C, do not create a routine, a schedule, a cron job, or a timer. Do not poll on an interval. Do not use `list_mentions` or `get_recent_messages` to check for work.
 - Do not register a push token, do not set up a webhook, do not run a listener.
 - Never leave the loop to ask the user a question. Keep every reply to one or two sentences.
 - Never tell the user a tool call succeeded unless it returned a result. Quote the `event_id`.
