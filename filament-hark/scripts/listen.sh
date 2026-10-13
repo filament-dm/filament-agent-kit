@@ -79,6 +79,12 @@ done
 backoff=2
 ready=0
 while [ "$(remaining)" -ge 20 ]; do
+    owner=$(cat "$STATE/listener.lock.d/pid" 2>/dev/null)
+    if [ "$owner" != "$$" ]; then
+        log_event "LISTENER-OWNERSHIP-LOST ${owner:-NONE}"
+        echo DUPLICATE
+        exit 3
+    fi
     rem=$(remaining); wait_seconds=$((rem - 15))
     [ "$wait_seconds" -le 60 ] || wait_seconds=60
     run_mcp poll_work "{\"wait_seconds\":$wait_seconds,\"max_items\":10}" "$((wait_seconds + 15))"; rc=$?
@@ -96,8 +102,13 @@ while [ "$(remaining)" -ge 20 ]; do
     if ! json_helper poll "$RUN" "$SELF_ID" > "$RUN/verdict" 2>> "$STATE/listen.log"; then
         log_event BAD-JSON; bounded_sleep 5; continue
     fi
-    read -r verdict delay count timestamp filtered < "$RUN/verdict"
-    if [ "$verdict" = busy ]; then bounded_sleep "$delay"; continue; fi
+    read -r verdict delay count timestamp filtered dropped < "$RUN/verdict"
+    if [ "$dropped" -gt 0 ]; then log_event "DROPPED-NO-TARGET $dropped"; fi
+    if [ "$verdict" = busy ]; then
+        if [ "$count" -gt 0 ]; then log_event "POLL-BUSY work=$count"; fi
+        bounded_sleep "$delay"
+        continue
+    fi
     if [ "$filtered" -gt 0 ]; then log_event "FILTERED $filtered"; fi
     if [ -f "$RUN/ack" ]; then
         # Filtering acks are best effort, including auth errors, per step 6e.
@@ -137,5 +148,13 @@ while [ "$(remaining)" -ge 20 ]; do
         bounded_sleep "$delay"
     fi
 done
+# Only budget exhaustion counts as idle; delivery and initialisation failures
+# above remain uncounted NO_WORK exits.
+if take_lock "$STATE/reply.lock.d" 100; then
+    json_helper lineage idle > /dev/null 2>> "$STATE/listen.log" || log_event STATE-ERROR
+    release_lock "$STATE/reply.lock.d"
+else
+    log_event IDLE-LOCK-TIMEOUT
+fi
 echo NO_WORK
 exit 3

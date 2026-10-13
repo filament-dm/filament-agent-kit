@@ -82,14 +82,22 @@ try:
         run, self_id = pathlib.Path(args[0]), args[1]
         d = read(run / 'out')
         if not isinstance(d, dict) or not isinstance(d.get('work', []), list): raise ValueError('invalid poll')
+        if d.get('work') or d.get('busy') is True:
+            saved = S / 'last_poll.json'
+            tmp = saved.with_name(saved.name + '.tmp.' + str(os.getpid()))
+            try:
+                shutil.copyfile(run / 'out', tmp)
+                os.replace(tmp, saved)
+            finally:
+                if tmp.exists(): tmp.unlink()
         delay = d.get('next_poll_ms', 1000)
         if not isinstance(delay, (int, float)) or not math.isfinite(delay): delay = 1000
         delay = max(0, delay / 1000)
         if d.get('busy') is True:
-            print('busy', delay, 0, 'none', 0)
+            print('busy', delay, len(d.get('work', [])), 'none', 0, 0)
             sys.exit()
         seen = set(seen_ids())
-        kept, ack, filtered = [], [], 0
+        kept, ack, filtered, dropped = [], [], 0, 0
         def ids(messages):
             return [m['event_id'] for m in messages if isinstance(m.get('event_id'), str) and m['event_id']]
         def not_for_us(m):
@@ -97,7 +105,9 @@ try:
             return (bool(self_id) and sender == self_id) or (isinstance(sender, str) and sender.startswith('@filament_god:'))
         for item in d.get('work', []):
             if not isinstance(item, dict): raise ValueError('invalid item')
-            if item.get('reply_with') is None: continue
+            if item.get('reply_with') is None:
+                dropped += 1
+                continue
             messages = item.get('messages')
             if not isinstance(messages, list) or any(not isinstance(m, dict) for m in messages): raise ValueError('invalid messages')
             new = [m for m in messages if m.get('event_id') not in seen]
@@ -117,9 +127,9 @@ try:
                 for item in kept:
                     f.write(json.dumps({'channel': item['channel_id'], 'limit': 25}, separators=(',', ':')) + '\n')
             stamp = str(kept[0]['messages'][0].get('timestamp', 'none')).replace(' ', '_').replace('\n', '_')[:100]
-            print('work', delay, len(kept), stamp, filtered)
+            print('work', delay, len(kept), stamp, filtered, dropped)
         else:
-            print('truncated' if d.get('truncated') else 'empty', delay, 0, 'none', filtered)
+            print('truncated' if d.get('truncated') else 'empty', delay, 0, 'none', filtered, dropped)
     elif action == 'deliver':
         run = pathlib.Path(args[0])
         d = read(run / 'filtered')
@@ -185,16 +195,38 @@ try:
         (run / 'delivery').write_text('\n'.join(summaries) + '\n' + json.dumps(d, ensure_ascii=True, separators=(',', ':')) + '\n')
     elif action == 'lineage':
         p = S / 'lineage.json'
-        if args[0] == 'reset':
-            write(p, {'started': int(time.time()), 'count': 0})
+        mode = args[0]
+        if mode == 'reset':
+            write(p, {'started': int(time.time()), 'jobs': 0, 'idle': 0})
         else:
-            d = read(p) if p.exists() else {'started': int(time.time()), 'count': 0}
-            d['count'] += 1
-            write(p, d)
-            try: raw = (S / 'rotate_after').read_text().strip()
-            except FileNotFoundError: raw = ''
-            limit = int(raw) if re.fullmatch(r'[0-9]{1,3}', raw) and 2 <= int(raw) <= 200 else 12
-            print(d['count'], limit)
+            if mode not in ('job', 'idle', 'due'): raise ValueError('invalid lineage action')
+            def limit_file(name, low, high, default):
+                try: raw = (S / name).read_text().strip()
+                except FileNotFoundError: raw = ''
+                return int(raw) if re.fullmatch(r'[0-9]{1,3}', raw) and low <= int(raw) <= high else default
+            limit = limit_file('rotate_after', 3, 200, 8)
+            idle_limit = limit_file('rotate_idle', 1, 20, 2)
+            try:
+                old = read(p)
+                if not isinstance(old, dict): raise ValueError('invalid lineage.json')
+                if 'jobs' in old:
+                    jobs, idle = old['jobs'], old['idle']
+                else:
+                    jobs, idle = old['count'], 0
+                if any(type(n) is not int or n < 0 for n in (jobs, idle)):
+                    raise ValueError('invalid lineage counters')
+                d = {'started': old.get('started', int(time.time())), 'jobs': jobs, 'idle': idle}
+            except (ValueError, OSError, TypeError, KeyError):
+                if mode != 'due' and p.exists(): raise
+                d = {'started': int(time.time()), 'jobs': 0, 'idle': 0}
+            if mode == 'due':
+                print(int(d['idle'] >= idle_limit or d['jobs'] >= limit),
+                      d['idle'], idle_limit, d['jobs'], limit)
+            else:
+                d['jobs' if mode == 'job' else 'idle'] += 1
+                write(p, d)
+                if mode == 'job': print(d['jobs'], limit)
+                else: print(d['idle'], idle_limit, d['jobs'], limit)
     elif action == 'reclaim':
         path, pid = pathlib.Path(args[0]), args[1]
         renamed = pathlib.Path(str(path) + '.reclaim.' + pid)
@@ -205,10 +237,12 @@ try:
             if value.isdigit() and int(value) > 1:
                 try:
                     os.kill(int(value), 0)
-                    command = subprocess.run(['ps', '-o', 'args=', '-p', value], capture_output=True, text=True).stdout
-                    return value, ('listen.sh' if path.name == 'listener.lock.d' else '.sh') in command
+                    inspection = subprocess.run(['ps', '-o', 'args=', '-p', value],
+                                                capture_output=True, text=True, timeout=5)
+                    if inspection.returncode or not inspection.stdout.strip(): return value, True
+                    return value, ('listen.sh' if path.name == 'listener.lock.d' else '.sh') in inspection.stdout
                 except ProcessLookupError: pass
-                except PermissionError: return value, True
+                except (OSError, subprocess.TimeoutExpired): return value, True
             return value, False
         # Avoid moving a known live lock or its PID-publication window.
         _, protected = owner(path)
@@ -443,13 +477,13 @@ restart_main() {
             [ -z "${FILAMENT_JOB_START+x}" ] || log_event CHAIN-ALREADY-LISTENING
             echo ALREADY_LISTENING; exit 3
         fi
-        stop_listener || :
     fi
     if [ -z "${FILAMENT_JOB_START+x}" ]; then
         if ! take_lock "$STATE/reply.lock.d" 25; then echo RESTART_BUSY; exit 3; fi
-        if ! json_helper lineage reset; then echo RESTART_BUSY; exit 3; fi
+        if ! json_helper lineage job > /dev/null; then echo RESTART_BUSY; exit 3; fi
         release_lock "$STATE/reply.lock.d"
     fi
+    if [ "${1:-}" = --replace ]; then stop_listener || :; fi
     printf '%s\n' "$$" > "$STATE/restart.pending"
     release_lock "$STATE/restart.lock.d"
     trap - EXIT TERM INT
