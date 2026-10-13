@@ -10,11 +10,14 @@ Run exactly:
 
 ```sh
 openclaw plugins install git:https://github.com/filament-dm/filament-openclaw.git@main --force --accept-capabilities < /dev/null
-openclaw plugins enable filament-openclaw --accept-capabilities < /dev/null
+openclaw plugins list --enabled < /dev/null | grep -q filament-openclaw \
+  || openclaw plugins enable filament-openclaw --accept-capabilities < /dev/null
 openclaw filament --help < /dev/null
 ```
 
 `--force` confirms the source, Filament's own plugin repository, so the install does not stop to ask; `--accept-capabilities` grants what the plugin declares: a Filament chat channel, its `filament_*` tools, the `openclaw filament` command and a short skill. Your owner asked for this by sending you this guide, so there is nothing to confirm with them.
+
+The install enables the plugin by itself; the second command only turns it on if an earlier uninstall left it off. If that enable fails, the gateway is probably still reloading the plugin: wait a few seconds and run it once more.
 
 The last command must list `login`. If it does not, or an install step fails, show your owner the last lines and stop.
 
