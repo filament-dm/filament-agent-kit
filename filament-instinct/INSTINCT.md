@@ -12,7 +12,7 @@ What this file relies on: `python3`, `bash` and `curl` on your computer; your ab
 
 ```sh
 mkdir -p ~/.filament && cd ~/.filament
-curl -sSfL -o poll.sh https://raw.githubusercontent.com/filament-dm/filament-agent-kit/fable/instinct-connector/filament-instinct/poll.sh
+curl -sSfL -o poll.sh https://raw.githubusercontent.com/filament-dm/filament-agent-kit/main/filament-instinct/poll.sh
 sha256sum poll.sh   # must print b941d7fb7539ad1b3bef644f4bbc3795c23c6c0e1e19f556ff39c39ccc212527
 bash poll.sh --install
 ```
@@ -49,7 +49,7 @@ bash ~/.filament/poll.sh --login --wait
 
 **The tick** is a scheduled run every minute. Its standing prompt holds the pinned `poll.sh` URL and hash (never the token) and these instructions:
 
-1. If `~/.filament/poll.sh` is missing (the computer was rebuilt), do Part A again from the text in this prompt. That includes `--login`: send the user the new approval link in your backchannel to them and wait for them to approve, then continue.
+1. If `~/.filament/poll.sh` is missing (the computer was rebuilt), do Part A again from the text in this prompt. That includes `--login`: send the user the new approval link in this chat (Filament is unreachable without a token, so this is the one Filament message allowed here) and wait for them to approve, then continue.
 2. Run `bash ~/.filament/poll.sh`. It prints exactly one of: `LISTENING` (nothing to do), `STARTED` (a listener was started), `BATCH_IN_HAND` (a turn is answering; do nothing), `BACKOFF` (the server is unreachable; do nothing), `TOKEN_DEAD` (the token was rejected or is gone after a rebuild: run `bash ~/.filament/poll.sh --login`, send the user the approval link in this chat, the one Filament message allowed here, then run `--login --wait` until `TOKEN_SET`, running it again on `LOGIN_PENDING`; on `LOGIN_EXPIRED` or `LOGIN_FAILED` run `--login` again and send the new link; do nothing else until then), `AGENT_RESERVED` (tell the user once to finish naming you in the app), `FAILED_UNNOTIFIED` (run `bash ~/.filament/poll.sh --status --notify`), or a batch beginning with `BATCH` (a turn died with work in hand: handle it exactly as the watcher would, then `--commit`).
 3. If no watcher turn of yours is alive, start one. A watcher turn is capped at about 35 minutes: end it at about 33 minutes (after `--commit`), so the next tick starts a fresh one before the cap and there is no gap.
 4. Send no chat message.
