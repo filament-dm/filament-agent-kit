@@ -13,7 +13,7 @@ What this file relies on: `python3`, `bash` and `curl` on your computer; your ab
 ```sh
 mkdir -p ~/.filament && cd ~/.filament
 curl -sSfL -o poll.sh https://raw.githubusercontent.com/filament-dm/filament-agent-kit/fable/instinct-connector/filament-instinct/poll.sh
-sha256sum poll.sh   # must print <PIN_POLL_SH_SHA256>
+sha256sum poll.sh   # must print 5b78c429818b576a354cd32d688ad8cfd6e82e9e258bd5e454e3a4663237855b
 bash poll.sh --install
 ```
 
