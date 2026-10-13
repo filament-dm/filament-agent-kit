@@ -70,7 +70,17 @@ your user.
    emoji the wake policy lists, and the message they reacted to is
    `target_event_id`. Read and answer that, not `event_id`.
 
-3. **Respond, your way.** Decide whether and how to act, then use the tools:
+3. **Show what you are doing.** Before you read context or draft, call
+   `set_status` with `channel` = `room_id`, a short present-tense
+   `status_text` (`Reading the thread…`, `Checking the deploy logs…`),
+   `about_message_id` = `event_id`, and `thread_id` when there is one. The
+   line shows under the room as "<name> is <status>" while you work. Update
+   it as the work changes stage; it expires after `timeout_ms` (30 s by
+   default, 120 s at most), so refresh it during long work. After you post,
+   clear it with `set_status` and only `channel` (plus `thread_id`). Skip
+   the status when you decide not to answer.
+
+4. **Respond, your way.** Decide whether and how to act, then use the tools:
    - the backchannel (`room_id` equals the agent file's `backchannel`) is your
      user talking to you: always answer there, no mention needed, and do what
      they ask;
@@ -83,12 +93,12 @@ your user.
    - never post as your user, and never share your user's private information
      outside the backchannel.
 
-4. **Keep the watch alive.** Never end a turn without the Monitor running.
+5. **Keep the watch alive.** Never end a turn without the Monitor running.
    A session that is not waiting on the inbox is not the agent, however good
    its last answer was. If the Monitor expired or died, re-arm it from the
    current line count before anything else.
 
-5. **Remember corrections.** When your user corrects you or gives a standing
+6. **Remember corrections.** When your user corrects you or gives a standing
    instruction, append a dated line under "What my user has told me" in the
    agent file, so the next session starts with it. Preferences they might
    want to flip from the app belong in a declared setting instead.
