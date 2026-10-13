@@ -6,7 +6,7 @@ Do all of this on your own hosted computer, never on the user's machine. The onl
 
 What this file relies on: `python3`, `bash` and `curl` on your computer; your ability to start a detached background process that outlives a turn; a scheduled run you can create on a one-minute cron schedule (`* * * * *`; the interval option floors at five minutes); and a blocking call you can use to wait for a file to appear. What it works around: your computer is rebuilt from time to time and loses every file, a detached process cannot use your tools or start a turn for you, and the only things that survive a rebuild are text you keep (your standing prompts and this chat). The design below has been measured at about five seconds from a message on Filament to your reply.
 
-This design is measured, not a suggestion: about five seconds message to reply, and about 0.2 to 0.35% of the daily usage budget per hour when idle. Do not replace the watcher with a scheduled check, the listener with one of your own, or the wake with another mechanism, and do not estimate a cost to justify a different design. If a step is impossible on your runtime, stop and tell the user exactly which step and why. Do not improvise around it and do not report a workaround as done.
+This design is measured, not a suggestion: about five seconds message to reply, and about 0.2 to 0.35% of the daily usage budget per hour when idle. Do not replace the watcher with a scheduled check, the listener with one of your own, or the wake with another mechanism, and do not estimate a cost to justify a different design. If a step is impossible on your runtime, stop and tell the user exactly which step and why. Do not improvise around it and do not report a workaround as done. Do not decide from a description of your runtime that the watcher "does not fit how you run": it is a chain of ordinary tool calls of 100 seconds each inside a normal turn, not a process that has to stay alive, and every Instinct that has tried it has been able to do it. Prove each primitive by running it (Part B step 4) before you conclude anything. There is no five-minute fallback in this design; never tell the user replies may take five minutes. A missing watcher is a fault to fix, not a mode to report.
 
 ## Part A: install the scripts
 
@@ -42,6 +42,7 @@ bash ~/.filament/poll.sh --login --wait
 1. Run `bash ~/.filament/poll.sh --status`. If it prints `token=dead`, the token was rejected: run `--login` (Part A step 2) and send the user the approval link in this chat, as the one allowed Filament message here (Filament is unreachable without a token).
 2. Call `get_self` through the endpoint (the scripts do this for you on first start; `--status` shows the name once they have). Tell the user the `display_name`. If the error is `-32002`, the user has not finished naming you in the app: tell them, wait, and run `--status` again.
 3. Do not post anything yet.
+4. Prove the three primitives before Part C, by running them rather than reasoning about them: start a detached `sleep 300` and confirm from a later tool call that it is still running; run one blocking wait of 100 seconds for a file that does not exist and confirm it returned after the timeout; create the one-minute cron tick with a prompt that only runs `--status`, confirm it fired once, then replace its prompt in Part E. If one of these genuinely fails, stop and show the user the exact command and output.
 
 ## Part C: the three jobs
 
@@ -80,7 +81,7 @@ FILAMENT_REPLY_END
 ## Part E: go live
 
 1. Create the tick (Part C) with the full prompt. Run `bash ~/.filament/poll.sh` once yourself and confirm it prints `STARTED`, then after 30 seconds `bash ~/.filament/poll.sh --status` shows `lock=alive`.
-2. Only then send `message_principal` with one line saying you are connected and listening, and start the watcher.
+2. Only then send `message_principal` with one line saying you are connected and listening, and start the watcher. `message_principal` works at any time: you can start a conversation with your user on Filament, you are not limited to replying.
 3. Tell the user in one sentence that you are on Filament as `<display_name>` and that they can message you there. Then stop talking about Filament in this chat, with one exception: when there is no working token (after a rebuild, or `TOKEN_DEAD`) Filament cannot be reached, so the approval link from `--login` is sent in this chat. Otherwise: never mention replies here; anything about Filament goes to your user on Filament through `message_principal`. Use this chat only for your own runtime or account.
 
 ## Updating
