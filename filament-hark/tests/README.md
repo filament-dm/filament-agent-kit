@@ -34,6 +34,7 @@ when supplied, and removes it afterwards. It copies the scripts into each
 directory: production scripts always resolve siblings through that state
 directory. It does not modify a live connector. Each scenario writes a
 `scenario.json` of canned responses into its private directory. The original test numbering is retained; tests 25-26 cover media and tests 27-38 cover tags, stable numbers, lineage accounting, lock reclaim and the backstop. Tests 39-48 cover idle accounting and the composed lifecycle, cumulative idle across work, limits, migration, job accounting, non-reset commands, uncounted failure paths, lock contention, reply progress after redelivery and lineage errors. Tests 49-58 cover read-only due parsing and defaults, status priority, takeover lock/write failures, the under-lock due recheck, the no-relaunch lifecycle, replacement counting before killing, and failed/empty/timed-out ps protecting live locks.
+Tests 59-63 cover lost or missing per-poll ownership, preservation of the replacement owner, busy work and missing/null reply targets without delivery or ack, six-field verdicts and raw last_poll.json retention; empty and delivered polls also verify snapshot absence and creation.
 Run a single group with, for example:
 
 ```sh

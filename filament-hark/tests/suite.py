@@ -133,11 +133,13 @@ exit 3
         self.assertFalse((self.state / 'listener.lock.d').exists())
         self.assertFalse((self.state / 'listener.pid').exists())
         self.assertFalse((self.state / 'cursor').exists())
+        self.assertFalse((self.state / 'last_poll.json').exists())
 
     def test_02_second_poll_delivery(self):
         target = item()
         self.scenario(poll_work=[work(), work(target)])
         output = self.run_script(rc=0, last='ITEMS 1')
+        self.assertEqual(json.loads((self.state / 'last_poll.json').read_text()), work(target)['out'])
         target.update(number=1, tags='ROOM QUIET')
         target['messages'][0]['tags'] = ''
         delivered = json.loads(output.splitlines()[-2])
@@ -1207,6 +1209,70 @@ original_json_helper "$@"''')
         self.assertFalse((self.state / 'reply.lock.d').exists())
         self.assertIsNone(listener.poll())
         listener.terminate(); self.finish(listener, 3, 'KILLED')
+
+    def test_59_ownership_lost_preserves_new_owner(self):
+        self.scenario(poll_work=[dict(work(), delay=1), work()])
+        listener = self.start()
+        self.wait_for(lambda: len(self.calls('poll_work')) == 1)
+        lock = self.state / 'listener.lock.d'
+        holder = self.hold_lock(lock)
+        (self.state / 'listener.pid').write_text(str(holder.pid))
+        self.finish(listener, 3, 'DUPLICATE')
+        self.assertIn(f'LISTENER-OWNERSHIP-LOST {holder.pid}', self.log())
+        self.assertEqual((lock / 'pid').read_text(), str(holder.pid))
+        self.assertEqual((self.state / 'listener.pid').read_text(), str(holder.pid))
+        self.assertEqual(len(self.calls('poll_work')), 1)
+        self.assertFalse((self.state / 'lineage.json').exists())
+
+    def test_60_ownership_missing(self):
+        self.scenario(poll_work=[dict(work(), delay=1), work()])
+        listener = self.start()
+        self.wait_for(lambda: len(self.calls('poll_work')) == 1)
+        (self.state / 'listener.lock.d/pid').unlink()
+        self.finish(listener, 3, 'DUPLICATE')
+        self.assertIn('LISTENER-OWNERSHIP-LOST NONE', self.log())
+        self.assertEqual(len(self.calls('poll_work')), 1)
+        self.assertTrue((self.state / 'listener.lock.d').exists())
+
+    def test_61_busy_work_saved_without_delivery_or_ack(self):
+        raw = json.dumps(dict(busy=True, work=[item()], next_poll_ms=100), indent=2)
+        self.scenario(poll_work=[{'raw': raw}, work()])
+        self.run_script(age=455)
+        self.assertIn('POLL-BUSY work=1', self.log())
+        self.assertEqual((self.state / 'last_poll.json').read_text(), raw + '\n')
+        self.assertGreater(len(self.calls('poll_work')), 1)
+        self.assertEqual(self.calls('ack'), [])
+        self.assertFalse((self.state / 'items/wake.json').exists())
+        self.assertNotIn('WAKE-DELIVERED', self.log())
+
+    def test_62_missing_or_null_target_saved_without_ack(self):
+        for missing in (False, True):
+            with self.subTest(missing=missing):
+                target = item()
+                if missing: del target['reply_with']
+                else: target['reply_with'] = None
+                response = work(target)
+                self.scenario(poll_work=[response, work()])
+                (self.state / 'counts.json').unlink(missing_ok=True)
+                self.run_script(age=455)
+                self.assertIn('DROPPED-NO-TARGET 1', self.log())
+                self.assertEqual(json.loads((self.state / 'last_poll.json').read_text()), response['out'])
+                self.assertEqual(self.calls('ack'), [])
+                self.assertFalse((self.state / 'items/wake.json').exists())
+                self.assertNotIn('FILTERED', self.log())
+
+    def test_63_poll_verdict_fields_and_busy_empty_retention(self):
+        self.helper_probe('poll "$STATE/probe" "@self:test"')
+        run = self.state / 'probe'; run.mkdir()
+        samples = [({'busy': True, 'work': [], 'next_poll_ms': 100}, 'busy 0.1 0 none 0 0'),
+                   ({'work': [], 'next_poll_ms': 100}, 'empty 0.1 0 none 0 0')]
+        saved = None
+        for response, expected in samples:
+            raw = json.dumps(response, indent=2) + '\n'
+            (run / 'out').write_text(raw)
+            self.run_script('probe.sh', rc=0, last=expected)
+            if response.get('busy'): saved = raw
+            self.assertEqual((self.state / 'last_poll.json').read_text(), saved)
 
 if __name__ == '__main__':
     print('Bash: ' + subprocess.check_output([BASH, '-c', 'printf "%s" "$BASH_VERSION"'], text=True), flush=True)

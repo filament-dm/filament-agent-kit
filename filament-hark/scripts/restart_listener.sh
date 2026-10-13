@@ -82,14 +82,22 @@ try:
         run, self_id = pathlib.Path(args[0]), args[1]
         d = read(run / 'out')
         if not isinstance(d, dict) or not isinstance(d.get('work', []), list): raise ValueError('invalid poll')
+        if d.get('work') or d.get('busy') is True:
+            saved = S / 'last_poll.json'
+            tmp = saved.with_name(saved.name + '.tmp.' + str(os.getpid()))
+            try:
+                shutil.copyfile(run / 'out', tmp)
+                os.replace(tmp, saved)
+            finally:
+                if tmp.exists(): tmp.unlink()
         delay = d.get('next_poll_ms', 1000)
         if not isinstance(delay, (int, float)) or not math.isfinite(delay): delay = 1000
         delay = max(0, delay / 1000)
         if d.get('busy') is True:
-            print('busy', delay, 0, 'none', 0)
+            print('busy', delay, len(d.get('work', [])), 'none', 0, 0)
             sys.exit()
         seen = set(seen_ids())
-        kept, ack, filtered = [], [], 0
+        kept, ack, filtered, dropped = [], [], 0, 0
         def ids(messages):
             return [m['event_id'] for m in messages if isinstance(m.get('event_id'), str) and m['event_id']]
         def not_for_us(m):
@@ -97,7 +105,9 @@ try:
             return (bool(self_id) and sender == self_id) or (isinstance(sender, str) and sender.startswith('@filament_god:'))
         for item in d.get('work', []):
             if not isinstance(item, dict): raise ValueError('invalid item')
-            if item.get('reply_with') is None: continue
+            if item.get('reply_with') is None:
+                dropped += 1
+                continue
             messages = item.get('messages')
             if not isinstance(messages, list) or any(not isinstance(m, dict) for m in messages): raise ValueError('invalid messages')
             new = [m for m in messages if m.get('event_id') not in seen]
@@ -117,9 +127,9 @@ try:
                 for item in kept:
                     f.write(json.dumps({'channel': item['channel_id'], 'limit': 25}, separators=(',', ':')) + '\n')
             stamp = str(kept[0]['messages'][0].get('timestamp', 'none')).replace(' ', '_').replace('\n', '_')[:100]
-            print('work', delay, len(kept), stamp, filtered)
+            print('work', delay, len(kept), stamp, filtered, dropped)
         else:
-            print('truncated' if d.get('truncated') else 'empty', delay, 0, 'none', filtered)
+            print('truncated' if d.get('truncated') else 'empty', delay, 0, 'none', filtered, dropped)
     elif action == 'deliver':
         run = pathlib.Path(args[0])
         d = read(run / 'filtered')
