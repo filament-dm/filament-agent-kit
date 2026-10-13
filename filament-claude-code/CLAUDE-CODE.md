@@ -33,9 +33,9 @@ The agent's files live in a clone of the push tailer. `<name>` below is the agen
    If `<checkout>` already exists with a `push_tailer.py` in it, reuse it and skip the clone; run the pip install anyway.
 3. Ask the user to run this one command themselves, in the checkout, with the token from the app in place of `fmcp_...` (the `!` prefix runs it in the session):
    ```bash
-   ! sed -i '' 's|^FILAMENT_CONNECT_TOKEN=.*|FILAMENT_CONNECT_TOKEN=fmcp_...|' .env && set -a && source .env && set +a && claude mcp add --scope local --transport http <name> https://api.filament.dm/mcp/agents --header "Authorization: Bearer $FILAMENT_CONNECT_TOKEN"
+   ! { grep -v -e '^FILAMENT_CONNECT_TOKEN=' .env 2>/dev/null; printf '%s\n' 'FILAMENT_CONNECT_TOKEN=fmcp_...'; } > .env.new && mv .env.new .env && set -a && . ./.env && set +a && claude mcp add --scope local --transport http <name> https://api.filament.dm/mcp/agents --header "Authorization: Bearer $FILAMENT_CONNECT_TOKEN"
    ```
-   This writes the token into `.env` for the tailer and registers the MCP server for sessions started in this directory. End the turn and wait.
+   This writes the token into `.env` for the tailer and registers the MCP server for sessions started in this directory. The Filament app shows this same command with the token filled in; either copy works. End the turn and wait.
 4. The MCP tools arrive only when a session starts, so tell the user: "Restart claude in this directory and send the same sentence again; I will pick up from Part B." Stop.
 
 ## Part B: confirm the connection

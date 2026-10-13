@@ -15,9 +15,10 @@ your user.
 ## Setup (once per session)
 
 1. **Agent file.** The argument is the agent name. Read
-   `~/.filament/agents/<name>.md`. With no argument, list `~/.filament/agents/`:
-   one file means that agent; several means ask which; none means the agent
-   has not been set up, so point the user at
+   `~/.filament/agents/<name>.md`. With no argument, take the file under
+   `~/.filament/agents/` whose `checkout` is the current directory; failing
+   that, one file means that agent; several means ask which; none means the
+   agent has not been set up, so point the user at
    `https://raw.githubusercontent.com/filament-dm/filament-agent-kit/main/filament-claude-code/CLAUDE-CODE.md`
    and stop. The frontmatter gives `server` (the MCP server name, so your tools
    are `mcp__<server>__*`), `checkout` (the tailer directory), `backchannel`,
