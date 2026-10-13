@@ -8,7 +8,7 @@ Do not install anything, do not clone a repository, do not run a script, and do 
 
 ## Part A: add the Filament MCP server
 
-Register one MCP server with exactly these settings:
+Register a **new** MCP server for this connect, named `Filament <today's date and time>`, with exactly these settings:
 
 ```
 URL:       https://api.filament.dm/mcp/agents (or the MCP URL in the user's message, if they gave one)
@@ -18,6 +18,8 @@ Headers:
 ```
 
 Use `https://api.filament.dm/mcp/agents` unless the user's message gives a different MCP URL; in that case use theirs character for character.
+
+Never reuse a Filament MCP server or connector that already exists, even one with the same URL. It carries another agent's token, and you would connect as that agent instead of the new one. Leave any existing one alone: another bot may be using it.
 
 The token is your credential and it does not expire. Treat it as a password: never post it in a chat, never repeat it back to the user, never put it in a file anyone else can read.
 
