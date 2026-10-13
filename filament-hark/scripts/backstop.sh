@@ -25,6 +25,25 @@ case "${1:-}" in
                 log_event LINEAGE-RESET-SKIPPED
             fi
         fi
+        if [ "$status" = RUNNING ]; then
+            due=$(json_helper lineage due 2>> "$STATE/backstop.log") || due=0
+            if [[ $due == 1\ * ]]; then
+                if take_lock "$STATE/reply.lock.d" 100; then
+                    # A reply or another check may have changed the lineage.
+                    due=$(json_helper lineage due 2>> "$STATE/backstop.log") || due=0
+                    if [[ $due == 1\ * ]]; then
+                        if json_helper lineage reset 2>> "$STATE/backstop.log"; then
+                            status=TAKEOVER
+                        else
+                            log_event TAKEOVER-SKIPPED
+                        fi
+                    fi
+                    release_lock "$STATE/reply.lock.d"
+                else
+                    log_event TAKEOVER-SKIPPED
+                fi
+            fi
+        fi
         printf '%s %s\n' "$(stamp)" "$status" >> "$STATE/backstop.log"
         echo "$status"
         ;;

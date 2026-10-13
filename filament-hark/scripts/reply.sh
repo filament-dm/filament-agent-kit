@@ -21,21 +21,9 @@ if [ "${1:-}" = --ack ]; then mode=ack; shift; fi
 number=${1:-}
 log_event "REPLY-START item=$number"
 if ! take_lock "$STATE/reply.lock.d" 150; then log_event LOCK-TIMEOUT; chain; fi
-if ! json_helper lineage job > "$STATE/.lineage-count.$$" 2>> "$STATE/reply.log"; then
-    rm -f "$STATE/.lineage-count.$$"; log_event STATE-ERROR; chain
-fi
-read -r count limit < "$STATE/.lineage-count.$$"
-rm -f "$STATE/.lineage-count.$$"
-if [ "$count" -ge "$limit" ]; then
-    # Never let a signal take the usual chain path after the rotation decision.
-    trap 'exit 3' TERM INT
-    stop_listener || :
-    log_event "ROTATE count=$count"
-    task=NONE
-    if [ -f "$STATE/backstop.task" ]; then task=$(cat "$STATE/backstop.task"); fi
-    cleanup
-    echo "ROTATE $task"
-    exit 3
+# Job output retains its count/limit format; posting does not use either value.
+if ! json_helper lineage job > /dev/null 2>> "$STATE/reply.log"; then
+    log_event STATE-ERROR; chain
 fi
 if [ "$#" -ne 1 ] || ! [[ $number =~ ^[1-9][0-9]*$ ]] || [ ! -f "$STATE/items/$number.json" ]; then
     log_event BAD-ITEM; echo BAD_ITEM; chain

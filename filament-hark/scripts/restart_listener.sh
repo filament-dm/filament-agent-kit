@@ -185,25 +185,38 @@ try:
         (run / 'delivery').write_text('\n'.join(summaries) + '\n' + json.dumps(d, ensure_ascii=True, separators=(',', ':')) + '\n')
     elif action == 'lineage':
         p = S / 'lineage.json'
-        if args[0] == 'reset':
+        mode = args[0]
+        if mode == 'reset':
             write(p, {'started': int(time.time()), 'jobs': 0, 'idle': 0})
         else:
-            old = read(p) if p.exists() else {}
-            d = {'started': old.get('started', int(time.time())),
-                 'jobs': old.get('jobs', old.get('count', 0)), 'idle': old.get('idle', 0)}
-            if args[0] not in ('job', 'idle'): raise ValueError('invalid lineage action')
-            d['jobs' if args[0] == 'job' else 'idle'] += 1
-            write(p, d)
-            try: raw = (S / 'rotate_after').read_text().strip()
-            except FileNotFoundError: raw = ''
-            limit = int(raw) if re.fullmatch(r'[0-9]{1,3}', raw) and 3 <= int(raw) <= 200 else 12
-            if args[0] == 'job':
-                print(d['jobs'], limit)
-            else:
-                try: raw = (S / 'rotate_idle').read_text().strip()
+            if mode not in ('job', 'idle', 'due'): raise ValueError('invalid lineage action')
+            def limit_file(name, low, high, default):
+                try: raw = (S / name).read_text().strip()
                 except FileNotFoundError: raw = ''
-                idle_limit = int(raw) if re.fullmatch(r'[0-9]{1,3}', raw) and 1 <= int(raw) <= 20 else 2
-                print(d['idle'], idle_limit, d['jobs'], limit)
+                return int(raw) if re.fullmatch(r'[0-9]{1,3}', raw) and low <= int(raw) <= high else default
+            limit = limit_file('rotate_after', 3, 200, 8)
+            idle_limit = limit_file('rotate_idle', 1, 20, 2)
+            try:
+                old = read(p)
+                if not isinstance(old, dict): raise ValueError('invalid lineage.json')
+                if 'jobs' in old:
+                    jobs, idle = old['jobs'], old['idle']
+                else:
+                    jobs, idle = old['count'], 0
+                if any(type(n) is not int or n < 0 for n in (jobs, idle)):
+                    raise ValueError('invalid lineage counters')
+                d = {'started': old.get('started', int(time.time())), 'jobs': jobs, 'idle': idle}
+            except (ValueError, OSError, TypeError, KeyError):
+                if mode != 'due' and p.exists(): raise
+                d = {'started': int(time.time()), 'jobs': 0, 'idle': 0}
+            if mode == 'due':
+                print(int(d['idle'] >= idle_limit or d['jobs'] >= limit),
+                      d['idle'], idle_limit, d['jobs'], limit)
+            else:
+                d['jobs' if mode == 'job' else 'idle'] += 1
+                write(p, d)
+                if mode == 'job': print(d['jobs'], limit)
+                else: print(d['idle'], idle_limit, d['jobs'], limit)
     elif action == 'reclaim':
         path, pid = pathlib.Path(args[0]), args[1]
         renamed = pathlib.Path(str(path) + '.reclaim.' + pid)
@@ -214,10 +227,12 @@ try:
             if value.isdigit() and int(value) > 1:
                 try:
                     os.kill(int(value), 0)
-                    command = subprocess.run(['ps', '-o', 'args=', '-p', value], capture_output=True, text=True).stdout
-                    return value, ('listen.sh' if path.name == 'listener.lock.d' else '.sh') in command
+                    inspection = subprocess.run(['ps', '-o', 'args=', '-p', value],
+                                                capture_output=True, text=True, timeout=5)
+                    if inspection.returncode or not inspection.stdout.strip(): return value, True
+                    return value, ('listen.sh' if path.name == 'listener.lock.d' else '.sh') in inspection.stdout
                 except ProcessLookupError: pass
-                except PermissionError: return value, True
+                except (OSError, subprocess.TimeoutExpired): return value, True
             return value, False
         # Avoid moving a known live lock or its PID-publication window.
         _, protected = owner(path)
@@ -452,13 +467,13 @@ restart_main() {
             [ -z "${FILAMENT_JOB_START+x}" ] || log_event CHAIN-ALREADY-LISTENING
             echo ALREADY_LISTENING; exit 3
         fi
-        stop_listener || :
     fi
     if [ -z "${FILAMENT_JOB_START+x}" ]; then
         if ! take_lock "$STATE/reply.lock.d" 25; then echo RESTART_BUSY; exit 3; fi
         if ! json_helper lineage job > /dev/null; then echo RESTART_BUSY; exit 3; fi
         release_lock "$STATE/reply.lock.d"
     fi
+    if [ "${1:-}" = --replace ]; then stop_listener || :; fi
     printf '%s\n' "$$" > "$STATE/restart.pending"
     release_lock "$STATE/restart.lock.d"
     trap - EXIT TERM INT

@@ -33,7 +33,7 @@ creates a private temporary directory for each test, under `FILAMENT_STATE`
 when supplied, and removes it afterwards. It copies the scripts into each
 directory: production scripts always resolve siblings through that state
 directory. It does not modify a live connector. Each scenario writes a
-`scenario.json` of canned responses into its private directory. The original test numbering is retained; tests 25-26 cover media and tests 27-38 cover tags, stable numbers, lineage rotation, lock reclaim and the backstop. Tests 39-48 cover idle rotation and the composed lifecycle, cumulative idle across work, limits, migration, job accounting, non-reset commands, uncounted failure paths, lock contention, reply progress after redelivery and lineage errors.
+`scenario.json` of canned responses into its private directory. The original test numbering is retained; tests 25-26 cover media and tests 27-38 cover tags, stable numbers, lineage accounting, lock reclaim and the backstop. Tests 39-48 cover idle accounting and the composed lifecycle, cumulative idle across work, limits, migration, job accounting, non-reset commands, uncounted failure paths, lock contention, reply progress after redelivery and lineage errors. Tests 49-58 cover read-only due parsing and defaults, status priority, takeover lock/write failures, the under-lock due recheck, the no-relaunch lifecycle, replacement counting before killing, and failed/empty/timed-out ps protecting live locks.
 Run a single group with, for example:
 
 ```sh
@@ -111,9 +111,9 @@ An old number still addresses its original reply target. Redelivered work gets
 a new number; after one posts, the other acks through the replied-ids guard.
 Overlapping message sets can both post if either contains new content. Pruning
 removes fully-replied or 24-hour-old numbered files without acking; items/next
-survives. Rotation leaves its item file outstanding for the next lineage.
+survives. Replies at or past the job limit still post or ack, delete their item file and chain.
 
-Backstop tests exercise PAUSED/RUNNING/WEDGED/NEED_START, the 200-line truncation
+Backstop tests exercise PAUSED/RUNNING/WEDGED/NEED_START/TAKEOVER, the 200-line truncation
 before appending (201 afterwards), started, quota-body escaping and the 20-hour
 throttle. Lock fixtures use live .sh owners, as production identity checking
 requires. The media rotation test holds rotate.lock.d while downloading and

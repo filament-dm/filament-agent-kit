@@ -139,28 +139,11 @@ while [ "$(remaining)" -ge 20 ]; do
 done
 # Only budget exhaustion counts as idle; delivery and initialisation failures
 # above remain uncounted NO_WORK exits.
-rotate=0
 if take_lock "$STATE/reply.lock.d" 100; then
-    if json_helper lineage idle > "$RUN/lineage" 2>> "$STATE/listen.log"; then
-        read -r idle idle_limit jobs limit < "$RUN/lineage"
-        if [ "$idle" -ge "$idle_limit" ] || [ "$jobs" -ge "$limit" ]; then
-            log_event "ROTATE idle=$idle jobs=$jobs"
-            rotate=1
-        fi
-    else
-        log_event STATE-ERROR
-        rotate=1
-    fi
+    json_helper lineage idle > /dev/null 2>> "$STATE/listen.log" || log_event STATE-ERROR
     release_lock "$STATE/reply.lock.d"
 else
     log_event IDLE-LOCK-TIMEOUT
-    rotate=1
 fi
-if [ "$rotate" -eq 1 ]; then
-    task=NONE
-    if [ -f "$STATE/backstop.task" ]; then task=$(cat "$STATE/backstop.task"); fi
-    echo "ROTATE $task"
-else
-    echo NO_WORK
-fi
+echo NO_WORK
 exit 3
