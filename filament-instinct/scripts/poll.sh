@@ -17,6 +17,8 @@ import signal
 import sys
 import tempfile
 import time
+import urllib.error
+import urllib.parse
 import urllib.request
 
 # PINNED_BEGIN
@@ -258,6 +260,80 @@ def stop():
     return 0
 
 
+def oauth_post(path, fields, as_json=False):
+    base = EP + '/oauth'
+    if as_json:
+        data = json.dumps(fields).encode()
+        headers = {'Content-Type': 'application/json', 'Accept': 'application/json'}
+    else:
+        data = urllib.parse.urlencode(fields).encode()
+        headers = {'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json'}
+    req = urllib.request.Request(base + path, data=data, method='POST', headers=headers)
+    try:
+        with urllib.request.urlopen(req, timeout=20) as r:
+            return json.loads(r.read().decode())
+    except urllib.error.HTTPError as e:
+        try:
+            return json.loads(e.read().decode())
+        except ValueError:
+            return {'error': 'http_{}'.format(e.code)}
+
+
+def login(wait):
+    """OAuth device flow. `--login` starts it and prints the approval link;
+    `--login --wait` polls for up to 90 s and stores the token like --token."""
+    pending = STATE / 'login.json'
+    if not wait:
+        reg = oauth_post('/register', {
+            'client_name': 'Instinct agent',
+            'token_endpoint_auth_method': 'none',
+            'grant_types': ['urn:ietf:params:oauth:grant-type:device_code'],
+            'redirect_uris': ['http://127.0.0.1:8765/callback']}, as_json=True)
+        if not reg.get('client_id'):
+            print('LOGIN_FAILED register {}'.format(reg.get('error', 'no client_id')))
+            return 2
+        dev = oauth_post('/device_authorization', {'client_id': reg['client_id'], 'scope': 'filament:agent:control'})
+        if not dev.get('device_code'):
+            print('LOGIN_FAILED device {}'.format(dev.get('error', 'no device_code')))
+            return 2
+        with state_guard():
+            wr('login.json', json.dumps({'client_id': reg['client_id'], 'device_code': dev['device_code'],
+                                         'interval': dev.get('interval', 5),
+                                         'expires_at': time.time() + dev.get('expires_in', 600)}), mode=0o600)
+        print('APPROVE {} code={} expires_in={}s'.format(
+            dev.get('verification_uri_complete') or dev.get('verification_uri'), dev.get('user_code'), dev.get('expires_in')))
+        print('Send the user that link now, then run: bash ~/.filament/poll.sh --login --wait')
+        return 0
+    try:
+        st = json.loads(pending.read_text())
+    except (OSError, ValueError):
+        print('LOGIN_FAILED no login in progress; run --login first')
+        return 2
+    deadline = time.time() + 90
+    while time.time() < min(deadline, st['expires_at']):
+        res = oauth_post('/token', {'grant_type': 'urn:ietf:params:oauth:grant-type:device_code',
+                                    'device_code': st['device_code'], 'client_id': st['client_id']})
+        if res.get('access_token'):
+            with state_guard():
+                wr('token', res['access_token'], mode=0o600)
+                remove('token_dead')
+                remove('login.json')
+            print('TOKEN_SET')
+            return 0
+        err = res.get('error')
+        if err not in ('authorization_pending', 'slow_down'):
+            print('LOGIN_FAILED {}'.format(err))
+            remove('login.json')
+            return 2
+        time.sleep(max(st.get('interval', 5), 5) + (5 if err == 'slow_down' else 0))
+    if time.time() >= st['expires_at']:
+        remove('login.json')
+        print('LOGIN_EXPIRED run --login again')
+        return 2
+    print('LOGIN_PENDING run --login --wait again')
+    return 0
+
+
 def main():
     rotate_logs()
     if not args:
@@ -277,9 +353,13 @@ def main():
             remove('token_dead')
         print('TOKEN_SET')
         return 0
+    if args == ['--login']:
+        return login(False)
+    if args == ['--login', '--wait']:
+        return login(True)
     if args == ['--stop']:
         return stop()
-    print('BAD_ARGS: --token reads stdin; see README.md')
+    print('BAD_ARGS: --token reads stdin, --login [--wait] uses OAuth; see README.md')
     return 2
 
 
