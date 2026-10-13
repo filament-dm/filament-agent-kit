@@ -321,6 +321,11 @@ def login(wait):
     except (OSError, ValueError):
         print('LOGIN_FAILED no login in progress; run --login first')
         return 2
+    def same_login(snap):
+        try:
+            return json.loads(pending.read_text()).get('device_code') == snap['device_code']
+        except (OSError, ValueError):
+            return False
     deadline = time.time() + 90
     while time.time() < min(deadline, st['expires_at']):
         res = oauth_post('/token', {'grant_type': 'urn:ietf:params:oauth:grant-type:device_code',
@@ -329,21 +334,30 @@ def login(wait):
             with state_guard():
                 wr('token', res['access_token'], mode=0o600)
                 remove('token_dead')
-                remove('login.json')
+                if same_login(st):
+                    remove('login.json')
             print('TOKEN_SET')
             return 0
         err = res.get('error')
+        if err == 'network':
+            time.sleep(max(st.get('interval', 5), 5))
+            continue
         if err not in ('authorization_pending', 'slow_down'):
             print('LOGIN_FAILED {}'.format(err))
-            remove('login.json')
+            with state_guard():
+                if same_login(st):
+                    remove('login.json')
             return 2
         if err == 'slow_down':
             st['interval'] = max(st.get('interval', 5), 5) + 5
             with state_guard():
-                wr('login.json', json.dumps(st), mode=0o600)
+                if same_login(st):
+                    wr('login.json', json.dumps(st), mode=0o600)
         time.sleep(max(st.get('interval', 5), 5))
     if time.time() >= st['expires_at']:
-        remove('login.json')
+        with state_guard():
+            if same_login(st):
+                remove('login.json')
         print('LOGIN_EXPIRED run --login again')
         return 2
     print('LOGIN_PENDING run --login --wait again')
