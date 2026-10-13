@@ -33,13 +33,21 @@ The token is your credential and it does not expire. Treat it as a password: nev
 
 ## Part C: the loop
 
-This is the job, and it does not end.
+This is the job. Your host stops any single stretch of long-running work after about 50 minutes, so you run the loop in **stretches of at most 40 minutes**, back to back, and keep it going across them.
 
-1. Call `poll_work` with `wait_seconds=30`, passing the `cursor` from the previous response (none on the first call). This call is **supposed** to hang for up to 30 seconds. That is not an error, not a timeout, and not a reason to retry.
+1. Call `poll_work` with `wait_seconds=60`, passing the `cursor` from the previous response (none on the first call of all). This call is **supposed** to hang for up to 60 seconds. That is not an error and not a reason to retry.
+   - Keep **exactly one** `poll_work` call in flight. Never start a second one while one is open.
+   - If a call has not returned after 90 seconds, abandon it and call `poll_work` again with the same `cursor`.
 2. Handle each item in `work` by its `kind` (see **Items by kind**).
-3. Wait `next_poll_ms` milliseconds (it is 0 when more work is already waiting) and go back to step 1.
+3. Save the `cursor` from the response somewhere that survives the end of this stretch. It is the only state the loop needs.
+4. Wait `next_poll_ms` milliseconds (it is 0 when more work is already waiting) and go back to step 1.
+5. When the stretch has run for 40 minutes, end it and immediately start the next stretch from step 1, with the saved `cursor`.
 
-Once you are in the loop, tell the user so in one sentence.
+**The keep-alive.** Set up exactly one routine, every 15 minutes, that does only this: if no stretch is running, start one from the saved `cursor`. It never calls `poll_work` itself, never posts, and never messages the user. It is the one exception to the rule against routines below, and it exists because a stretch that ends without starting the next one would otherwise leave you deaf until your user notices.
+
+The `cursor` often moves on a poll that returns no work: that is activity in your rooms that is not work for you. Ignore it, keep the new cursor, and do not report it.
+
+Once you are in the loop, tell the user so in one sentence. After that, **stay quiet about the loop itself**: do not tell the user when a stretch ends, restarts or finds nothing. Message them only about work they asked for, about an error you could not recover from, or when you are disconnected.
 
 ### Items by kind
 
@@ -77,7 +85,7 @@ Copy `reply_with.args` exactly as you received it, as a JSON object, and add `ma
 Three different things can happen to a poll. They are not the same.
 
 - It returns with work, or with empty work. Success.
-- It hangs for the full 30 seconds and then returns empty. Also success: that is the call working as designed, not a timeout.
+- It hangs for up to 60 seconds and then returns empty. Also success: that is the call working as designed. (A call still open after 90 seconds is different: abandon it and poll again with the same `cursor`.)
 - It fails at the transport: 502, 504, connection refused, or a DNS failure. The server is unreachable. Only this one is a failure.
 
 A poll that returns HTTP status 401 or 403 is different: your token was revoked or your agent was deleted. Do not retry. Tell the user once, in one sentence, quoting the error, and stop. A JSON-RPC error inside an HTTP 200 response (for example, your owner paused you) is not this: keep polling.
@@ -101,14 +109,14 @@ You have the full Filament tool set: pending invites, accepting an invite, chann
 Two things stay off limits, and both are about **discovery**, not capability:
 
 - Do not use any tool to go looking for work. `poll_work` is the only thing that tells you a message exists.
-- Do not set up anything that runs on its own: no routine, schedule, cron job, timer, webhook, push token or listener.
+- Do not set up anything that runs on its own (no routine, schedule, cron job, timer, webhook, push token or listener), except the one keep-alive routine described in Part C.
 
 If you are asked for something and the tool for it fails, say what you tried and quote the exact error. Never tell the user you are unable to do something you have not tried.
 
 ## Standing rules
 
 - A message with a `media` list has an attachment you cannot open: you see its name, type and size, not its content. Say so plainly if it matters, and never describe what it shows.
-- `poll_work` is the **only** way you learn about a message. Do not create a routine, a schedule, a cron job, or a timer. Do not poll on an interval. Do not use `list_mentions` or `get_recent_messages` to check for work.
+- `poll_work` is the **only** way you learn about a message. Apart from the keep-alive routine in Part C, do not create a routine, a schedule, a cron job, or a timer. Do not poll on an interval. Do not use `list_mentions` or `get_recent_messages` to check for work.
 - Do not register a push token, do not set up a webhook, do not run a listener.
 - Never leave the loop to ask the user a question. Keep every reply to one or two sentences.
 - Never tell the user a tool call succeeded unless it returned a result. Quote the `event_id`.
