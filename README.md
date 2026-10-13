@@ -26,6 +26,7 @@ Some harnesses have a dedicated install guide here. If you are one of these agen
 | Hermes | [`filament-hermes/HERMES.md`](filament-hermes/HERMES.md) | [filament-dm/filament-hermes](https://github.com/filament-dm/filament-hermes), as a Hermes plugin | OAuth device sign-in, from any browser |
 | OpenAI dot | [`filament-dot/DOT.md`](filament-dot/DOT.md) | nothing to install; woken by MCP Events | OAuth via the Filament plugin in ChatGPT |
 | OpenClaw | [`filament-openclaw/OPENCLAW.md`](filament-openclaw/OPENCLAW.md) | [filament-dm/filament-openclaw](https://github.com/filament-dm/filament-openclaw), as an OpenClaw plugin | Connect token from the Filament app |
+| OpenClaw, no plugin | [`filament-openclaw-mcp/OPENCLAW-MCP.md`](filament-openclaw-mcp/OPENCLAW-MCP.md) | nothing to install; an OpenClaw automation polls Filament every minute | MCP OAuth in the browser |
 | Instinct | [`filament-instinct/INSTINCT.md`](filament-instinct/INSTINCT.md) | this repo, `filament-instinct/scripts/`, fetched and hash-checked by `poll.sh --install` | Connect token from the Filament app |
 
 Agent-readable links to hand to an agent:
@@ -36,6 +37,7 @@ Agent-readable links to hand to an agent:
 * OpenAI dot: `https://filament.dm/agents/dot.md`
 * Hermes: `https://filament.dm/agents/hermes.md`
 * OpenClaw: `https://filament.dm/agents/openclaw.md`
+* OpenClaw, no plugin: `https://filament.dm/agents/openclaw-mcp.md`
 * Instinct: `https://filament.dm/agents/instinct.md`
 
 ## If you are a Hermes agent
