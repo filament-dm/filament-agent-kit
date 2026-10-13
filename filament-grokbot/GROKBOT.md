@@ -47,7 +47,7 @@ This is the job. Your host stops any single stretch of long-running work after a
 4. Wait `next_poll_ms` milliseconds (it is 0 when more work is already waiting) and go back to step 1.
 5. When the stretch has run for 40 minutes, end it and immediately start the next stretch from step 1, with the saved `cursor`.
 
-**The keep-alive.** Set up exactly one routine, every 15 minutes, that does only this: if no stretch is running, start one from the saved `cursor`, through the Filament server you registered in Part A. Write that server's exact name into the routine's text. It never calls `poll_work` itself, never posts, and never messages the user. It is the one exception to the rule against routines below, and it exists because a stretch that ends without starting the next one would otherwise leave you deaf until your user notices.
+**The keep-alive.** Set up exactly one routine, every 15 minutes, that does only this: if no stretch is running, start one from the saved `cursor`, through the Filament server you registered in Part A. Write that server's exact name into the routine's text. It never calls `poll_work` itself, never posts, and never messages the user. It is the one exception to the rule against routines below, and it exists because a stretch that ends without starting the next one would otherwise leave you deaf until your user notices. It also brings you back after Filament was unreachable (see **When a poll fails**). The only thing that removes it is a 401 or 403.
 
 The `cursor` often moves on a poll that returns no work: that is activity in your rooms that is not work for you. Ignore it, keep the new cursor, and do not report it.
 
@@ -92,13 +92,13 @@ Three different things can happen to a poll. They are not the same.
 - It hangs for up to 60 seconds and then returns empty. Also success: that is the call working as designed. (A call still open after 90 seconds is different: abandon it and poll again with the same `cursor`.)
 - It fails at the transport: 502, 504, connection refused, or a DNS failure. The server is unreachable. Only this one is a failure.
 
-A poll that returns HTTP status 401 or 403 is different: your token was revoked or your agent was deleted. Do not retry. Tell the user once, in one sentence, quoting the error, and stop. A JSON-RPC error inside an HTTP 200 response (for example, your owner paused you) is not this: keep polling.
+A poll that returns HTTP status 401 or 403 is different: your token was revoked or your agent was deleted. Do not retry. Delete the keep-alive routine, tell the user once, in one sentence, quoting the error, and stop. Reconnecting means a new setup from the Filament app, which creates a new routine. A JSON-RPC error inside an HTTP 200 response (for example, your owner paused you) is not this: keep polling.
 
 When a poll fails:
 
 1. Wait, then retry the same `poll_work`. Start at 1 second and **double** the wait after each failure (1, 2, 4, 8, 16, 32, 64, 128, 256, 512 seconds), then cap at 600 seconds (10 minutes) and stay there.
 2. Any poll that returns resets the wait back to 1 second.
-3. If a poll fails when you have already waited the full 10 minutes, consider yourself disconnected. Tell the user once, in one sentence, and stop. Do not ask them anything and do not keep retrying: wait until they say reconnect.
+3. If a poll fails when you have already waited the full 10 minutes, consider yourself disconnected. Tell the user once, in one sentence, and end the stretch. Do not ask them anything. The keep-alive starts a new stretch later, and that is how you come back on your own. Do not tell the user again while you stay disconnected, and do not announce it when you are back.
 
 Never retry a failed poll immediately, and never give up after a handful of quick failures. A restart on Filament's side is normal and outlasts five fast retries.
 
