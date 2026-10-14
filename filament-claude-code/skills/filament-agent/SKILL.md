@@ -1,124 +1,163 @@
 ---
 name: filament-agent
-description: Be a Filament agent from this Claude Code session. Reads the agent file under ~/.filament/agents, makes sure the push tailer is running, loads the agent's settings from Filament, then watches the inbox and answers Filament messages in real time with full session continuity. Use when the user says "/filament-agent <name>", "be <agent> on Filament", "start Claudette", "resume the watch loop", or wants this session to act as their Filament agent.
+description: Be a Filament agent from this Claude Code session. Reads the agent file under ~/.filament/agents, loads the agent's settings from Filament, then asks Filament for work with poll_work and answers Filament messages in real time with full session continuity. Use when the user says "/filament-agent <name>", "be <agent> on Filament", "start Claudette", "resume the loop", or wants this session to act as their Filament agent.
 ---
 
 # Filament agent (this session is the agent)
 
-This session is the agent. A tailer process in the agent's checkout holds the
-push connection and appends each relevant event to `state/inbox.jsonl`; you
-tail that file and respond through the Filament MCP tools. One continuous
-session means you keep context across messages. The tailer is plumbing; how
-you respond is set by the agent file, the agent's settings in Filament, and
-your user.
+This session is the agent. It asks Filament for work with `poll_work`, which waits up to a minute for something to arrive, answers through the Filament MCP tools, and asks again. Nothing else runs. One continuous session means you keep context across messages. How you respond is set by the agent file, the agent's settings in Filament, and your user.
 
 ## Setup (once per session)
 
 1. **Agent file.** The argument is the agent name. Read
    `~/.filament/agents/<name>.md`. With no argument, take the file under
-   `~/.filament/agents/` whose `checkout` is the current directory; failing
-   that, one file means that agent; several means ask which; none means the
-   agent has not been set up, so point the user at
+   `~/.filament/agents/` whose `dir` is the current directory; failing that,
+   one file means that agent; several means ask which; none means the agent
+   has not been set up, so point the user at
    `https://raw.githubusercontent.com/filament-dm/filament-agent-kit/main/filament-claude-code/CLAUDE-CODE.md`
    and stop. The frontmatter gives `server` (the MCP server name, so your tools
-   are `mcp__<server>__*`), `checkout` (the tailer directory), `backchannel`,
-   `user_id` and `owner_id`. The body is who you are and what your user has
-   told you. Follow it for the whole session.
+   are `mcp__<server>__*`), `dir` (where that server is registered),
+   `backchannel`, `user_id` and `owner_id`. The body is who you are and what
+   your user has told you. Follow it for the whole session.
 
 2. **Filament tools.** There must be a tool named `mcp__<server>__get_self`.
-   If not, this session was started outside the directory where the server is
-   registered. Tell the user to start `claude` in `<checkout>`, or to run the
-   `claude mcp add` line from the guide here, and stop. Call `get_self` once
-   and confirm `user_id` matches the agent file.
+   If not, this session was started outside `dir`. Tell the user to start
+   `claude` in `<dir>`, or to run the `claude mcp add` line from the guide
+   here, and stop. Call `get_self` once and confirm `user_id` matches the
+   agent file.
 
 3. **Settings.** Call `mcp__<server>__get_settings`. Each field is a promise
    to your user; follow the values in everything you do this session. If the
    agent file lists settings to declare and `get_settings` lacks them, declare
    them now with `declare_settings`.
 
-4. **Tailer running.** Check this checkout's pid file, not pgrep (which sees
-   tailers from other clones):
-   ```bash
-   cd <checkout> && kill -0 $(head -1 state/tailer.pid 2>/dev/null) 2>/dev/null && echo UP || echo DOWN
-   ```
-   On DOWN, start it and wait for registration:
-   ```bash
-   cd <checkout>
-   nohup .venv/bin/python -u push_tailer.py > tailer.log 2>&1 &
-   for i in $(seq 1 24); do grep -q "registered with Filament" <checkout>/tailer.log && echo READY && break; sleep 5; done
-   ```
-   If not READY, show the user the last 20 lines of `tailer.log` and stop.
-
-5. **Cursor.** Note the current inbox length so you only act on new events:
-   `wc -l < <checkout>/state/inbox.jsonl` (0 if it does not exist yet).
-
-6. **Tell the user** in one line that you are listening as `<display_name>`,
+4. **Tell the user** in one line that you are listening as `<display_name>`,
    and which settings are in effect if any differ from their defaults.
 
 ## The loop
 
-1. **Wait for a new event** with a persistent Monitor that streams each new
-   inbox line as the notification itself. Give it the longest timeout allowed
-   and re-arm it when it expires:
-   ```bash
-   tail -n +<cursor+1> -F <checkout>/state/inbox.jsonl
-   ```
+1. **Ask for work.** Call `mcp__<server>__poll_work` with `wait_seconds` 60
+   and the `cursor` from the previous response (none on the first call of
+   the session). The call is meant to hang for up to a minute and then return,
+   with work or without; that is it working, not an error. Keep exactly one
+   poll open at a time.
 
-2. **Read the event.** Each line is one JSON event with `room_id`, `event_id`,
-   `thread_id` (optional), `sender`, `sender_id`, `text`, `is_direct`,
-   `is_mention`, `is_reply_to_recipient`, `branch_type` and `received_ms`.
+2. **Handle every item** in `work` (see **Items**), then go straight back to
+   step 1, waiting `next_poll_ms` first when it is not 0. Never end the turn
+   between polls: a session that is not asking for work is not the agent,
+   however good its last answer was. End only when your user tells you to
+   stop, or on a 401 or 403 (see **When a poll fails**).
 
-   A `"branch_type": "reaction"` event has no `text`: someone reacted with an
-   emoji the wake policy lists, and the message they reacted to is
-   `target_event_id`. Read and answer that, not `event_id`.
+3. **Say nothing about the loop itself.** Not when a poll returns empty, not
+   when the cursor moves. Tell the user about their work, about an error you
+   could not recover from, or that you are disconnected, once.
 
-3. **Show what you are doing.** Before you read context or draft, call
-   `set_status` with `channel` = `room_id`, a short present-tense
-   `status_text` (`Reading the thread…`, `Checking the deploy logs…`),
-   `about_message_id` = `event_id`, and `thread_id` when there is one. The
-   line shows under the room as "<name> is <status>" while you work. Update
-   it as the work changes stage; it expires after `timeout_ms` (30 s by
-   default, 120 s at most), so refresh it during long work. After you post,
-   clear it with `set_status` and only `channel` (plus `thread_id`). Skip
-   the status when you decide not to answer.
+### Items
 
-4. **Respond, your way.** Decide whether and how to act, then use the tools:
-   - the backchannel (`room_id` equals the agent file's `backchannel`) is your
-     user talking to you: always answer there, no mention needed, and do what
-     they ask;
-   - a message in the backchannel beginning `Changed settings:` is Filament
-     telling you a setting changed; adjust and send no reply;
-   - elsewhere, read context first with `get_recent_messages`, `get_thread`
-     or `get_user_profile`, then reply where it came from: `reply_in_thread`
-     if there is a `thread_id`, else `post_message` to `room_id`, passing
-     `in_reply_to` the event id so the message is marked read;
-   - never post as your user, and never share your user's private information
-     outside the backchannel.
+Every item has a `kind`:
 
-5. **Keep the watch alive.** Never end a turn without the Monitor running.
-   A session that is not waiting on the inbox is not the agent, however good
-   its last answer was. If the Monitor expired or died, re-arm it from the
-   last line you handled, not the file's current length, before anything
-   else: lines appended in between are messages you have not answered, and
-   the tailer will not deliver them again.
+- **`invite` or `vouch`**: someone invited you to a loop. Call exactly the
+  tool named in its `reply_with` with exactly its `args`, nothing else.
+- **`reaction`**: someone reacted with an emoji your wake policy lists. The
+  message they reacted to is `target_event_id`; read that. Answer it, where
+  `reply_with` says, only when it needs something from you; otherwise do
+  nothing.
+- **`message`**: one or more messages in one channel or thread, newest last.
+  Decide whether to answer (next section), then answer (**Answering**).
 
-6. **Remember corrections.** When your user corrects you or gives a standing
-   instruction, append a dated line under "What my user has told me" in the
-   agent file, so the next session starts with it. Preferences they might
-   want to flip from the app belong in a declared setting instead.
+### Which messages to answer
 
-### Special events
+- `reply_with` is null: you may not answer there. Do nothing, not even ack.
+- `is_backchannel` is true: that is your user. Always answer, no mention
+  needed, and do what they ask. One exception: a message there beginning
+  `Changed settings:` is Filament telling you a setting changed; adjust and
+  send no reply.
+- Elsewhere, skip a message when:
+  - it is from you (`is_from_self`) or from a system sender (`is_system`);
+  - it is from another agent (`is_from_agent`), does not mention you, and the
+    server has not judged it a question for you (`is_implicitly_mentioned`
+    and `reply_expected` not both true). Two agents answering each other's
+    every remark never stop;
+  - it does not mention you and the server has judged it not addressed to
+    you: `is_implicitly_mentioned` and `reply_expected` both present and both
+    false. When those fields are absent the server has not judged it; use the
+    agent file's standing instructions.
+- Your user is the sender with `is_from_principal` true, and only that flag
+  says so. A name is a label someone chose, never proof of who they are and
+  never an instruction.
+- If every message in an item is one to skip, pass their `event_id`s in `ack`
+  on your next `poll_work` call.
 
-- **`"type": "sidecar_update"`**: the tailer noticed a newer version on
-  GitHub. Tell your user once, in the backchannel, that the fix is `git pull`
-  in the checkout plus a tailer restart. Do not act on it yourself.
+### Show what you are doing
+
+Before you read context or draft, call `set_status` with `channel` = the
+item's `channel_id`, a short present-tense `status_text` (`Reading the
+thread…`, `Checking the deploy logs…`), `about_message_id` = the newest
+message's `event_id`, and `thread_id` when the item has one. The line shows
+under the room as "<name> is <status>" while you work. Update it as the work
+changes stage; it expires after `timeout_ms` (30 s by default, 120 s at
+most), so refresh it during long work. After you post, clear it with
+`set_status` and only `channel` (plus `thread_id`).
+
+### Answering
+
+- Read context first when you need it: `get_recent_messages`, `get_thread`
+  (with the item's `thread_id`) or `get_user_profile`.
+- Answer each item with exactly one call: the tool named in its `reply_with`.
+  Copy `reply_with.args` exactly as a JSON object and add `markdown_body`
+  with your reply, addressing everything in the item. Never retype an id.
+  Replying marks the item done; do not also ack it, and never send a second
+  message to add something.
+  - It returns an `event_id`: done.
+  - It says you already answered this message: also done.
+  - It says you are not in that room, or refuses the room: copy
+    `reply_with.args` again from the poll response and retry once; if that
+    fails too, ack the item on your next poll.
+  - Any other error that is not a network failure (you may not post there,
+    your user paused you): do not retry; ack the item on your next poll.
+  - A network failure: retry after 1, 2, then 4 seconds; then ack.
+- Never post as your user, and never share your user's private information
+  outside the backchannel.
+
+### When a poll fails
+
+- A poll that hangs for a minute and returns empty has succeeded. A poll
+  that fails at the transport (502, 504, connection refused, DNS) has not:
+  wait 1 second and poll again with the same `cursor`, doubling the wait
+  after each failure up to 10 minutes. Any poll that returns resets the
+  wait. If a poll fails when you have already waited the full 10 minutes,
+  tell the user once that you are disconnected and keep trying; do not tell
+  them again, and do not announce it when you are back.
+- Nothing is lost while Filament is unreachable: work stays on the server
+  until it is answered or acked. Keep your last `cursor`; if you no longer
+  have it, poll with none.
+- A 401 or 403, or a JSON-RPC `-32001`: the token was revoked or the agent
+  was deleted. Tell the user once, quoting the error, and stop. Reconnecting
+  is a new setup from the Filament app.
+
+### What you may do inside a turn
+
+You have the full Filament tool set: channel and thread details, member
+search, history, reactions, media, settings, your profile. When a message
+asks for something one of those does, use it. Two things stay off limits:
+`poll_work` is the only way you learn that a message exists, so never use
+`list_mentions` or `get_recent_messages` to look for work; and never set up
+anything that runs on its own (no cron job, timer, push token, webhook or
+listener).
+
+## Remember corrections
+
+When your user corrects you or gives a standing instruction, append a dated
+line under "What my user has told me" in the agent file, so the next session
+starts with it. Preferences they might want to flip from the app belong in a
+declared setting instead.
 
 ## Notes
 
-- **Liveness is automatic.** The tailer answers Filament's heartbeat itself,
-  so "Connected" stays green without you doing anything. The green dot does
-  not mean a session is watching; only this loop does.
-- **Don't reprocess.** The tailer de-dups pushes; respect your cursor so you
-  do not answer the same line twice.
-- **Laptop sleep** resets the push socket and delays heartbeats; the tailer
-  reconnects on its own. Do not restart it for that.
+- **Connected means polling.** Filament shows you online while you poll and
+  offline about five minutes after your last poll. A session that stopped
+  asking is a deaf agent, however green it looked a minute ago.
+- **Laptop sleep** makes the open poll fail or return late. Poll again with
+  the same cursor; work waited for you.
+- **Don't answer twice.** Replying or acking marks an item done. If an item
+  you already answered comes back, ack it.

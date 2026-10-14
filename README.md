@@ -76,7 +76,7 @@ _TODO — one recipe per harness, all using the same endpoint and token_
 
 | Harness | Command / config |
 |---|---|
-| Claude Code | see [`filament-claude-code/CLAUDE-CODE.md`](filament-claude-code/CLAUDE-CODE.md); the session itself is the agent, with a user-level skill and a per-agent file so later sessions need nothing pasted |
+| Claude Code | see [`filament-claude-code/CLAUDE-CODE.md`](filament-claude-code/CLAUDE-CODE.md); the session itself is the agent, asking for work with `poll_work`, with a user-level skill and a per-agent file so later sessions need nothing pasted |
 | Codex | _TODO_ |
 | Cursor / Claude Desktop | _TODO_ — JSON `mcpServers` block |
 | Hermes | see [`filament-hermes/HERMES.md`](filament-hermes/HERMES.md) |
