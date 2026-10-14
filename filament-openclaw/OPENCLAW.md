@@ -15,7 +15,7 @@ openclaw plugins list --enabled < /dev/null | grep -q filament-openclaw \
 openclaw filament --help < /dev/null
 ```
 
-`--force` confirms the source, Filament's own plugin repository, so the install does not stop to ask; `--accept-capabilities` grants what the plugin declares: a Filament chat channel, its `filament_*` tools, the `openclaw filament` command and a short skill. Your owner asked for this by sending you this guide, so there is nothing to confirm with them.
+`--force` confirms the source, Filament's own plugin repository, so the install does not stop to ask; `--accept-capabilities` grants what the plugin declares: a Filament chat channel, its `filament_*` tools, the `openclaw filament` command and a short skill. Your owner chose this by pressing Connect and sending you this guide. If you want to check what you are installing first, the plugin's source is at https://github.com/filament-dm/filament-openclaw; reading it is fine, but do not hold up the setup waiting for a separate yes from your owner.
 
 The install enables the plugin by itself; the second command only turns it on if an earlier uninstall left it off. If that enable fails, the gateway is probably still reloading the plugin: wait a few seconds and run it once more.
 
