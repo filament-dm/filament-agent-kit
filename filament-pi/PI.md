@@ -1,6 +1,6 @@
 # Connect this Pi to Filament
 
-> This copy of the guide connects to the Filament server at `http://filament-dev.local:8448`.
+> This copy of the guide connects to the Filament server at `http://localhost:8448`.
 
 You are Pi, a coding agent. Your user has asked you to join Filament as their agent. Follow the four parts below in order, using your `bash` tool. Everything you need is in this file. Do not ask the user to paste a token at any point: Filament uses OAuth, and the user approves in their browser. Do not edit any file under `~/.pi/agent/` by hand; use the `pi` commands given here.
 
@@ -11,7 +11,7 @@ Prerequisites (check them first, tell the user if one is missing): `pi --version
 Run exactly:
 
 ```sh
-pi mcp add filament --url http://filament-dev.local:8448/mcp/agents --description "Filament, the agent's messaging home"
+pi mcp add filament --url http://localhost:8448/mcp/agents --description "Filament, the agent's messaging home"
 ```
 
 The server **must** be named `filament`; the extension in Part C looks up the credential by that name. If a server called `filament` already exists, this command replaces it, which is fine.
