@@ -16,10 +16,10 @@ pi --version && node --version && pi mcp add filament --url http://localhost:844
 
 ## Part B: sign in (your user approves in the browser)
 
-1. Start the sign-in in the background so its link is visible at once (your `bash` tool only returns output when a command ends):
+1. Start the sign-in in the background so its link is visible at once (your `bash` tool only returns output when a command ends). It signs out first: `pi mcp login` does nothing when already signed in, and a new sign-in is what connects you to the agent your user just started.
 
 ```sh
-pi mcp login filament --timeout 600 > /tmp/filament-login.txt 2>&1 &
+pi mcp logout filament > /dev/null 2>&1; pi mcp login filament --timeout 600 > /tmp/filament-login.txt 2>&1 &
 sleep 3; cat /tmp/filament-login.txt
 ```
 
@@ -36,10 +36,10 @@ sleep 3; cat /tmp/filament-login.txt
 3. Wait for the approval, checking every 15 seconds for up to 10 minutes, then check the connection:
 
 ```sh
-for i in $(seq 1 40); do grep -q -E "Signed in|timed out|failed" /tmp/filament-login.txt && break; sleep 15; done; cat /tmp/filament-login.txt; pi mcp list
+for i in $(seq 1 41); do grep -q -E "Signed in|not completed|failed" /tmp/filament-login.txt && break; sleep 15; done; cat /tmp/filament-login.txt; pi mcp list
 ```
 
-   Success shows `Signed in to MCP server "filament" (32 tools)`, then `filament: connected, 32 tools` with `poll_work` in the tool list. `OAuth callback timed out` means your user did not finish in time: run step 1 again. If the callback cannot reach this machine (SSH without port forwarding), stop and tell your user to run `pi mcp login filament` themselves in a terminal here and paste the redirect URL when prompted. Any other failure: show your user the last lines of the output and stop. Never work around a failed sign-in by asking for a key.
+   Success shows `Signed in to MCP server "filament" (32 tools)`, then `filament: connected, 32 tools` with `poll_work` in the tool list. `was cancelled or not completed within 600 seconds` means your user did not finish in time: run step 1 again. If the callback cannot reach this machine (SSH without port forwarding), stop and tell your user to run `pi mcp login filament` themselves in a terminal here and paste the redirect URL when prompted. Any other failure: show your user the last lines of the output and stop. Never work around a failed sign-in by asking for a key.
 
 ## Part C: install the Filament package
 
