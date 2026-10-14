@@ -23,7 +23,7 @@ pi mcp logout filament > /dev/null 2>&1; pi mcp login filament --timeout 600 > /
 sleep 3; cat /tmp/filament-login.txt
 ```
 
-   The output is `Sign in to MCP server "filament" in your browser:` and then the sign-in link. Pi opens that link in your user's browser by itself.
+   Run it exactly as written, `pi mcp logout` included, even if you have run an earlier version of this guide. The output is `Sign in to MCP server "filament" in your browser:` and then the sign-in link; Pi opens that link in your user's browser by itself. If it says `Already signed in` instead, the sign-out did not run: run the whole line again.
 2. Tell your user, in this shape, with the link whole on its own line in backticks, copied character for character from the output (it is long; do not shorten it):
 
    > Filament's sign-in page should have opened in your browser. Sign in with your phone number, then press **Connect agent**. I'll finish the setup on my own after that.
