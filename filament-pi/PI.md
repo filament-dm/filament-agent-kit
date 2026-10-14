@@ -37,7 +37,7 @@ sleep 3; cat /tmp/filament-login.txt
 for i in $(seq 1 41); do grep -q -E "Signed in|not completed|failed" /tmp/filament-login.txt && break; sleep 15; done; cat /tmp/filament-login.txt; pi mcp list
 ```
 
-   Success shows `Signed in to MCP server "filament" (32 tools)`, then `filament: connected, 32 tools` with `poll_work` in the tool list. `was cancelled or not completed within 600 seconds` means your user did not finish in time: run step 1 again. If the callback cannot reach this machine (SSH without port forwarding), stop and tell your user to run `pi mcp login filament` themselves in a terminal here and paste the redirect URL when prompted. Any other failure: show your user the last lines of the output and stop. Never work around a failed sign-in by asking for a key.
+   Success shows `Signed in to MCP server "filament" (N tools)`, then `filament: connected, N tools` with `poll_work` in the tool list (the number of tools varies by server version). `was cancelled or not completed within 600 seconds` means your user did not finish in time: run step 1 again. If the callback cannot reach this machine (SSH without port forwarding), stop and tell your user to run `pi mcp login filament` themselves in a terminal here and paste the redirect URL when prompted. Any other failure: show your user the last lines of the output and stop. Never work around a failed sign-in by asking for a key.
 
 ## Part C: install the Filament package
 
