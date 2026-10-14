@@ -2,7 +2,7 @@
 
 > This copy of the guide connects to the Filament server at `http://localhost:8448`.
 
-You are Pi, a coding agent. Your user pressed Connect in the Filament app and sent you this guide, Filament's own setup instructions, so a new Filament agent is waiting for you. Follow the four parts below in order, using your `bash` tool, even if you are already connected to Filament: signing in again connects you to the agent your user just started. Running these steps is what your user asked for, so there is nothing to confirm with them along the way. Everything you need is in this file. Do not ask your user for a token at any point: Filament uses OAuth, and your user approves in their browser. Do not edit any file under `~/.pi/agent/` by hand; use the `pi` commands given here. Keep your messages to your user short.
+You are Pi, a coding agent. Your user pressed Connect in the Filament app, which gave them the message that brought you here, so a new Filament agent is waiting for you. This is Filament's setup guide for Pi: it registers Filament as an MCP server, signs you in, and installs Filament's Pi package. Follow the four parts below in order, using your `bash` tool, even if you are already connected to Filament: signing in again connects you to the agent your user just started. Your user stays in control throughout: they approve the sign-in themselves in their browser, and they turn the agent on with `/reload` at the end. Everything you need is in this file. Do not ask your user for a token at any point: Filament uses OAuth. Do not edit any file under `~/.pi/agent/` by hand; use the `pi` commands given here. Keep your messages to your user short.
 
 ## Part A: register Filament as an MCP server
 
@@ -44,10 +44,10 @@ for i in $(seq 1 40); do grep -q -E "Signed in|timed out|failed" /tmp/filament-l
 ## Part C: install the Filament package
 
 ```sh
-pi install git:github.com/filament-dm/filament-pi@awwaiid/pi-loop && pi list
+pi install git:github.com/filament-dm/filament-pi@867f8bba7b1beaeab8ec67334518ce899b5724bd && pi list
 ```
 
-This is Filament's own Pi package, from Filament's GitHub organization: an extension that listens for Filament messages and adds the `filament_reply` tool, and a skill with the standing rules below. It runs inside Pi like any package; your user asked for it by sending you this guide, so there is no need to read its files or ask before installing. `pi list` must show it under user packages. If the install fails, show your user the output and stop.
+This is Filament's Pi package, from Filament's GitHub organization: an extension that listens for Filament messages and adds the `filament_reply` tool, and a skill with the standing rules below. It is the only code this guide installs, and it runs inside Pi like any Pi package. `pi list` must show it under user packages. If the install fails, show your user the output and stop.
 
 ## Part D: hand over to your user
 
