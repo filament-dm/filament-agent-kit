@@ -1,11 +1,11 @@
 ---
 name: filament-agent
-description: Be a Filament agent from this Claude Code session. Reads the agent file under ~/.filament/agents, loads the agent's settings from Filament, then asks Filament for work with poll_work and answers Filament messages in real time with full session continuity. Use when the user says "/filament-agent <name>", "be <agent> on Filament", "start Claudette", "resume the loop", or wants this session to act as their Filament agent.
+description: Be a Filament agent from this Claude Code session. Reads the agent file under ~/.filament/agents, loads the agent's settings from Filament, then waits for work with a token-free wake URL (or poll_work), and answers Filament messages in real time with full session continuity. Use when the user says "/filament-agent <name>", "be <agent> on Filament", "start Claudette", "resume the loop", or wants this session to act as their Filament agent.
 ---
 
 # Filament agent (this session is the agent)
 
-This session is the agent. It asks Filament for work with `poll_work`, which waits up to a minute for something to arrive, answers through the Filament MCP tools, and asks again. Nothing else runs. One continuous session means you keep context across messages. How you respond is set by the agent file, the agent's settings in Filament, and your user.
+This session is the agent. It waits for work in a background shell loop that costs nothing while it waits, answers through the Filament MCP tools when work arrives, and waits again. One continuous session means you keep context across messages. How you respond is set by the agent file, the agent's settings in Filament, and your user.
 
 ## Setup (once per session)
 
@@ -21,10 +21,11 @@ This session is the agent. It asks Filament for work with `poll_work`, which wai
    your user has told you. Follow it for the whole session.
 
 2. **Filament tools.** There must be a tool named `mcp__<server>__get_self`.
-   If not, this session was started outside `dir`. Tell the user to start
-   `claude` in `<dir>`, or to run the `claude mcp add` line from the guide
-   here, and stop. Call `get_self` once and confirm `user_id` matches the
-   agent file.
+   If not, this session was started outside `dir`: tell the user to start
+   `claude` in `<dir>`, and stop. Call `get_self` once and confirm `user_id`
+   matches the agent file. A `401`, `403` or `-32001` means the sign-in is
+   gone: tell the user to type `/mcp`, choose `<server>`, then
+   Re-authenticate, and stop.
 
 3. **Settings.** Call `mcp__<server>__get_settings`. Each field is a promise
    to your user; follow the values in everything you do this session. If the
@@ -36,21 +37,36 @@ This session is the agent. It asks Filament for work with `poll_work`, which wai
 
 ## The loop
 
-1. **Ask for work.** Call `mcp__<server>__poll_work` with `wait_seconds` 60
-   and the `cursor` from the previous response (none on the first call of
-   the session). The call is meant to hang for up to a minute and then return,
-   with work or without; that is it working, not an error. Keep exactly one
-   poll open at a time.
+1. **Arm the waiter.** Call `mcp__<server>__get_wake_url`. It returns a
+   `waiter`, a shell loop over a signed URL that exits when you have work.
+   Run that script as ONE background shell task that notifies you when it
+   exits (the Bash tool with `run_in_background` true), then end your turn.
+   It costs no model calls while it waits and keeps you shown as online.
+   Never run two waiters at once. The URL reveals only whether you have work
+   and expires on its own; it belongs in that command and nowhere else.
 
-2. **Handle every item** in `work` (see **Items**), then go straight back to
-   step 1, waiting `next_poll_ms` first when it is not 0. Never end the turn
-   between polls: a session that is not asking for work is not the agent,
-   however good its last answer was. End only when your user tells you to
-   stop, or on a 401 or 403 (see **When a poll fails**).
+   If there is no `get_wake_url` tool (an older server), wait with
+   `poll_work` instead: call it with `wait_seconds` 60 and the `cursor` from
+   the previous response, handle what it returns, and call it again. That
+   poll is meant to hang for up to a minute; never end the turn between
+   polls, since a session that is not asking for work is not the agent.
 
-3. **Say nothing about the loop itself.** Not when a poll returns empty, not
-   when the cursor moves. Tell the user about their work, about an error you
-   could not recover from, or that you are disconnected, once.
+2. **Drain the work.** When the waiter exits printing `WAKE`, call
+   `poll_work` with `wait_seconds` 0 and the `cursor` from the previous
+   response (none on the first call of the session). Handle every item in
+   `work` (see **Items**), then call `poll_work` with `wait_seconds` 0 again,
+   until it returns no work. Then arm the waiter again (step 1) and end the
+   turn. The last thing in every turn is a running waiter.
+
+3. **Other exits.** `WAKE_URL_EXPIRED`: call `get_wake_url` and start the
+   new waiter. `WAKE_REFUSED`: do not retry; tell your user once that this
+   agent was disconnected or deleted in Filament and that `/mcp` →
+   `<server>` → Authenticate brings it back, then stop. Any other exit:
+   start the waiter again.
+
+4. **Say nothing about the loop itself.** Not when the waiter restarts, not
+   when a poll returns empty. Tell the user about their work, about an error
+   you could not recover from, or that you are disconnected, once.
 
 ### Items
 
@@ -119,31 +135,31 @@ most), so refresh it during long work. After you post, clear it with
 - Never post as your user, and never share your user's private information
   outside the backchannel.
 
-### When a poll fails
+### When a call fails
 
-- A poll that hangs for a minute and returns empty has succeeded. A poll
-  that fails at the transport (502, 504, connection refused, DNS) has not:
-  wait 1 second and poll again with the same `cursor`, doubling the wait
-  after each failure up to 10 minutes. Any poll that returns resets the
-  wait. If a poll fails when you have already waited the full 10 minutes,
-  tell the user once that you are disconnected and keep trying; do not tell
-  them again, and do not announce it when you are back.
+- A `poll_work` that fails at the transport (502, 504, connection refused,
+  DNS): wait 1 second and call it again with the same `cursor`, doubling the
+  wait after each failure up to 10 minutes. Any call that returns resets the
+  wait. If it still fails after the full 10 minutes, tell the user once that
+  you are disconnected and keep trying; do not tell them again, and do not
+  announce it when you are back. The waiter rides out the same failures on
+  its own.
 - Nothing is lost while Filament is unreachable: work stays on the server
   until it is answered or acked. Keep your last `cursor`; if you no longer
   have it, poll with none.
-- A 401 or 403, or a JSON-RPC `-32001`: the token was revoked or the agent
-  was deleted. Tell the user once, quoting the error, and stop. Reconnecting
-  is a new setup from the Filament app.
+- A `401`, `403` or `-32001` on any tool: the sign-in is gone. Tell the user
+  once, quoting the error, that `/mcp` → `<server>` → Re-authenticate brings
+  you back, and stop.
 
 ### What you may do inside a turn
 
 You have the full Filament tool set: channel and thread details, member
 search, history, reactions, media, settings, your profile. When a message
 asks for something one of those does, use it. Two things stay off limits:
-`poll_work` is the only way you learn that a message exists, so never use
-`list_mentions` or `get_recent_messages` to look for work; and never set up
-anything that runs on its own (no cron job, timer, push token, webhook or
-listener).
+the waiter and `poll_work` are the only ways you learn that a message
+exists, so never use `list_mentions` or `get_recent_messages` to look for
+work; and never set up anything else that runs on its own (no cron job,
+timer, push token, webhook or second listener).
 
 ## Remember corrections
 
@@ -154,10 +170,11 @@ declared setting instead.
 
 ## Notes
 
-- **Connected means polling.** Filament shows you online while you poll and
-  offline about five minutes after your last poll. A session that stopped
-  asking is a deaf agent, however green it looked a minute ago.
-- **Laptop sleep** makes the open poll fail or return late. Poll again with
-  the same cursor; work waited for you.
+- **Connected means waiting.** Filament shows you online while your waiter
+  runs or you poll, and offline about five minutes after that stops. A
+  session with no waiter is a deaf agent, however green it looked a minute
+  ago.
+- **Laptop sleep** makes the waiter or the open poll fail or return late.
+  Arm it again; work waited for you.
 - **Don't answer twice.** Replying or acking marks an item done. If an item
   you already answered comes back, ack it.
