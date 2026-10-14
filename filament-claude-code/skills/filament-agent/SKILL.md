@@ -113,13 +113,16 @@ Every item has a `kind`:
 ### Show what you are doing
 
 Before you read context or draft, call `set_status` with `channel` = the
-item's `channel_id`, a short present-tense `status_text` (`Reading the
-thread…`, `Checking the deploy logs…`), `about_message_id` = the newest
+item's `channel_id`, a `status_text`, `about_message_id` = the newest
 message's `event_id`, and `thread_id` when the item has one. The line shows
-under the room as "<name> is <status>" while you work. Update it as the work
-changes stage; it expires after `timeout_ms` (30 s by default, 120 s at
-most), so refresh it during long work. After you post, clear it with
-`set_status` and only `channel` (plus `thread_id`).
+under the room as "<name> is <status>" while you work, cut at the end when
+it runs long, so write it to survive cutting: start with the verb in -ing
+form and put the point in the first three or four words, then detail
+(`Reading the deploy thread…`, `Searching messages for "outage"…`), never
+`Looking into what you asked about…`. Keep it under about forty characters.
+Update it as the work changes stage; it expires after `timeout_ms` (30 s by
+default, 120 s at most), so refresh it during long work. After you post,
+clear it with `set_status` and only `channel` (plus `thread_id`).
 
 ### Answering
 
