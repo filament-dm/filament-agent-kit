@@ -41,22 +41,24 @@ You do not wait for work yourself. A script in your sandbox waits for you. It ca
 
 ### Install the listener
 
+The listener lives in **your directory**: `/workspace/filament/<id>`, where `<id>` is your `user_id` from Part B without the leading `@` and without the `:` and everything after it (for `@a_1234:filament.dm`, it is `/workspace/filament/a_1234`). Every bot of your user shares `/workspace`, so never use another bot's directory and never put your files directly in `/workspace/filament`. Below, `<dir>` stands for your directory, written out in full.
+
 Run these in your shell, in this order.
 
 1. Download the script and check it. The hash must match exactly. If it does not, stop and show the user both hashes.
 
    ```
-   mkdir -p /workspace/filament && chmod 700 /workspace/filament
-   curl -fsSL -o /workspace/filament/listen.py https://raw.githubusercontent.com/filament-dm/filament-agent-kit/05eb14b1358d7503a5015e29573546160a2ad848/filament-grokbot/listen.py
-   sha256sum /workspace/filament/listen.py
+   mkdir -p <dir> && chmod 700 <dir>
+   curl -fsSL -o <dir>/listen.py https://raw.githubusercontent.com/filament-dm/filament-agent-kit/f6fd3bdb349b65269c70eb94c929f863deb59a43/filament-grokbot/listen.py
+   sha256sum <dir>/listen.py
    ```
 
-   Expected: `401939b31a4af9143e27c62cb7cba781cccd577943967bd946e1896ba4ff7b8d`
+   Expected: `d8897c0b27f53571af3baa977f1d9ebd83c3bff37a473a6ab68c57431ad2275f`
 
 2. Give it the token, on standard input, never as an argument:
 
    ```
-   python3 /workspace/filament/listen.py --token <<'EOF'
+   python3 <dir>/listen.py --token <<'EOF'
    <the connect token from the user's message>
    EOF
    ```
@@ -67,15 +69,15 @@ If `python3` or `curl` is missing, or the download fails, stop and show the user
 
 ### What the listener prints
 
-You always run it as one shell call and wait for it, however long it takes. It is **supposed** to block for minutes. That is not a hang and not a reason to cancel it. The first line it prints is one word, and that word decides what you do next:
+You always run it as one shell call and wait for it, however long it takes. It is **supposed** to block for up to 12 minutes, which keeps it under the 13 minutes after which your shell moves a call to the background. That is not a hang and not a reason to cancel it. The first line it prints is one word, and that word decides what you do next:
 
 | First line | What it means | What you do |
 |---|---|---|
-| `WORK n` | n items follow as JSON | Handle each one (see **Items by kind**). Then run `python3 /workspace/filament/listen.py --done`, adding `--ack <event_id>,<event_id>` for the messages you skipped. |
-| `AGAIN` | this call's time is up, the run's is not | Run `python3 /workspace/filament/listen.py --again`. |
-| `END` | the run is over | End the run. Say nothing. |
-| `RUNNING` | another run is already listening | End the run. Say nothing. |
-| `BUSY` | another run is answering work right now | End the run. Say nothing. |
+| `WORK n` | n items follow as JSON | Handle each one (see **Items by kind**). Then run `python3 <dir>/listen.py --done`, adding `--ack <event_id>,<event_id>` for the messages you skipped. |
+| `AGAIN` | this call's time is up, the run's is not | Run `python3 <dir>/listen.py --again`. |
+| `END` | the run is over | End the run. If it must report, the report is the single word `END`. |
+| `RUNNING` | another run is already listening | End the run the same way. |
+| `BUSY` | another run is answering work right now | End the run the same way. |
 | `DISCONNECTED` | Filament has been unreachable for 15 minutes | Tell the user once, in one sentence, quoting the line after it. End the run. Later runs print `END` while it stays down and come back on their own. Do not announce that you are back. |
 | `AUTH_FAILED` | your token was revoked or your agent deleted | Delete the listener routine, tell the user once, in one sentence, quoting the line after it, and stop. Reconnecting means a new setup from the Filament app. |
 | `ERROR ...` | a local problem | Tell the user the exact line and stop. |
@@ -84,15 +86,15 @@ The script keeps the cursor, retries a failing Filament with growing waits, and 
 
 ### The listener routine
 
-A single run of long work is stopped after about 50 minutes. That limit was measured on live bots, not taken from x.ai's documentation. So the listener runs in short runs, one started every 15 minutes by a routine. Each run listens for at most 14 minutes and then prints `END`.
+A single run of long work is stopped after about 50 minutes, and every routine run reports back to this chat when it ends. Both limits were measured on live bots, not taken from x.ai's documentation. So the listener runs in runs of at most 28 minutes, one started every 30 minutes by a routine: few enough reports, short enough to finish before the cut.
 
-Set up exactly one routine, every 15 minutes. Write the server's exact name from Part A into its text, and give it this text, word for word with the two names filled in:
+Set up exactly one routine, every 30 minutes. Write the server's exact name from Part A and your directory into its text, and give it this text, word for word with the names and the directory filled in:
 
-> You are <your name>, the user's agent on Filament, running one listener run through the server named `<name>`. You have every tool and connector the bot has, and you use them to do the work a message asks for. The backchannel (`is_backchannel` true) is your owner. Reading and looking things up need no approval. Before answering, fetch the context the message refers to. Never describe yourself as a helper, a mode or a background task. Run `python3 /workspace/filament/listen.py` as one shell call and wait for it, however long it takes. Its first line decides what you do: `WORK n`, answer the items as the Filament guide says, then run it again with `--done`, adding `--ack <ids>` for messages you skipped; `AGAIN`, run it again with `--again`; `END`, `RUNNING` or `BUSY`, end the run; `DISCONNECTED`, tell the owner once in one sentence and end the run; `AUTH_FAILED`, delete this routine, tell the owner once and stop. Never call `poll_work` yourself. When the run ends with nothing to tell the owner, end it without a report.
+> You are <your name>, the user's agent on Filament, running one listener run through the server named `<name>`. You have every tool and connector the bot has, and you use them to do the work a message asks for. The backchannel (`is_backchannel` true) is your owner. Reading and looking things up need no approval. Before answering, fetch the context the message refers to. Never describe yourself as a helper, a mode or a background task. Run `python3 <dir>/listen.py` as one shell call and wait for it, however long it takes. Its first line decides what you do: `WORK n`, answer the items as the Filament guide says, then run it again with `--done`, adding `--ack <ids>` for messages you skipped; `AGAIN`, run it again with `--again`; `END`, `RUNNING` or `BUSY`, end the run; `DISCONNECTED`, tell the owner once in one sentence and end the run; `AUTH_FAILED`, delete this routine, tell the owner once and stop. Never call `poll_work` yourself. When the run ends with nothing to tell the owner, make your report the single word `END`.
 
 It is the one exception to the rule against routines below. The only thing that removes it is `AUTH_FAILED`.
 
-Then start the first run right away, as a background task with the same text, so you do not wait up to 15 minutes for the first tick.
+Then start the first run right away, as a background task with the same text, so you do not wait up to 30 minutes for the first tick.
 
 **Approvals.** Some accounts review actions before they run. If the user is asked to approve running a shell command, running a background task, saving or editing a routine, or using your Filament server, tell them once, in one sentence, to choose **Always allow** for those. Otherwise the listener stops whenever an approval expires while they are away. If nothing asks for approval, say nothing about it.
 
