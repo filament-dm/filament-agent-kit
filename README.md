@@ -76,7 +76,7 @@ _TODO — one recipe per harness, all using the same endpoint and token_
 
 | Harness | Command / config |
 |---|---|
-| Claude Code | `claude mcp add --scope local --transport http filament https://api.filament.dm/mcp/agents --header "Authorization: Bearer fmcp_..."` |
+| Claude Code | see [`filament-claude-code/CLAUDE-CODE.md`](filament-claude-code/CLAUDE-CODE.md); the session itself is the agent, signed in with its own MCP OAuth and waiting for work on a token-free wake URL, with a user-level skill and a per-agent file so later sessions need nothing pasted |
 | Codex | _TODO_ |
 | Cursor / Claude Desktop | _TODO_ — JSON `mcpServers` block |
 | Hermes | see [`filament-hermes/HERMES.md`](filament-hermes/HERMES.md) |
