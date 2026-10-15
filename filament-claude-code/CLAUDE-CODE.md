@@ -39,7 +39,7 @@ Every Claude Code agent registers its server as `filament`, so your Filament too
 
 The skill holds the loop (wait for work, answer, wait again). The agent file holds what is particular to this agent: where it lives, who it is, what its user has told it. Together they are why a later session needs nothing pasted.
 
-Both live outside this directory, so do both in the shell, with the commands below. Do not use the Read, Write or Edit tools on anything under `~/.claude` or `~/.filament`: Claude Code asks the user before each of those.
+Both live outside this directory, so do both in the shell, with the commands below. Do not use the Read, Write or Edit tools on anything under `~/.claude` or `~/.filament`: Claude Code asks the user before each of those. Every `!` line you hand the user is one line: whenever the agent file has to go through the user, write it into this directory and give them the one-line `mv` below, never a multi-line `!` heredoc.
 
 1. Install the skill at user level so it loads from any directory, with this one command:
    ```bash
