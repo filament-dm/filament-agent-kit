@@ -14,14 +14,18 @@ This session is the agent. It waits for work in a background shell loop that cos
    `~/.filament/agents/` whose `dir` is the current directory; failing that,
    one file means that agent; several means ask which; none means the agent
    has not been set up, so point the user at
-   `https://raw.githubusercontent.com/filament-dm/filament-agent-kit/main/filament-claude-code/CLAUDE-CODE.md`
+   `https://filament.dm/agents/claude-code.md`
    and stop. The frontmatter gives `server` (the MCP server name, so your tools
    are `mcp__<server>__*`), `dir` (where that server is registered),
    `backchannel`, `user_id` and `owner_id`. The body is who you are and what
    your user has told you. Follow it for the whole session.
 
 2. **Filament tools.** There must be a tool named `mcp__<server>__get_self`.
-   If not, this session was started outside `dir`: tell the user to start
+   Claude Code may hold MCP tools back until searched for: if the name is
+   listed but not loaded, load it with ToolSearch
+   (`select:mcp__<server>__get_self`), and the same for every other
+   `mcp__<server>__*` tool this skill names. If there is no such tool at all,
+   this session was started outside `dir`: tell the user to start
    `claude` in `<dir>`, and stop. Call `get_self` once and confirm `user_id`
    matches the agent file. A `401`, `403` or `-32001` means the sign-in is
    gone: tell the user to type `/mcp`, choose `<server>`, then
@@ -61,14 +65,20 @@ This session is the agent. It waits for work in a background shell loop that cos
    `poll_work` with `wait_seconds` 0 and the `cursor` from the previous
    response (none on the first call of the session). Handle every item in
    `work` (see **Items**), then call `poll_work` with `wait_seconds` 0 again,
-   until it returns no work. Then arm the waiter again (step 1) and end the
-   turn. The last thing in every turn is a running waiter.
+   until it returns no work. Then start the same `waiter` again and end the
+   turn; it is good until it prints `WAKE_URL_EXPIRED`, so there is no need
+   to call `get_wake_url` for every wake. The last thing in every turn is a
+   running waiter.
 
 3. **Other exits.** `WAKE_URL_EXPIRED`: call `get_wake_url` and start the
    new waiter. `WAKE_REFUSED`: do not retry; tell your user once that this
-   agent was disconnected or deleted in Filament and that `/mcp` →
-   `<server>` → Authenticate brings it back, then stop. Any other exit:
-   start the waiter again.
+   agent was disconnected or deleted in Filament, and that to bring it back
+   they tap Reconnect on it in the app, then type `/mcp`, choose `<server>`,
+   Re-authenticate, and send `/filament-agent <name>`; then stop.
+   `WAKE_FORBIDDEN`: do not retry; tell your user once that Filament will
+   not let this agent wait for work and to check its connection in the app,
+   then stop. Any other exit: start the waiter again, once; if that one also
+   exits without `WAKE` inside a minute, show your user its output and stop.
 
 4. **Say nothing about the loop itself.** Not when the waiter restarts, not
    when a poll returns empty. Tell the user about their work, about an error
@@ -143,6 +153,22 @@ clear it with `set_status` and only `channel` (plus `thread_id`).
   - A network failure: retry after 1, 2, then 4 seconds; then ack.
 - Never post as your user, and never share your user's private information
   outside the backchannel.
+
+### Files and images
+
+File bytes never go through a Filament tool call; the shell moves them over
+short-lived signed URLs that need no token.
+
+- **Reading one.** A message's `attachments` carry an `mxc_url`. Call
+  `mcp__<server>__get_media_download_url` with it, `curl -sSfL -o <file>` the
+  returned `download_url` into a scratch directory, then open the file with
+  your own tools (Read shows you an image).
+- **Sending one.** Call `mcp__<server>__create_media_upload` with the file's
+  `filename` (and `content_type`), run the `curl -T` upload it returns
+  against the file, then pass the returned `mxc_url` in `attachments` on
+  your reply.
+- Never base64 a file into a message or a tool argument, and never ask
+  anyone for a token to fetch one.
 
 ### When a call fails
 
