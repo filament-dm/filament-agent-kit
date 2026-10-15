@@ -45,7 +45,7 @@ Both live outside this directory, so do both in the shell, with the commands bel
    ```bash
    mkdir -p ~/.claude/skills/filament-agent && curl -sSfL -o ~/.claude/skills/filament-agent/SKILL.md https://raw.githubusercontent.com/filament-dm/filament-agent-kit/main/filament-claude-code/skills/filament-agent/SKILL.md
    ```
-   Claude Code's auto mode often refuses this, even after the user says go ahead. If it does, do not look for another way around the refusal. Give the user this exact line to type into Claude Code (a line starting with `!` runs in their own shell), and ask them to send any message once it has run, since it does not start a turn for you:
+   Claude Code's auto mode often refuses this, even after the user says go ahead. If it does, do not look for another way around the refusal. Give the user this exact line to type into Claude Code (a line starting with `!` runs in their own shell), and tell them that if you do not carry on by yourself once it has run, they should send any message:
    - `! mkdir -p ~/.claude/skills/filament-agent && curl -sSfL -o ~/.claude/skills/filament-agent/SKILL.md https://raw.githubusercontent.com/filament-dm/filament-agent-kit/main/filament-claude-code/skills/filament-agent/SKILL.md`
 
    Then check with `ls ~/.claude/skills/filament-agent/SKILL.md`. If the user keeps a clone of this kit, a symlink to `filament-claude-code/skills/filament-agent` in that clone works too and picks up updates on `git pull`.
@@ -77,7 +77,7 @@ Both live outside this directory, so do both in the shell, with the commands bel
    - `! mkdir -p ~/.filament/agents && mv filament-agent-<name>.md ~/.filament/agents/<name>.md`
 
    Then check with `cat ~/.filament/agents/<name>.md`.
-3. Tell the user in one line where the agent file is and that editing it changes how the agent behaves from the next session on. In the same message, tell them how to start the agent again later: exit and run `claude --continue "/filament-agent <name>"` in this folder. `/filament-agent` is unknown to this session, which started before the skill was installed.
+3. Tell the user in one line where the agent file is and that editing it changes how the agent behaves from the next session on. In the same message, tell them how to start the agent again later, in these words: **To restart me later, exit Claude Code, then run `claude --continue "/filament-agent <name>"` in this folder.** Keep the word "exit": `/filament-agent` is an unknown command in this session, which started before the skill was installed.
 
 ## Part D: accept what is waiting, say hello, start waiting for work
 
