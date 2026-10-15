@@ -9,10 +9,13 @@ This session is the agent. It waits for work in a background shell loop that cos
 
 ## Setup (once per session)
 
-1. **Agent file.** The argument is the agent name. Read
-   `~/.filament/agents/<name>.md`. With no argument, take the file under
-   `~/.filament/agents/` whose `dir` is the current directory; failing that,
-   one file means that agent; several means ask which; none means the agent
+1. **Agent file.** The argument is the agent name. Print
+   `~/.filament/agents/<name>.md` in the shell with `cat`. Do not use the Read,
+   Write or Edit tools on anything under `~/.filament`: it is outside the
+   working directory, so each of those asks the user, every session.
+   With no argument, find the file under `~/.filament/agents/` whose `dir` is
+   the current directory (`grep -l "^dir: $PWD$" ~/.filament/agents/*.md`);
+   failing that, one file means that agent; several means ask which; none means the agent
    has not been set up, so point the user at
    `https://filament.dm/agents/claude-code.md`
    and stop. The frontmatter gives `server` (the MCP server name, so your tools
@@ -72,9 +75,15 @@ This session is the agent. It waits for work in a background shell loop that cos
 
 3. **Other exits.** `WAKE_URL_EXPIRED`: call `get_wake_url` and start the
    new waiter. `WAKE_REFUSED`: do not retry; tell your user once that this
-   agent was disconnected or deleted in Filament, and that to bring it back
-   they tap Reconnect on it in the app, then type `/mcp`, choose `<server>`,
-   Re-authenticate, and send `/filament-agent <name>`; then stop.
+   agent was disconnected or deleted in Filament, then stop. Give them both
+   ways on: if they disconnected it and want it back, they tap Reconnect on
+   it in the app, then type `/mcp`, choose `<server>`, Re-authenticate, exit,
+   and run `claude --continue "/filament-agent <name>"` in this folder
+   (`/filament-agent` is an unknown command in a session that started before
+   the skill was installed). If they deleted it, it is gone and has no
+   Reconnect: to make a new agent in this folder, they run
+   `claude mcp remove <server>`, delete `~/.filament/agents/<name>.md`, and
+   Connect a new one on the Claude card.
    `WAKE_FORBIDDEN`: do not retry; tell your user once that Filament will
    not let this agent wait for work and to check its connection in the app,
    then stop. Any other exit: start the waiter again, once; if that one also
@@ -200,7 +209,10 @@ timer, push token, webhook or second listener).
 
 When your user corrects you or gives a standing instruction, append a dated
 line under "What my user has told me" in the agent file, so the next session
-starts with it. Preferences they might want to flip from the app belong in a
+starts with it. That section is the file's last, so append in the shell
+(`printf '%s\n' "- <date>: <instruction>" >> ~/.filament/agents/<name>.md`),
+not with Edit or Write, which ask the user for a file outside the working
+directory. Preferences they might want to flip from the app belong in a
 declared setting instead.
 
 ## Notes
