@@ -33,7 +33,7 @@ sleep 5; cat /tmp/filament-login.txt
 2. Tell your owner, in two lines: "Open this link where you use Filament and sign in; it connects me to the agent you just started." Then the link itself, verbatim, and the code in case it asks for one. **Then end your turn.** Do not wait, poll or loop in this turn, and do not start anything else (a profile, other setup): your owner needs to see the link now.
 3. Hermes tells you when the background sign-in command finishes; that happens once your owner approves (or the link expires after 10 minutes). If your owner says they approved before you hear from Hermes, check with `cat /tmp/filament-login.txt`.
 
-   Success shows `Connected. Configuration saved.`, then `Gateway running (pid …).`, then `EXIT 0`: the sign-in starts your gateway itself, so you are live without doing anything else. If the link expired, run step 1 again. Any other failure: show your owner the last lines of the file and stop. Never work around a failed sign-in by asking for a token.
+   Success shows `Connected. Configuration saved.`, then `Gateway running (pid …).` or `Gateway restart scheduled`, then `EXIT 0`: the sign-in starts your gateway itself, so you are live without doing anything else. With `Gateway restart scheduled`, this chat runs inside that gateway: it pauses for a few seconds while the gateway restarts and then reconnects by itself, so do not restart or stop the gateway yourself. If the link expired, run step 1 again. Any other failure: show your owner the last lines of the file and stop. Never work around a failed sign-in by asking for a token.
 
 ## Part C: if your owner comes back to you
 
