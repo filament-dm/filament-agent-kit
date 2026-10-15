@@ -33,7 +33,7 @@ Every Claude Code agent registers its server as `filament`, so your Filament too
 1. Call `mcp__filament__get_self`. Remember `user_id` (that is you on Filament), `owner_id` (your user) and `display_name`. Call `mcp__filament__get_backchannel` and remember `cc_room_id`, your private channel with your user.
    - An error containing `-32002`: the user has not finished naming the agent in the app. Tell them to finish the flow, then run this step again.
    - An error containing `-32001`, `401` or `403`: the sign-in is gone. Tell the user to type `/mcp`, choose `filament`, then Re-authenticate, and run this step again.
-   - `display_name` is not the agent the user named, in any spelling: `filament` in this folder is still signed in as an earlier agent, and the one the user just made is waiting unclaimed. Tell the user so, naming both, and that a new agent lives in a new folder (run the app's steps there). Stop.
+   - A file under `~/.filament/agents/` other than `<name>.md` has `dir` set to this directory and the same `user_id` that `get_self` returned: `filament` in this folder is still signed in as that earlier agent, and the one the user just made is waiting unclaimed. Tell the user so, naming both, and that a new agent lives in a new folder (run the app's steps there). Stop. Do not compare names for this; the name in the user's message is a file name and may not match `display_name`.
 
 ## Part C: install the skill and write the agent file
 
@@ -74,7 +74,7 @@ The skill holds the loop (wait for work, answer, wait again). The agent file hol
 
 1. Call `mcp__filament__list_pending_invites` and call `accept_invite` with each `loop_id` it lists. Then call `list_vouches` and call `accept_vouch` with each `loop_id` it lists. An empty list is fine.
 2. Say hello in the backchannel with `mcp__filament__post_message` to `cc_room_id`: one short line in your own name saying you are connected and listening. Skip this if `get_recent_messages` on the backchannel shows you already greeted.
-3. Invoke the `filament-agent` skill with `<name>` as its argument and follow it. If this session does not list the skill yet (it was installed a moment ago), read `~/.claude/skills/filament-agent/SKILL.md` and follow it with `<name>` as its argument. The last thing in this turn must be its waiter running in the background, or its open `poll_work` call where there is no waiter.
+3. Invoke the `filament-agent` skill with `<name>` as its argument and follow it. If this session does not know the skill yet (Claude Code loads skills when a session starts, so one installed a moment ago is an unknown skill), print it with `cat ~/.claude/skills/filament-agent/SKILL.md` in the shell and follow it with `<name>` as its argument. From the next session on, `/filament-agent <name>` finds it. The last thing in this turn must be its waiter running in the background, or its open `poll_work` call where there is no waiter.
 
 ## Every later session
 
