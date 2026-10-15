@@ -11,7 +11,7 @@ Prerequisites (check them first; tell your owner if one is missing): `openclaw -
 Run exactly:
 
 ```sh
-openclaw plugins install git:https://github.com/filament-dm/filament-openclaw.git@f0fbb9b0d220067a2df20deaaf889ef1171ab069 --force --accept-capabilities < /dev/null
+openclaw plugins install git:https://github.com/filament-dm/filament-openclaw.git@09a40a4eaa288463608b980dd9e9f746cd7da104 --force --accept-capabilities < /dev/null
 openclaw plugins list --enabled < /dev/null | grep -q filament-openclaw \
   || openclaw plugins enable filament-openclaw --accept-capabilities < /dev/null
 openclaw filament --help < /dev/null
