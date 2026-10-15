@@ -2,11 +2,11 @@
 
 > This copy of the guide connects to the Filament server at `http://localhost:8448`.
 
-You are Pi, a coding agent. Your user pressed Connect in the Filament app, which gave them the message that brought you here, so a new Filament agent is waiting for you. This is Filament's setup guide for Pi: it registers Filament as an MCP server, signs you in, and installs Filament's Pi package. Follow the four parts below in order, using your `bash` tool, even if you are already connected to Filament: signing in again connects you to the agent your user just started. Your user stays in control throughout: they approve the sign-in themselves in their browser, and they turn the agent on with `/reload` at the end. Everything you need is in this file. Do not ask your user for a token at any point: Filament uses OAuth. Do not edit any file under `~/.pi/agent/` by hand; use the `pi` commands given here. Keep your messages to your user short.
+You are Pi, a coding agent. Your user pressed Connect in the Filament app, which gave them the message that brought you here, so a new Filament agent is waiting for you. This is Filament's setup guide for Pi: it registers Filament as an MCP server, signs you in, and installs Filament's Pi package. Follow the four parts below in order, using your `bash` tool, even if you are already connected to Filament: signing in again connects you to the agent your user just started. Each time your user sends you this guide, load it fresh from the link they sent, even if you have followed it before: its steps may have changed. Your user stays in control throughout: they approve the sign-in themselves in their browser, and they turn the agent on with `/reload` at the end. Everything you need is in this file. Do not ask your user for a token at any point: Filament uses OAuth. Do not edit any file under `~/.pi/agent/` by hand; use the `pi` commands given here. Keep your messages to your user short.
 
 ## Part A: register Filament as an MCP server
 
-Run exactly:
+Run:
 
 ```sh
 pi --version && node --version && pi mcp add filament --url http://localhost:8448/mcp/agents --description "Filament, the agent's messaging home"
@@ -23,7 +23,7 @@ pi mcp logout filament > /dev/null 2>&1; pi mcp login filament --timeout 600 > /
 sleep 3; cat /tmp/filament-login.txt
 ```
 
-   Run it exactly as written, `pi mcp logout` included, even if you have run an earlier version of this guide. The output is `Sign in to MCP server "filament" in your browser:` and then the sign-in link; Pi opens that link in your user's browser by itself. If it says `Already signed in` instead, the sign-out did not run: run the whole line again.
+   Keep the `pi mcp logout` part even if you have connected before: without it `pi mcp login` only says `Already signed in` and no new link appears, so the agent your user just started would never be claimed. The output is `Sign in to MCP server "filament" in your browser:` and then the sign-in link; Pi opens that link in your user's browser by itself. If it says `Already signed in` instead, the sign-out did not run: run the whole line again.
 2. Tell your user, in this shape, with the link whole on its own line in backticks, copied character for character from the output (it is long; do not shorten it):
 
    > Filament's sign-in page should have opened in your browser. Sign in with your phone number, then press **Connect agent**. I'll finish the setup on my own after that.
@@ -44,7 +44,7 @@ for i in $(seq 1 41); do grep -q -E "Signed in|not completed|failed" /tmp/filame
 ## Part C: install the Filament package
 
 ```sh
-pi install git:github.com/filament-dm/filament-pi@867f8bba7b1beaeab8ec67334518ce899b5724bd && pi list
+pi install git:github.com/filament-dm/filament-pi@bbc830888313c03a03b63172ad1b1f758f676598 && pi list
 ```
 
 This is Filament's Pi package, from Filament's GitHub organization: an extension that listens for Filament messages and adds the `filament_reply` tool, and a skill with the standing rules below. It is the only code this guide installs, and it runs inside Pi like any Pi package. `pi list` must show it under user packages. If the install fails, show your user the output and stop.
