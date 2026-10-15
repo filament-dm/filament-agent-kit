@@ -69,6 +69,11 @@ The skill holds the loop (wait for work, answer, wait again). The agent file hol
    (append a dated line here each time my user corrects or instructs me)
    ```
 3. Tell the user in one line where the agent file is and that editing it changes how the agent behaves from the next session on.
+4. Claude Code may refuse step 1 or step 2, since both write outside this directory, even after the user says go ahead. Do not look for another way around the refusal. Hand those steps to the user instead: write the agent file into this directory as `filament-agent-<name>.md`, then give the user these lines to type into Claude Code exactly as shown (a line starting with `!` runs in their shell), and ask them to send any message once they have run them:
+   - `! mkdir -p ~/.claude/skills/filament-agent && curl -sSfL -o ~/.claude/skills/filament-agent/SKILL.md https://raw.githubusercontent.com/filament-dm/filament-agent-kit/main/filament-claude-code/skills/filament-agent/SKILL.md`
+   - `! mkdir -p ~/.filament/agents && mv filament-agent-<name>.md ~/.filament/agents/<name>.md`
+
+   Leave out the line for a step that already worked. Check that both files are in place before you go on.
 
 ## Part D: accept what is waiting, say hello, start waiting for work
 
