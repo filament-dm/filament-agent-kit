@@ -74,16 +74,19 @@ This session is the agent. It waits for work in a background shell loop that cos
    running waiter.
 
 3. **Other exits.** `WAKE_URL_EXPIRED`: call `get_wake_url` and start the
-   new waiter. `WAKE_REFUSED`: do not retry; tell your user once that this
-   agent was disconnected or deleted in Filament, then stop. Give them both
-   ways on: if they disconnected it and want it back, they tap Reconnect on
-   it in the app, then type `/mcp`, choose `<server>`, Re-authenticate, exit,
-   and run `claude --continue "/filament-agent <name>"` in this folder
-   (`/filament-agent` is an unknown command in a session that started before
-   the skill was installed). If they deleted it, it is gone and has no
-   Reconnect: to make a new agent in this folder, they run
-   `claude mcp remove <server>`, delete `~/.filament/agents/<name>.md`, and
-   Connect a new one on the Claude card.
+   new waiter. `WAKE_REFUSED`: do not retry; tell your user once, quoting
+   the waiter's message (it says which case this is), that this agent's
+   sign-in is gone, then stop. Give them the way on for their case:
+   - They tapped Reconnect on it in the app: type `/mcp`, choose `<server>`,
+     Re-authenticate, then send `/filament-agent <name>`. If Claude Code
+     says Unknown command (this session started before the skill was
+     installed), exit and run `claude --continue "/filament-agent <name>"`
+     in this folder.
+   - They disconnected or deleted it in the app (the app's Disconnect
+     deletes it): it cannot come back. To make a new agent in this folder,
+     they run `claude mcp remove <server>`, delete
+     `~/.filament/agents/<name>.md`, and Connect a new one on the Claude
+     card.
    `WAKE_FORBIDDEN`: do not retry; tell your user once that Filament will
    not let this agent wait for work and to check its connection in the app,
    then stop. Any other exit: start the waiter again, once; if that one also
