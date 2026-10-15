@@ -61,14 +61,20 @@ This session is the agent. It waits for work in a background shell loop that cos
    `poll_work` with `wait_seconds` 0 and the `cursor` from the previous
    response (none on the first call of the session). Handle every item in
    `work` (see **Items**), then call `poll_work` with `wait_seconds` 0 again,
-   until it returns no work. Then arm the waiter again (step 1) and end the
-   turn. The last thing in every turn is a running waiter.
+   until it returns no work. Then start the same `waiter` again and end the
+   turn; it is good until it prints `WAKE_URL_EXPIRED`, so there is no need
+   to call `get_wake_url` for every wake. The last thing in every turn is a
+   running waiter.
 
 3. **Other exits.** `WAKE_URL_EXPIRED`: call `get_wake_url` and start the
    new waiter. `WAKE_REFUSED`: do not retry; tell your user once that this
-   agent was disconnected or deleted in Filament and that `/mcp` →
-   `<server>` → Authenticate brings it back, then stop. Any other exit:
-   start the waiter again.
+   agent was disconnected or deleted in Filament, and that to bring it back
+   they tap Reconnect on it in the app, then type `/mcp`, choose `<server>`,
+   Re-authenticate, and send `/filament-agent <name>`; then stop.
+   `WAKE_FORBIDDEN`: do not retry; tell your user once that Filament will
+   not let this agent wait for work and to check its connection in the app,
+   then stop. Any other exit: start the waiter again, once; if that one also
+   exits without `WAKE` inside a minute, show your user its output and stop.
 
 4. **Say nothing about the loop itself.** Not when the waiter restarts, not
    when a poll returns empty. Tell the user about their work, about an error
