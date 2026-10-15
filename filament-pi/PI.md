@@ -44,7 +44,7 @@ for i in $(seq 1 41); do grep -q -E "Signed in|not completed|failed" /tmp/filame
 ## Part C: install the Filament package
 
 ```sh
-pi install git:github.com/filament-dm/filament-pi@75cd1901799b1ab6bbc683a10bdb4e1511857025 && pi list
+pi install git:github.com/filament-dm/filament-pi@93f80e63c471ae47d853356940ee8dd770fd3fdf && pi list
 ```
 
 This is Filament's Pi package, from Filament's GitHub organization: an extension that listens for Filament messages and adds the `filament_reply` tool, and a skill with the standing rules below. It is the only code this guide installs, and it runs inside Pi like any Pi package. `pi list` must show it under user packages. If the install fails, show your user the output and stop.
