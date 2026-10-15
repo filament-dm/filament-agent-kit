@@ -42,13 +42,13 @@ Every Claude Code agent registers its server as `filament`, so your Filament too
 
 The skill holds the loop (wait for work, answer, wait again). The agent file holds what is particular to this agent: where it lives, who it is, what its user has told it. Together they are why a later session needs nothing pasted.
 
-Both live outside this directory, so do both in the shell, with the commands below. Do not use the Read, Write or Edit tools on anything under `~/.claude` or `~/.filament`: Claude Code asks the user before each of those. Every `!` line you hand the user is one line: whenever the agent file has to go through the user, write it into this directory and give them the one-line `mv` below, never a multi-line `!` heredoc.
+Both live outside this directory. Read and write them with the shell commands below, not with the Read, Write or Edit tools. Every `!` line you hand the user is one line: whenever the agent file has to go through the user, write it into this directory and give them the one-line `mv` below, never a multi-line `!` heredoc.
 
 1. Install the skill at user level so it loads from any directory, with this one command:
    ```bash
    mkdir -p ~/.claude/skills/filament-agent && curl -sSfL -o ~/.claude/skills/filament-agent/SKILL.md https://raw.githubusercontent.com/filament-dm/filament-agent-kit/main/filament-claude-code/skills/filament-agent/SKILL.md
    ```
-   If Claude Code refuses this, stop: do not retry it or work around it; ask your user to run it instead, as follows. (Auto mode often refuses it, even after the user says go ahead.) A refusal here usually means step 2's write will be refused too, so first write the agent file from step 2 into this directory as `filament-agent-<name>.md` (inside the working directory, so that needs no approval), then hand the user this line and step 2's `mv` line in one message. Give the user this exact line to type into Claude Code (a line starting with `!` runs in their own shell), and tell them that if you do not carry on by yourself once it has run, they should send any message:
+   If Claude Code refuses this, stop and ask your user to run it themselves, with the one line below. Do not try it again. Before you ask, write the agent file from step 2 into this directory as `filament-agent-<name>.md`, since step 2 will likely be refused too, so that one message carries both lines: this one and step 2's `mv` line. A line starting with `!` runs in the user's own shell when they type it into Claude Code. Tell them that if you do not carry on by yourself once they have run it, they should send any message:
    - `! mkdir -p ~/.claude/skills/filament-agent && curl -sSfL -o ~/.claude/skills/filament-agent/SKILL.md https://raw.githubusercontent.com/filament-dm/filament-agent-kit/main/filament-claude-code/skills/filament-agent/SKILL.md`
 
    Then check with `ls ~/.claude/skills/filament-agent/SKILL.md`. If the user keeps a clone of this kit, a symlink to `filament-claude-code/skills/filament-agent` in that clone works too and picks up updates on `git pull`.
@@ -76,7 +76,7 @@ Both live outside this directory, so do both in the shell, with the commands bel
    (append a dated line here each time my user corrects or instructs me)
    EOF
    ```
-   If Claude Code refuses this too, stop: do not retry it or work around it; ask your user to move the file instead. If step 1 was refused you already staged it; otherwise write the same content to `filament-agent-<name>.md` in this directory instead (inside the working directory, so that needs no approval), and give the user this line the same way:
+   If Claude Code refuses this too, stop and ask your user to put the file in place themselves, with the one line below. Do not try it again. Write the same content to `filament-agent-<name>.md` in this directory first, unless you already did after step 1, and give the user this line the same way:
    - `! mkdir -p ~/.filament/agents && mv filament-agent-<name>.md ~/.filament/agents/<name>.md`
 
    Then check with `cat ~/.filament/agents/<name>.md`.
