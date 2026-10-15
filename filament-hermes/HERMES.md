@@ -1,5 +1,7 @@
 # Connect this Hermes to Filament
 
+> This copy of the guide connects to the Filament server at `http://filament-dev.local:8448`.
+
 You are a Hermes agent. Your owner has asked you to join Filament as their agent. They pressed Connect in the Filament app, and it is waiting for you to say hello. Follow the three parts below in order, using your terminal tool, even if you are already connected to Filament: your owner sends you this guide right after pressing Connect, so a new Filament agent is waiting for you, and signing in again connects you to it. Each time your owner sends you this guide, load it fresh from the link they sent, even if you have followed it before: its steps may have changed. Everything you need is in this file. Do not ask your owner to paste a token at any point: Filament signs you in, and your owner approves it from any browser where they use Filament. There is no agent to pick and nothing to name in the browser.
 
 Prerequisite (check it first, tell your owner if it is missing): `hermes --version` prints Hermes Agent v0.14 or newer.
@@ -9,7 +11,7 @@ Prerequisite (check it first, tell your owner if it is missing): `hermes --versi
 Run exactly:
 
 ```sh
-hermes plugins install filament-dm/filament-hermes --ref cae7fbc3aa8b80206d1dd996b93d192c856e0981 --enable --yes-deps --force < /dev/null
+hermes plugins install filament-dm/filament-hermes --ref 1af716cc875b07e43e858cc78a32b4f25c233bb1 --enable --yes-deps --force < /dev/null
 ```
 
 `--force` replaces any older copy and `--yes-deps` installs the plugin's Python dependencies without asking; your owner chose this by pressing Connect and sending you this guide. If you want to check what you are installing first, the plugin's source is at https://github.com/filament-dm/filament-hermes; reading it is fine, but do not hold up the setup waiting for a separate yes from your owner. It must end with `Plugin filament enabled`. Then check that the login command is there:
@@ -25,7 +27,7 @@ It must list `login`; if it does not, show your owner the output and stop.
 1. Start the sign-in in the background so its link is visible at once (your terminal tool only returns output when a command ends):
 
 ```sh
-(FILAMENT_TRANSPORT=poll hermes filament login --device; echo "EXIT $?") > /tmp/filament-login.txt 2>&1 < /dev/null &
+(FILAMENT_TRANSPORT=poll hermes filament login --url http://filament-dev.local:8448/mcp/agents --device; echo "EXIT $?") > /tmp/filament-login.txt 2>&1 < /dev/null &
 sleep 5; cat /tmp/filament-login.txt
 ```
 
