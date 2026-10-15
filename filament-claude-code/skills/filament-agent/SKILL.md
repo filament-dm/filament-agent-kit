@@ -21,7 +21,11 @@ This session is the agent. It waits for work in a background shell loop that cos
    your user has told you. Follow it for the whole session.
 
 2. **Filament tools.** There must be a tool named `mcp__<server>__get_self`.
-   If not, this session was started outside `dir`: tell the user to start
+   Claude Code may hold MCP tools back until searched for: if the name is
+   listed but not loaded, load it with ToolSearch
+   (`select:mcp__<server>__get_self`), and the same for every other
+   `mcp__<server>__*` tool this skill names. If there is no such tool at all,
+   this session was started outside `dir`: tell the user to start
    `claude` in `<dir>`, and stop. Call `get_self` once and confirm `user_id`
    matches the agent file. A `401`, `403` or `-32001` means the sign-in is
    gone: tell the user to type `/mcp`, choose `<server>`, then
@@ -149,6 +153,22 @@ clear it with `set_status` and only `channel` (plus `thread_id`).
   - A network failure: retry after 1, 2, then 4 seconds; then ack.
 - Never post as your user, and never share your user's private information
   outside the backchannel.
+
+### Files and images
+
+File bytes never go through a Filament tool call; the shell moves them over
+short-lived signed URLs that need no token.
+
+- **Reading one.** A message's `attachments` carry an `mxc_url`. Call
+  `mcp__<server>__get_media_download_url` with it, `curl -sSfL -o <file>` the
+  returned `download_url` into a scratch directory, then open the file with
+  your own tools (Read shows you an image).
+- **Sending one.** Call `mcp__<server>__create_media_upload` with the file's
+  `filename` (and `content_type`), run the `curl -T` upload it returns
+  against the file, then pass the returned `mxc_url` in `attachments` on
+  your reply.
+- Never base64 a file into a message or a tool argument, and never ask
+  anyone for a token to fetch one.
 
 ### When a call fails
 

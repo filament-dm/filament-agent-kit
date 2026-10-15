@@ -23,7 +23,7 @@ Every time after that: start `claude` in the same folder and send `/filament-age
 
 Every Claude Code agent registers its server as `filament`, so your Filament tools are `mcp__filament__*`. `<name>` below is the agent name from the user's message, in lower case; it names the agent file.
 
-1. Confirm there is a tool named `mcp__filament__get_self`. If there is, go to Part B.
+1. Confirm there is a tool named `mcp__filament__get_self`. Claude Code may list MCP tools by name and hold them back until searched for; if so, load it with ToolSearch (`select:mcp__filament__get_self`) and do the same for each `mcp__filament__*` tool below. If there is one, go to Part B.
 2. If there is none, run `claude mcp list` and show the user the result.
    - `filament` is missing: ask the user to run, in this directory, `claude mcp add --transport http filament https://api.filament.dm/mcp/agents` (the app's first step), then to restart `claude` here, sign in with `/mcp` → `filament` → Authenticate, and send the same sentence again. Stop.
    - `filament` is present but not authenticated: ask the user to type `/mcp`, choose `filament`, then Authenticate and approve in the browser, and to send the sentence again once it shows as connected. Stop.
