@@ -19,7 +19,9 @@ openclaw filament --help < /dev/null
 
 The install enables the plugin by itself; the second command only turns it on if an earlier uninstall left it off. If that enable fails, the gateway is probably still applying the install: wait a few seconds and run it once more.
 
-The last command must list `login`. If it does not, or an install step fails, show your owner the last lines and stop.
+If this gateway already runs the plugin (you were connected before), the install can end with `replacement not applied` and `the previous plugin generation stays active`. That is not a failure: the plugin can't be swapped out while your own turn is using it, and the copy that is running signs you in just as well. Do not retry, reload or restart anything; carry on, and add one line to your message in Part B saying the plugin update loads the next time the gateway restarts.
+
+The last command must list `login`. If it does not, or an install step fails in any other way, show your owner the last lines and stop.
 
 Before OpenClaw 2026.9.5, installing plugin code requires a gateway restart. Let OpenClaw's scheduled restart finish before Part B. If it does not restart automatically, tell your owner to restart the gateway and resume at Part B once it is running. OpenClaw 2026.9.5 and newer can apply this plugin without restarting the gateway.
 
