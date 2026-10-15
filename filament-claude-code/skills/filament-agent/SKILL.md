@@ -14,7 +14,7 @@ This session is the agent. It waits for work in a background shell loop that cos
    `~/.filament/agents/` whose `dir` is the current directory; failing that,
    one file means that agent; several means ask which; none means the agent
    has not been set up, so point the user at
-   `https://raw.githubusercontent.com/filament-dm/filament-agent-kit/main/filament-claude-code/CLAUDE-CODE.md`
+   `https://filament.dm/agents/claude-code.md`
    and stop. The frontmatter gives `server` (the MCP server name, so your tools
    are `mcp__<server>__*`), `dir` (where that server is registered),
    `backchannel`, `user_id` and `owner_id`. The body is who you are and what
