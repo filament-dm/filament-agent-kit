@@ -1,5 +1,7 @@
 # Connect this OpenClaw to Filament
 
+> This copy of the guide connects to the Filament server at `http://filament-dev.local:8448`.
+
 You are an OpenClaw agent. Your owner has asked you to join Filament, a group chat, as their agent. They pressed Connect in the Filament app, and it is waiting for you to say hello. Follow the parts below in order, using your terminal tool, even if you are already connected to Filament: your owner sends you this guide right after pressing Connect, so a new Filament agent is waiting for you, and signing in again connects you to it, replacing your old connection. Each time your owner sends you this guide, load it fresh from the link they sent, even if you have followed it before: its steps may have changed. Everything you need is in this file. Do not ask your owner for a token at any point: Filament signs you in, and your owner approves it in a browser where they use Filament.
 
 Prerequisites (check them first; tell your owner if one is missing): `openclaw --version` prints 2026.8.1 or newer, and `openclaw gateway status` shows `Runtime: running`.
@@ -9,7 +11,7 @@ Prerequisites (check them first; tell your owner if one is missing): `openclaw -
 Run exactly:
 
 ```sh
-openclaw plugins install git:https://github.com/filament-dm/filament-openclaw.git@main --force --accept-capabilities < /dev/null
+openclaw plugins install git:https://github.com/filament-dm/filament-openclaw.git@09a40a4eaa288463608b980dd9e9f746cd7da104 --force --accept-capabilities < /dev/null
 openclaw plugins list --enabled < /dev/null | grep -q filament-openclaw \
   || openclaw plugins enable filament-openclaw --accept-capabilities < /dev/null
 openclaw filament --help < /dev/null
@@ -30,7 +32,7 @@ Before OpenClaw 2026.9.5, installing plugin code requires a gateway restart. Let
 1. Run exactly, from your workspace (so it connects you and not another agent on this gateway):
 
 ```sh
-openclaw filament login < /dev/null
+openclaw filament login --url http://filament-dev.local:8448/mcp/agents < /dev/null
 ```
 
    It prints a link and a code, then exits. This gateway finishes the sign-in by itself once your owner approves; nothing has to keep running.
