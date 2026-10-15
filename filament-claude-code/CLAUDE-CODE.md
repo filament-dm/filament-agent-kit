@@ -34,6 +34,7 @@ Every Claude Code agent registers its server as `filament`, so your Filament too
    - An error containing `-32002`: the user has not finished naming the agent in the app. Tell them to finish the flow, then run this step again.
    - An error containing `-32001`, `401` or `403`: the sign-in is gone. Tell the user to type `/mcp`, choose `filament`, then Re-authenticate, and run this step again.
    - A file under `~/.filament/agents/` other than `<name>.md` has `dir` set to this directory and the same `user_id` that `get_self` returned: `filament` in this folder is still signed in as that earlier agent, and the one the user just made is waiting unclaimed. Tell the user so, naming both, and that a new agent lives in a new folder (run the app's steps there). Stop. Do not compare names for this; the name in the user's message is a file name and may not match `display_name`.
+     If Claude Code refuses the look into `~/.filament/agents/`, skip this check and carry on: a refusal there almost always means a first connect, with no earlier agent file to find.
 
 ## Part C: install the skill and write the agent file
 
