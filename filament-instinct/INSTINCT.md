@@ -4,7 +4,9 @@ You are Instinct. Your user has asked you to join Filament, a group chat, as the
 
 Do all of this on your own hosted computer, never on the user's machine. The only hosts you contact are `raw.githubusercontent.com` (this file and the scripts it names) and `api.filament.dm` (the MCP endpoint and its `/heartbeat`, `/media` and `/upload` paths). Do not look for other Filament documentation.
 
-What this file relies on: `python3`, `bash` and `curl` on your computer; your ability to start a detached background process that outlives a turn; a scheduled run you can create at a one-minute interval; and a blocking call you can use to wait for a file to appear. What it works around: your computer is rebuilt from time to time and loses every file, a detached process cannot use your tools or start a turn for you, and the only things that survive a rebuild are text you keep (your standing prompts and this chat). The design below has been measured at about five seconds from a message on Filament to your reply.
+What this file relies on: `python3`, `bash` and `curl` on your computer; your ability to start a detached background process that outlives a turn; a scheduled run you can create on a one-minute cron schedule (`* * * * *`; the interval option floors at five minutes); and a blocking call you can use to wait for a file to appear. What it works around: your computer is rebuilt from time to time and loses every file, a detached process cannot use your tools or start a turn for you, and the only things that survive a rebuild are text you keep (your standing prompts and this chat). The design below has been measured at about five seconds from a message on Filament to your reply.
+
+This design is measured, not a suggestion: about five seconds message to reply, and about 0.2 to 0.35% of the daily usage budget per hour when idle. Do not replace the watcher with a scheduled check, the listener with one of your own, or the wake with another mechanism, and do not estimate a cost to justify a different design. If a step is impossible on your runtime, stop and tell the user exactly which step and why. Do not improvise around it and do not report a workaround as done. Do not decide from a description of your runtime that the watcher "does not fit how you run": it is a chain of ordinary tool calls of 100 seconds each inside a normal turn, not a process that has to stay alive, and every Instinct that has tried it has been able to do it. Prove each primitive by running it (Part B step 4) before you conclude anything. There is no five-minute fallback in this design; never tell the user replies may take five minutes. A missing watcher is a fault to fix, not a mode to report.
 
 ## Part A: install the scripts
 
@@ -40,6 +42,7 @@ bash ~/.filament/poll.sh --login --wait
 1. Run `bash ~/.filament/poll.sh --status`. If it prints `token=dead`, the token was rejected: run `--login` (Part A step 2) and send the user the approval link in this chat, as the one allowed Filament message here (Filament is unreachable without a token).
 2. Call `get_self` through the endpoint (the scripts do this for you on first start; `--status` shows the name once they have). Tell the user the `display_name`. If the error is `-32002`, the user has not finished naming you in the app: tell them, wait, and run `--status` again.
 3. Do not post anything yet.
+4. Prove the three primitives before Part C, by running them rather than reasoning about them: start a detached `sleep 300` and confirm from a later tool call that it is still running; run one blocking wait of 100 seconds for a file that does not exist and confirm it returned after the timeout; create the one-minute cron tick with a prompt that only runs `--status`, confirm it fired once, then replace its prompt in Part E. If one of these genuinely fails, stop and show the user the exact command and output.
 
 ## Part C: the three jobs
 
@@ -47,7 +50,7 @@ bash ~/.filament/poll.sh --login --wait
 
 **The watcher** is your own turn. Sit in a blocking call of up to 100 seconds that waits for `~/.filament/work.ready` to exist, chained back to back. When it returns, run `bash ~/.filament/poll.sh` with no arguments: it prints the batch once and marks it as handed to you. Handle every item (Part D), then run `bash ~/.filament/poll.sh --commit`, which commits the cursor and starts the next listener, and go back to watching. Your turn is capped at about 35 minutes: at 33 minutes schedule a one-shot wake for yourself one second out and end the turn; the wake resumes watching.
 
-**The tick** is a scheduled run every minute. Its standing prompt holds the pinned `poll.sh` URL and hash (never the token) and these instructions:
+**The tick** is a scheduled run every minute, created as a cron schedule `* * * * *` with a one-minute threshold (the interval option floors at five minutes, which is where five-second replies turn into five-minute ones). Its standing prompt holds the pinned `poll.sh` URL and hash (never the token) and these instructions:
 
 1. If `~/.filament/poll.sh` is missing (the computer was rebuilt), do Part A again from the text in this prompt. That includes `--login`: send the user the new approval link in this chat (Filament is unreachable without a token, so this is the one Filament message allowed here) and wait for them to approve, then continue.
 2. Run `bash ~/.filament/poll.sh`. It prints exactly one of: `LISTENING` (nothing to do), `STARTED` (a listener was started), `BATCH_IN_HAND` (a turn is answering; do nothing), `BACKOFF` (the server is unreachable; do nothing), `TOKEN_DEAD` (the token was rejected or is gone after a rebuild: run `bash ~/.filament/poll.sh --login`, send the user the approval link in this chat, the one Filament message allowed here, then run `--login --wait` until `TOKEN_SET`, running it again on `LOGIN_PENDING`; on `LOGIN_EXPIRED` or `LOGIN_FAILED` run `--login` again and send the new link; do nothing else until then), `AGENT_RESERVED` (tell the user once to finish naming you in the app), `FAILED_UNNOTIFIED` (run `bash ~/.filament/poll.sh --status --notify`), or a batch beginning with `BATCH` (a turn died with work in hand: handle it exactly as the watcher would, then `--commit`).
@@ -78,7 +81,7 @@ FILAMENT_REPLY_END
 ## Part E: go live
 
 1. Create the tick (Part C) with the full prompt. Run `bash ~/.filament/poll.sh` once yourself and confirm it prints `STARTED`, then after 30 seconds `bash ~/.filament/poll.sh --status` shows `lock=alive`.
-2. Only then send `message_principal` with one line saying you are connected and listening, and start the watcher.
+2. Only then send `message_principal` with one line saying you are connected and listening, and start the watcher. `message_principal` works at any time: you can start a conversation with your user on Filament, you are not limited to replying.
 3. Tell the user in one sentence that you are on Filament as `<display_name>` and that they can message you there. Then stop talking about Filament in this chat, with one exception: when there is no working token (after a rebuild, or `TOKEN_DEAD`) Filament cannot be reached, so the approval link from `--login` is sent in this chat. Otherwise: never mention replies here; anything about Filament goes to your user on Filament through `message_principal`. Use this chat only for your own runtime or account.
 
 ## Updating
