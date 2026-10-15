@@ -102,6 +102,18 @@ class ListenTest(unittest.TestCase):
         self.assertEqual(oct(os.stat(os.path.join(self.state, 'token')).st_mode & 0o777), '0o600')
         self.assertEqual(self.state_file('token'), TOKEN)
 
+    def test_state_defaults_to_script_directory(self):
+        # Two bots of one owner share /workspace: each copy keeps its own state.
+        home = tempfile.mkdtemp()
+        copy = os.path.join(home, 'listen.py')
+        with open(SCRIPT) as src, open(copy, 'w') as dst:
+            dst.write(src.read())
+        env = {k: v for k, v in os.environ.items() if k != 'FM_STATE'}
+        out = subprocess.run([sys.executable, copy, '--token'], input=TOKEN + '\n',
+                             capture_output=True, text=True, env=env, timeout=30)
+        self.assertEqual(out.stdout.strip(), 'TOKEN_SET')
+        self.assertTrue(os.path.exists(os.path.join(home, 'token')))
+
     def test_rejects_non_token(self):
         self.assertEqual(self.run_script('--token', stdin='nope\n')[0], 'ERROR the token must start with fmcp_')
 

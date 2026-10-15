@@ -19,9 +19,15 @@ The first line of output is always one verb:
   TOKEN_SET     --token stored the token.
   ERROR <why>   a local problem (no token, bad arguments).
 
-Python 3.6+ standard library only. State lives in FM_STATE
-(default /workspace/filament): token, endpoint, cursor, acks, session,
-handling, fail_since, notified, listen.lock/, listen.log.
+Python 3.6+ standard library only. State lives next to the script (or in
+FM_STATE): token, endpoint, cursor, acks, session, handling, fail_since,
+notified, listen.lock/, listen.log. One owner's bots share one /workspace,
+so each agent installs its own copy in its own directory.
+
+Grok moves a shell call to the background after 13 minutes (780 s), and
+the turn gets control back with no output. A call must return before that:
+the default budget of 690 s, plus at most 30 s for the last poll, stays
+under it.
 """
 import argparse
 import json
@@ -32,10 +38,10 @@ import time
 import urllib.error
 import urllib.request
 
-STATE = os.environ.get('FM_STATE', '/workspace/filament')
+STATE = os.environ.get('FM_STATE') or os.path.dirname(os.path.abspath(__file__))
 DEFAULT_ENDPOINT = 'https://api.filament.dm/mcp/agents'
 POLL_WAIT = 60          # seconds; the server caps wait_seconds at 60
-HTTP_TIMEOUT = 90       # a poll still open after this is abandoned
+HTTP_SLACK = 30         # a poll open this long past its wait is abandoned
 BEAT_STALE = 150        # a listener silent this long is dead
 HANDLING_STALE = 1200   # a turn handling work this long is presumed dead
 DISCONNECT_AFTER = int(os.environ.get('FM_DISCONNECT_AFTER', '900'))  # failing this long = disconnected
@@ -181,7 +187,7 @@ def poll(cursor, acks, wait):
         'Content-Type': 'application/json',
         'Accept': 'application/json, text/event-stream'})
     try:
-        with urllib.request.urlopen(request, timeout=HTTP_TIMEOUT) as response:
+        with urllib.request.urlopen(request, timeout=wait + HTTP_SLACK) as response:
             body = response.read().decode('utf-8')
     except urllib.error.HTTPError as e:
         if e.code in (401, 403):
@@ -291,9 +297,9 @@ def main():
     parser.add_argument('--done', action='store_true', help='finished handling the last WORK')
     parser.add_argument('--again', action='store_true', help='continue after AGAIN')
     parser.add_argument('--ack', default='', help='comma-separated event ids to skip')
-    parser.add_argument('--budget', type=int, default=int(os.environ.get('FM_BUDGET', '540')),
+    parser.add_argument('--budget', type=int, default=int(os.environ.get('FM_BUDGET', '690')),
                         help='longest this call may block, in seconds')
-    parser.add_argument('--session', type=int, default=int(os.environ.get('FM_SESSION', '840')),
+    parser.add_argument('--session', type=int, default=int(os.environ.get('FM_SESSION', '1680')),
                         help='longest one run listens, in seconds')
     args = parser.parse_args()
 
