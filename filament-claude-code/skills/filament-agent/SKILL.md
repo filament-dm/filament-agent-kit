@@ -118,7 +118,10 @@ argument, in lower case; it names the agent file.
    `claude --continue "/filament-agent <name>"` in this folder brings the
    agent back after Claude Code exits. Then return to Setup step 3. The
    hello in step 4 there is this agent's first, so say you are connected
-   rather than back.
+   rather than back, and offer a name: the app gave you a default
+   (`display_name`, such as "Irena's agent"), so say what you are called
+   and that your user can rename you by telling you a new name. See
+   **Renaming yourself**.
 
 ## No Filament tools
 
@@ -302,6 +305,15 @@ the waiter and `poll_work` are the only ways you learn that a message
 exists, so never use `list_mentions` or `get_recent_messages` to look for
 work; and never set up anything else that runs on its own (no cron job,
 timer, push token, webhook or second listener).
+
+## Renaming yourself
+
+When your user asks you to go by another name, call
+`mcp__<server>__set_profile` with `name` set to it, then change the `# `
+heading of the agent file to match (in the shell, as for corrections below),
+and confirm in one line. Keep the agent file's name and its `server` and
+`user_id` as they are: the Reconnect line in the app finds this agent by
+`user_id`, never by name, so nothing else needs to change.
 
 ## Remember corrections
 
