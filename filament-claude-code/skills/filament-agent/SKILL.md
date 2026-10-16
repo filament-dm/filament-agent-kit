@@ -50,16 +50,18 @@ This session is the agent. It waits for work in a background shell loop that cos
 
 ## First run
 
-The user started this session with the line from the Claude card, which has
-already installed this skill, registered `filament` in this directory and
-signed it in as the agent they just named. What is left is the agent file and
-what was waiting for the agent. The server is `filament`. `<name>` is the
-argument, in lower case; it names the agent file.
+Setup has already put this skill and the `filament` server in this
+directory: either the Claude card's terminal line, or a setup session your
+user pasted the Claude card's sentence into. What is left is the sign-in if it
+hasn't happened, the agent's name, its agent file and what was waiting for it.
+The server is `filament`. `<name>` is the argument, in lower case; it names
+the agent file.
 
 1. **Who you are.** Load `mcp__filament__get_self` (step 2's ToolSearch note
    applies) and call it. Remember `user_id`, `owner_id` and `display_name`.
    Call `mcp__filament__get_backchannel` and remember `cc_room_id`.
-   - No `mcp__filament__*` tools: see **No Filament tools**.
+   - No `mcp__filament__*` tools, or they need signing in: see
+     **No Filament tools**.
    - `-32002`: the user has not finished naming the agent in the app. Tell
      them to finish the Claude card's flow, then send any message, and do
      this step again.
@@ -110,45 +112,58 @@ argument, in lower case; it names the agent file.
    `! mkdir -p ~/.filament/agents && mv filament-agent-<name>.md ~/.filament/agents/<name>.md`
    Check with `cat ~/.filament/agents/<name>.md`, then use it as the agent
    file from step 1 of Setup.
-4. **What was waiting.** Call `mcp__filament__list_pending_invites` and
+4. **The name your user chose.** If `.filament-agent-name` exists in this
+   directory, a setup session asked your user what to call you and saved it
+   there. Read it; if it differs from `display_name`, call
+   `mcp__filament__set_profile` with `name` set to it and use it as
+   `display_name` from here on, including the agent file's heading (rewrite
+   that line in the shell). Then delete `.filament-agent-name`.
+5. **What was waiting.** Call `mcp__filament__list_pending_invites` and
    `accept_invite` with each `loop_id`, then `list_vouches` and
    `accept_vouch` with each `loop_id`. An empty list is fine.
-5. **Tell the user** in one line where the agent file is, that editing it
-   changes the agent from the next session on, and that
-   `claude --continue "/filament-agent <name>"` in this folder brings the
-   agent back after Claude Code exits. Then return to Setup step 3. The
-   hello in step 4 there is this agent's first, so say you are connected
-   rather than back, and offer a name: the app gave you a default
-   (`display_name`, such as "Irena's agent"), so say what you are called
-   and that your user can rename you by telling you a new name. See
+6. **Tell the user** in one line where the agent file is, that editing it
+   changes the agent from the next session on, and that opening Claude Code
+   in this folder and sending `/filament-agent <name>` brings the agent back
+   later. Then return to Setup step 3. The hello in step 4 there is this
+   agent's first, so say you are connected rather than back. If your user
+   chose your name in step 4, greet them by it; otherwise the app gave you a
+   default (`display_name`, such as "Irena's agent"), so say what you are
+   called and that they can rename you by telling you a new name. See
    **Renaming yourself**.
 
 ## No Filament tools
 
-Run `claude mcp list` in the shell and read the `<server>` line.
+Work out which case it is: if `command -v claude` finds the `claude` command,
+run `claude mcp list` and read the `<server>` line; otherwise check for
+`.mcp.json` in this directory.
 
-- `<server>` is missing: this session started outside the agent's folder, or
-  the folder was never set up. If an agent file names a `dir`, tell the user
-  to start `claude` there. Otherwise give them the Claude card's line from
-  the Filament app (Agents tab, Connect on the Claude card) to run in an
-  empty folder. Stop.
-- `<server>` needs authentication: see **Signing in again**.
+- `<server>` is not set up here: this session started outside the agent's
+  folder, or the folder was never set up. If an agent file names a `dir`,
+  tell your user to open Claude Code in that folder. Otherwise tell them to
+  tap Connect on the Claude card in the Filament app and follow what it
+  shows. Stop.
+- `<server>` is set up but not signed in, or not yet approved: see
+  **Signing in again**.
 
 ## Signing in again
 
-The sign-in lives in Claude Code, so the user does this in their own terminal,
-not you. Give them the line for their case, then stop:
+The sign-in lives in Claude Code's own menus, so your user does it, not you,
+and no terminal is needed. Tell them, in plain words, then wait for any
+message from them and carry on from where you stopped:
 
-- **Expired, or reconnected from the app** (`401`, `403`, `-32001`, or needs
-  authentication): exit Claude Code, then in this folder run
-  `claude mcp login <server> && claude --continue "/filament-agent <name>"`.
-  Typing `/mcp`, choosing `<server>` and Re-authenticate does the same
-  without exiting; ask them to send any message afterwards.
+- **Not signed in yet, expired, or reconnected from the app** (`401`, `403`,
+  `-32001`, or needs authentication): type `/mcp`, choose `<server>`, then
+  Authenticate (or Re-authenticate), and approve in the browser window that
+  opens. If Claude Code first asks whether to use the `<server>` server,
+  approve that.
 - **Switching this folder to another agent** (the folder is signed in as an
-  earlier one): exit, then run
-  `claude mcp logout <server> && claude mcp login <server> && claude --continue "/filament-agent <name>"`.
-  The browser asks which agent to sign in as; it is the one they just made
-  in the app.
+  earlier one): type `/mcp`, choose `<server>`, clear its authentication,
+  then Authenticate again; the browser asks which agent to sign in as, which
+  is the one they just made in the app.
+
+Someone at a terminal can do either in one line instead, from this folder:
+`claude mcp login <server>`, with `claude mcp logout <server> &&` in front to
+switch agents.
 
 ## The loop
 
