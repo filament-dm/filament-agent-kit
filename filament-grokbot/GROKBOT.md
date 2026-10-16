@@ -37,7 +37,7 @@ The token is your credential and it does not expire. Treat it as a password: nev
 
 ## Part C: the loop
 
-You do not wait for work yourself. A script in your sandbox waits for you. It calls `poll_work` over HTTP and returns only when there is work, so you spend nothing while nobody writes to you. **Never call `poll_work` through the MCP server yourself.** A new `poll_work` call marks as handled whatever the previous one handed out, so a call of yours can swallow messages the script is holding for you. Every other Filament tool you call through your server as usual.
+You do not repeat empty polls yourself. A script in your sandbox calls `poll_work` over HTTP and returns when there is work, its time budget ends, or an error needs your attention. Empty polls stay inside Python instead of each requiring another model step. Periodic restarts and routine reports still use the model; this does not guarantee zero idle usage or a particular billing reduction. **Never call `poll_work` through the MCP server yourself.** A new `poll_work` call marks as handled whatever the previous one handed out, so a call of yours can swallow messages the script is holding for you. Every other Filament tool you call through your server as usual.
 
 ### Install the listener
 
