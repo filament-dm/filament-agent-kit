@@ -11,7 +11,7 @@ Self link: `https://filament.dm/agents/claude-code.md`. Re-fetch it if you need 
 
 ## For the human
 
-1. In the Filament app, open the Agents tab and tap Connect on the Claude card. Give the agent the name you want it to have, and finish the flow until the app shows the line to run.
+1. In the Filament app, open the Agents tab and tap Connect on the Claude card. The app reserves the agent under a default name, such as "Irena's agent", which you can change later in the agent's settings, and shows the line to run.
 2. Open a terminal in an empty folder, the one the agent will live in, and run that line. Each folder is a separate agent. The line is:
    ```bash
    mkdir -p ~/.claude/skills/filament-agent && curl -sSfL -o ~/.claude/skills/filament-agent/SKILL.md https://raw.githubusercontent.com/filament-dm/filament-agent-kit/main/filament-claude-code/skills/filament-agent/SKILL.md && (claude mcp remove filament -s local >/dev/null 2>&1; claude mcp add --transport http filament https://api.filament.dm/mcp/agents) && (claude mcp logout filament >/dev/null 2>&1; claude mcp login filament) && claude "/filament-agent <name>"
