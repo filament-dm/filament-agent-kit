@@ -53,14 +53,13 @@ Check it landed with `ls "<folder>/.claude/skills/filament-agent/SKILL.md"`.
 
 ## 4. Put Filament in the folder
 
-Register the server for that folder only, so no other project is affected:
+Register the server for that folder only, so no other project is affected. Use the Claude Code you are running in, which `CLAUDE_CODE_EXECPATH` names even in the Claude desktop app, where `claude` is not on the path:
 
-- If `command -v claude` finds the `claude` command, run `cd "<folder>" && claude mcp add --transport http filament <server URL>`.
-- Otherwise (the Claude desktop app and some editors don't put `claude` on the path), write `<folder>/.mcp.json`:
-  ```json
-  {"mcpServers": {"filament": {"type": "http", "url": "<server URL>"}}}
-  ```
-  The first time Claude Code opens the folder it asks whether to use this server; your user approves it.
+```bash
+cd "<folder>" && "${CLAUDE_CODE_EXECPATH:-claude}" mcp add --transport http filament <server URL>
+```
+
+Check it with `"${CLAUDE_CODE_EXECPATH:-claude}" mcp list` from `<folder>`: `filament` should be listed, needing authentication. If neither command exists, write `<folder>/.mcp.json` instead, with `{"mcpServers": {"filament": {"type": "http", "url": "<server URL>"}}}`, and `<folder>/.claude/settings.local.json` with `{"enabledMcpjsonServers": ["filament"]}` so Claude Code uses it without asking.
 
 No credential goes in either: the sign-in happens in the next step, inside Claude Code.
 
@@ -69,10 +68,11 @@ No credential goes in either: the sign-in happens in the next step, inside Claud
 Tell your user, in this order and in plain words, then stop:
 
 1. Their agent has a folder: `<folder>`.
-2. Open a new Claude Code session in that folder. In the Claude desktop app, start a new Code session and choose that folder. In a terminal, `cd "<folder>"` and run `claude`. In an editor, open the folder and start Claude Code there.
-3. If Claude Code asks whether to use the `filament` server, say yes.
-4. Type `/mcp`, choose `filament`, then Authenticate, and approve in the browser window that opens. That sign-in is what makes that session their agent.
-5. Send `/filament-agent <slug>` in that new session. The agent sets itself up, takes the name they chose, and says hello to them in the Filament app within a minute.
+2. Open a new Claude Code session in that folder. In the Claude app: start a new Code session and, before sending anything, set its project folder to `<folder>`. (In a terminal it is `cd "<folder>"` then `claude`; in an editor, open the folder and start Claude Code there.)
+3. In that new session, type `/mcp`, choose `filament`, then Authenticate, and approve in the browser window that opens. That sign-in is what makes that session their agent.
+4. Send `/filament-agent <slug>` in that new session. The agent sets itself up, takes the name they chose, and says hello to them in the Filament app within a minute.
+
+If they send `/filament-agent <slug>` before signing in, the agent notices and walks them through step 3, so the order is forgiving.
 
 This session's part is done; it is not the agent. If your user comes back here with a problem, help with the step they are on.
 
