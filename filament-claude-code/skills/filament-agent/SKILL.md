@@ -160,17 +160,24 @@ run `claude mcp list` and read the `<server>` line; otherwise check for
 ## Signing in again
 
 The sign-in lives in Claude's own menus, so your user does it, not you, and
-no terminal is needed. If the server is a connector (its key starts with
-`claude_ai_`), tell them: type **/mcp**, and in **Connectors** click
-**Connect** on **Filament <name>**, then approve in the browser. Otherwise
-tell them the steps below. Then wait for any message from them and carry on
-from where you stopped:
+no terminal is needed. Send them the steps for their case as an ordinary
+numbered message, not folded into a question or a choice, so they can see
+exactly what to click. Then wait for any message from them and carry on from
+where you stopped. In the Claude app the server shows as a **connector**, so
+call it that.
 
 - **Not signed in yet, expired, or reconnected from the app** (`401`, `403`,
-  `-32001`, or needs authentication): in the Claude app, find **<server>**
-  under **Connectors** in the panel on the right and click its **Reconnect**;
-  in a terminal, type `/mcp`, choose `<server>`, then Authenticate (or
-  Re-authenticate). Either way they approve in the browser window that opens.
+  `-32001`, or needs authentication). In the Claude app:
+  > 1. In the panel on the right, under **Connectors**, find the **Filament**
+  >    connector. It shows an orange **Reconnect**. (If the panel is hidden,
+  >    open it with the panel button at the top right.)
+  > 2. Click **Reconnect**, sign in to Filament in the browser window that
+  >    opens, and approve.
+  >
+  > Tell me "done" when **Reconnect** has gone.
+
+  In a terminal: type `/mcp`, choose `<server>`, then Authenticate (or
+  Re-authenticate), and approve in the browser.
 - **Switching this folder to another agent** (the folder is signed in as an
   earlier one): type `/mcp`, choose `<server>`, clear its authentication,
   then Authenticate again; the browser asks which agent to sign in as, which

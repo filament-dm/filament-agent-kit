@@ -63,7 +63,7 @@ Send your user exactly this, filled in, then wait for them to say it's done:
 
 > One step left: sign in.
 >
-> 1. In the panel on the right, find **Filament** under **Connectors**. It shows an orange **Reconnect**. (It can take a few seconds to appear; if the panel is hidden, open it with the panel button at the top right.)
+> 1. In the panel on the right, under **Connectors**, find the **Filament** connector. It shows an orange **Reconnect**. (It can take a few seconds to appear; if the panel is hidden, open it with the panel button at the top right.)
 > 2. Click **Reconnect**, sign in to Filament in the browser window that opens, and approve.
 >
 > Tell me "done" when **Reconnect** has gone.
@@ -76,7 +76,7 @@ Load `mcp__filament__get_self` (use ToolSearch with `select:mcp__filament__get_s
 
 - **It answers:** print the skill with `cat ~/.claude/skills/filament-agent/SKILL.md` (or the folder copy) and follow it now, in this session, with `<slug>` as its argument, `filament` as the server, and the name from step 2 as the name your user chose. This is the agent's first session, so the skill starts with its **First run**. The last thing in this turn must be its waiter running in the background. Tell your user in one line that their agent is live and will say hello in the Filament app, and that opening Claude Code in this folder and sending **/filament-agent** brings it back.
 - **There is no such tool:** the server hasn't loaded into this session. Ask your user to start a new session in this same folder and send **/filament-agent <slug>**; save the name first with `printf '%s\n' "<the name>" > .filament-agent-name`. Stop.
-- **`401`, `403` or `-32001`:** the sign-in didn't finish. Ask them to click **Reconnect** again and approve.
+- **`401`, `403` or `-32001`:** the sign-in didn't finish. Ask them to click **Reconnect** on the **Filament** connector again and approve.
 - **`-32002`:** they haven't finished Connect on the Claude card in the app. Ask them to, then try again.
 
 ## Every later session
@@ -86,6 +86,6 @@ Open Claude Code in the agent's folder and send `/filament-agent`. In the Claude
 ## If something goes wrong
 
 - **No Filament tools:** the session isn't in the agent's folder. Start one there.
-- **Every Filament call is refused (`401`, `403`, `-32001`):** the sign-in expired or the agent was reconnected from the app. Click **Reconnect** next to **Filament** in the panel on the right (in a terminal: **/mcp**, **filament**, **Re-authenticate**).
+- **Every Filament call is refused (`401`, `403`, `-32001`):** the sign-in expired or the agent was reconnected from the app. Click **Reconnect** on the **Filament** connector in the panel on the right (in a terminal: **/mcp**, **filament**, **Re-authenticate**).
 - **The agent shows as offline:** no session is waiting for work. Open the agent's folder and send `/filament-agent`.
 - **To remove the agent:** delete it in the app's Agents tab (which revokes the sign-in), then in its folder remove the server with `claude mcp remove filament` and delete `~/.filament/agents/<slug>.md`.
