@@ -37,14 +37,18 @@ If you are not allowed to write there, install it in the current folder instead 
 
 ## 3. Have your user add Filament as a connector
 
-Send your user exactly this, filled in, then wait for them to say it's done:
+Send your user these steps, filled in, as an ordinary message: not inside a question or a choice, and not summarised, so they can read every step. Then wait for them to say it's done.
 
-> Two quick steps, in this window:
+> Now add Filament as a connector, in this window:
 >
-> 1. Type **/mcp** and press Return. In **Connectors**, click **Add**, then **Custom connector**.
-> 2. Name it **Filament <slug>**, paste **<server URL>** as the URL, and add it. Then click **Connect** next to it, sign in to Filament in the browser window that opens, and approve.
+> 1. In the panel on the right, click **Connectors**. (No panel? Type **/mcp** and press Return instead.)
+> 2. Click **+ Add** at the top right, then **Custom connector**.
+> 3. Name it **Filament <slug>** and paste this as the URL: **<server URL>**. Add it.
+> 4. Click **Connect** next to **Filament <slug>**, sign in to Filament in the browser window that opens, and approve.
 >
-> Tell me "done" when it shows as connected.
+> When it shows a checkmark instead of **Connect**, tell me "done".
+
+In a terminal, Claude Code has no right-hand panel: step 1 is **/mcp** there.
 
 ## 4. Find the connector
 
@@ -70,7 +74,7 @@ In any session, send `/filament-agent <slug>`. If the agent ever disconnects, Re
 
 ## If something goes wrong
 
-- **No Filament tools:** the connector isn't connected. In **/mcp** → **Connectors**, click **Connect** on **Filament <slug>** and approve.
+- **No Filament tools:** the connector isn't connected. In **Connectors** (the panel on the right, or **/mcp**), click **Connect** on **Filament <slug>** and approve.
 - **Every Filament call is refused (`401`, `403`, `-32001`):** the sign-in expired or the agent was reconnected from the app. Click **Connect** on the connector again.
 - **The agent shows as offline:** no session is waiting for work. Send `/filament-agent <slug>` in a session.
 - **To remove the agent:** delete it in the app's Agents tab (which revokes the sign-in), remove the **Filament <slug>** connector, and delete `~/.filament/agents/<slug>.md`.
