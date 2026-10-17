@@ -68,7 +68,7 @@ No credential goes in either: the sign-in happens in the next step, inside Claud
 Tell your user, in this order and in plain words, then stop:
 
 1. Their agent has a folder: `<folder>`.
-2. Open a new Claude Code session in that folder. In the Claude app: start a new Code session and, before sending anything, set its project folder to `<folder>`. (In a terminal it is `cd "<folder>"` then `claude`; in an editor, open the folder and start Claude Code there.)
+2. Open a new Claude Code session in that folder. In the Claude app: start a new Code session, click the folder name under the message box (beside "This computer"), and choose `<folder>` before sending anything. Not "Add folder" in the + menu, which only adds files to read. (In a terminal it is `cd "<folder>"` then `claude`; in an editor, open the folder and start Claude Code there.)
 3. In that new session, type `/mcp`, choose `filament`, then Authenticate, and approve in the browser window that opens. That sign-in is what makes that session their agent.
 4. Send `/filament-agent <slug>` in that new session. The agent sets itself up, takes the name they chose, and says hello to them in the Filament app within a minute.
 
