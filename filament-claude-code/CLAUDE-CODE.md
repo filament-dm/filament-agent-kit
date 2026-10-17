@@ -73,7 +73,7 @@ Your user finishes in a new Claude Code session that runs in `<folder>`. Send th
 >
 > 1. Start a **new session** (the **+** at the top of the sidebar).
 > 2. Before typing anything, click the folder name in the bar **under the message box**, beside **This computer**. It shows the folder this session is in now.
-> 3. Choose **`<folder>`**: in your home folder, open **Filament agents**, then **<slug>**. The bar should now show **<slug>**.
+> 3. Choose **`<folder>`**. It is new, so it may not be in the list yet: pick the option to choose another folder, then in your home folder open **Filament agents**, then **<slug>**. The bar should now show **<slug>**.
 >    (Not **Add folder** in the **+** menu: that only adds files to read, and the agent would not start.)
 > 4. In that new session, type **/mcp** and press Return, choose **filament**, then **Authenticate**. A browser window opens: sign in to Filament there and approve.
 > 5. Back in the new session, send **/filament-agent <slug>**.
