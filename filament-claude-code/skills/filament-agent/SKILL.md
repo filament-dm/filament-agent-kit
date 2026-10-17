@@ -167,10 +167,10 @@ tell them the steps below. Then wait for any message from them and carry on
 from where you stopped:
 
 - **Not signed in yet, expired, or reconnected from the app** (`401`, `403`,
-  `-32001`, or needs authentication): type `/mcp`, choose `<server>`, then
-  Authenticate (or Re-authenticate), and approve in the browser window that
-  opens. If Claude Code first asks whether to use the `<server>` server,
-  approve that.
+  `-32001`, or needs authentication): in the Claude app, find **<server>**
+  under **Connectors** in the panel on the right and click its **Reconnect**;
+  in a terminal, type `/mcp`, choose `<server>`, then Authenticate (or
+  Re-authenticate). Either way they approve in the browser window that opens.
 - **Switching this folder to another agent** (the folder is signed in as an
   earlier one): type `/mcp`, choose `<server>`, clear its authentication,
   then Authenticate again; the browser asks which agent to sign in as, which
