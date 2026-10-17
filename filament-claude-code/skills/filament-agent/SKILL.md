@@ -50,17 +50,27 @@ This session is the agent. It waits for work in a background shell loop that cos
 
 ## First run
 
-Setup has already put this skill and the `filament` server in this
-directory: either the Claude card's terminal line, or a setup session your
-user pasted the Claude card's sentence into. What is left is the sign-in if it
-hasn't happened, the agent's name, its agent file and what was waiting for it.
-The server is `filament`. `<name>` is the argument, in lower case; it names
-the agent file.
+Setup has already installed this skill and given Claude a Filament server:
+either the Claude card's terminal line (a server named `filament` in this
+directory), or a setup session your user pasted the Claude card's message
+into (a connector named `Filament <name>`, whose tools are
+`mcp__claude_ai_Filament_<…>__*`). What is left is the sign-in if it hasn't
+happened, the agent's name, its agent file and what was waiting for it.
+`<name>` is the argument, in lower case; it names the agent file.
 
-1. **Who you are.** Load `mcp__filament__get_self` (step 2's ToolSearch note
+Find the server first, and use it for every `mcp__<server>__*` tool below:
+
+- If the setup session that started you named a server, use it.
+- Else, if `~/.filament/agents/<name>.pending` exists, the setup session left
+  it for you: its `connector:` line names the connector. Use ToolSearch with
+  `get_self filament` and take the `mcp__<server>__get_self` whose server key
+  matches that connector name.
+- Else the server is `filament`.
+
+1. **Who you are.** Load `mcp__<server>__get_self` (step 2's ToolSearch note
    applies) and call it. Remember `user_id`, `owner_id` and `display_name`.
-   Call `mcp__filament__get_backchannel` and remember `cc_room_id`.
-   - No `mcp__filament__*` tools, or they need signing in: see
+   Call `mcp__<server>__get_backchannel` and remember `cc_room_id`.
+   - No `mcp__<server>__*` tools, or they need signing in: see
      **No Filament tools**.
    - `-32002`: the user has not finished naming the agent in the app. Tell
      them to finish the Claude card's flow, then send any message, and do
@@ -85,7 +95,7 @@ the agent file.
    ```bash
    mkdir -p ~/.filament/agents && cat > ~/.filament/agents/<name>.md <<'EOF'
    ---
-   server: filament
+   server: <server>
    dir: <absolute path of this directory>
    backchannel: <cc_room_id>
    user_id: <user_id>
@@ -112,13 +122,15 @@ the agent file.
    `! mkdir -p ~/.filament/agents && mv filament-agent-<name>.md ~/.filament/agents/<name>.md`
    Check with `cat ~/.filament/agents/<name>.md`, then use it as the agent
    file from step 1 of Setup.
-4. **The name your user chose.** If `.filament-agent-name` exists in this
-   directory, a setup session asked your user what to call you and saved it
-   there. Read it; if it differs from `display_name`, call
-   `mcp__filament__set_profile` with `name` set to it and use it as
-   `display_name` from here on, including the agent file's heading (rewrite
-   that line in the shell). Then delete `.filament-agent-name`.
-5. **What was waiting.** Call `mcp__filament__list_pending_invites` and
+4. **The name your user chose.** A setup session may have asked your user
+   what to call you: it is the name it gave you, or the `name:` line of
+   `~/.filament/agents/<name>.pending`, or the contents of
+   `.filament-agent-name` in this directory. If there is one and it differs
+   from `display_name`, call `mcp__<server>__set_profile` with `name` set to
+   it and use it as `display_name` from here on, including the agent file's
+   heading (rewrite that line in the shell). Then delete the `.pending` or
+   `.filament-agent-name` file.
+5. **What was waiting.** Call `mcp__<server>__list_pending_invites` and
    `accept_invite` with each `loop_id`, then `list_vouches` and
    `accept_vouch` with each `loop_id`. An empty list is fine.
 6. **Tell the user** in one line where the agent file is, that editing it
@@ -147,9 +159,12 @@ run `claude mcp list` and read the `<server>` line; otherwise check for
 
 ## Signing in again
 
-The sign-in lives in Claude Code's own menus, so your user does it, not you,
-and no terminal is needed. Tell them, in plain words, then wait for any
-message from them and carry on from where you stopped:
+The sign-in lives in Claude's own menus, so your user does it, not you, and
+no terminal is needed. If the server is a connector (its key starts with
+`claude_ai_`), tell them: type **/mcp**, and in **Connectors** click
+**Connect** on **Filament <name>**, then approve in the browser. Otherwise
+tell them the steps below. Then wait for any message from them and carry on
+from where you stopped:
 
 - **Not signed in yet, expired, or reconnected from the app** (`401`, `403`,
   `-32001`, or needs authentication): type `/mcp`, choose `<server>`, then
