@@ -41,14 +41,12 @@ Send your user these steps, filled in, as an ordinary message: not inside a ques
 
 > Now add Filament as a connector, in this window:
 >
-> 1. In the panel on the right, click **Connectors**. (No panel? Type **/mcp** and press Return instead.)
-> 2. Click **+ Add** at the top right, then **Custom connector**.
+> 1. Type **/mcp** in the message box and press Return. The **Connectors** window opens. (Not the **Connectors** list in the panel on the right: that one has no **+ Add**.)
+> 2. Click **+ Add** at the top right of that window, then **Custom connector**.
 > 3. Name it **Filament <slug>** and paste this as the URL: **<server URL>**. Add it.
 > 4. Click **Connect** next to **Filament <slug>**, sign in to Filament in the browser window that opens, and approve.
 >
 > When it shows a checkmark instead of **Connect**, tell me "done".
-
-In a terminal, Claude Code has no right-hand panel: step 1 is **/mcp** there.
 
 ## 4. Find the connector
 
@@ -74,7 +72,7 @@ In any session, send `/filament-agent <slug>`. If the agent ever disconnects, Re
 
 ## If something goes wrong
 
-- **No Filament tools:** the connector isn't connected. In **Connectors** (the panel on the right, or **/mcp**), click **Connect** on **Filament <slug>** and approve.
+- **No Filament tools:** the connector isn't connected. Type **/mcp**, and in the **Connectors** window click **Connect** on **Filament <slug>** and approve.
 - **Every Filament call is refused (`401`, `403`, `-32001`):** the sign-in expired or the agent was reconnected from the app. Click **Connect** on the connector again.
 - **The agent shows as offline:** no session is waiting for work. Send `/filament-agent <slug>` in a session.
 - **To remove the agent:** delete it in the app's Agents tab (which revokes the sign-in), remove the **Filament <slug>** connector, and delete `~/.filament/agents/<slug>.md`.
