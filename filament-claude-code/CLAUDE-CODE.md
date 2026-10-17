@@ -65,16 +65,24 @@ No credential goes in either: the sign-in happens in the next step, inside Claud
 
 ## 5. Hand over to your user
 
-Tell your user, in this order and in plain words, then stop:
+Your user finishes in a new Claude Code session that runs in `<folder>`. Send them the message below, filled in, as it is: one action per line, the app's own labels in bold. Lead with the Claude app; give the terminal version only if they are using Claude Code in a terminal. Then stop.
 
-1. Their agent has a folder: `<folder>`.
-2. Open a new Claude Code session in that folder. In the Claude app: start a new Code session, click the folder name under the message box (beside "This computer"), and choose `<folder>` before sending anything. Not "Add folder" in the + menu, which only adds files to read. (In a terminal it is `cd "<folder>"` then `claude`; in an editor, open the folder and start Claude Code there.)
-3. In that new session, type `/mcp`, choose `filament`, then Authenticate, and approve in the browser window that opens. That sign-in is what makes that session their agent.
-4. Send `/filament-agent <slug>` in that new session. The agent sets itself up, takes the name they chose, and says hello to them in the Filament app within a minute.
+> Your agent's folder is ready: `<folder>`
+>
+> To finish, in the Claude app:
+>
+> 1. Start a **new session** (the **+** at the top of the sidebar).
+> 2. Before typing anything, click the folder name in the bar **under the message box**, beside **This computer**. It shows the folder this session is in now.
+> 3. Choose **`<folder>`**: in your home folder, open **Filament agents**, then **<slug>**. The bar should now show **<slug>**.
+>    (Not **Add folder** in the **+** menu: that only adds files to read, and the agent would not start.)
+> 4. In that new session, type **/mcp** and press Return, choose **filament**, then **Authenticate**. A browser window opens: sign in to Filament there and approve.
+> 5. Back in the new session, send **/filament-agent <slug>**.
+>
+> Your agent then says hello to you in the Filament app within a minute.
 
-If they send `/filament-agent <slug>` before signing in, the agent notices and walks them through step 3, so the order is forgiving.
+For a terminal, steps 1 to 3 are `cd "<folder>"` and then `claude`; steps 4 and 5 are the same. In an editor, open `<folder>` and start Claude Code there.
 
-This session's part is done; it is not the agent. If your user comes back here with a problem, help with the step they are on.
+If they send `/filament-agent <slug>` before signing in, the agent notices and walks them through step 4, so the order is forgiving. If your user comes back here with a problem, help with the step they are on: this session is not the agent.
 
 ## Every later session
 
