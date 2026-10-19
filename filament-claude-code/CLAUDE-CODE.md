@@ -49,13 +49,13 @@ If you are not allowed to write there, put it in this folder instead (`./.claude
 
 ## 4. Put Filament in this folder
 
-Register the server for this folder only, with the Claude Code you are running in, which `CLAUDE_CODE_EXECPATH` names even in the Claude desktop app, where `claude` is not on the path:
+Register the server for this folder only, under a name of its own, `filament-<slug>`, with the Claude Code you are running in, which `CLAUDE_CODE_EXECPATH` names even in the Claude desktop app, where `claude` is not on the path:
 
 ```bash
-"${CLAUDE_CODE_EXECPATH:-claude}" mcp add --transport http filament <server URL>
+"${CLAUDE_CODE_EXECPATH:-claude}" mcp add --transport http filament-<slug> <server URL>
 ```
 
-If this folder already has a `filament` server, remove it first with `"${CLAUDE_CODE_EXECPATH:-claude}" mcp remove filament -s local`. No credential goes in: your user signs in next.
+The name matters: Claude Code keeps an MCP sign-in under the server's name and address, not per folder, so two folders with a server called just `filament` at the same address share one sign-in, and a new agent would silently come up as an earlier one. A name per agent gives each its own sign-in. Call it `<server>` (`filament-<slug>`). No credential goes in: your user signs in next.
 
 ## 5. Hand over to a new session in this folder
 
@@ -68,11 +68,11 @@ printf '%s\n' "<the name>" > .filament-agent-name
 > Your agent's folder is ready: **<folder name>**. Two steps to finish:
 >
 > 1. In the sidebar, click the **+** next to **<folder name>**. That starts a new session in this folder.
-> 2. In that new session, send **/filament-agent <slug>**. Your agent then walks you through signing in: it asks you to click **Reconnect** on the **Filament** connector in the panel on the right (the panel appears once the session has started).
+> 2. In that new session, send **/filament-agent <slug>**. Your agent then walks you through signing in: it asks you to click **Reconnect** on its connector, **<server>**, in the panel on the right (the panel appears once the session has started).
 >
 > Your agent then says hello to you in the Filament app within a minute. You can close this session.
 
-In a terminal, step 1 is `cd "<folder>"` then `claude`, and the agent asks for **/mcp**, **filament**, **Authenticate** instead of the panel.
+In a terminal, step 1 is `cd "<folder>"` then `claude`, and the agent asks for **/mcp**, **<server>**, **Authenticate** instead of the panel.
 
 The skill's first run takes it from there in the new session: it reads `.filament-agent-name`, confirms who it is, writes the agent file and starts waiting for work. If your user comes back here with a problem, help with the step they are on.
 
@@ -83,6 +83,6 @@ Open Claude Code in the agent's folder and send `/filament-agent`. In the Claude
 ## If something goes wrong
 
 - **No Filament tools:** the session isn't in the agent's folder. Start one there.
-- **Every Filament call is refused (`401`, `403`, `-32001`):** the sign-in expired or the agent was reconnected from the app. Click **Reconnect** on the **Filament** connector in the panel on the right (in a terminal: **/mcp**, **filament**, **Re-authenticate**).
+- **Every Filament call is refused (`401`, `403`, `-32001`):** the sign-in expired or the agent was reconnected from the app. Click **Reconnect** on the agent's connector, **filament-<slug>**, in the panel on the right (in a terminal: **/mcp**, **filament-<slug>**, **Re-authenticate**).
 - **The agent shows as offline:** no session is waiting for work. Open the agent's folder and send `/filament-agent`.
-- **To remove the agent:** delete it in the app's Agents tab (which revokes the sign-in), then in its folder remove the server with `claude mcp remove filament` and delete `~/.filament/agents/<slug>.md`.
+- **To remove the agent:** delete it in the app's Agents tab (which revokes the sign-in), then in its folder remove the server with `claude mcp remove filament-<slug>` and delete `~/.filament/agents/<slug>.md`.

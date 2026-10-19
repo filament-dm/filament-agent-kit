@@ -65,6 +65,9 @@ Find the server first, and use it for every `mcp__<server>__*` tool below:
   it for you: its `connector:` line names the connector. Use ToolSearch with
   `get_self filament` and take the `mcp__<server>__get_self` whose server key
   matches that connector name.
+- Else, if there is a `mcp__filament-<name>__get_self` tool, the server is
+  `filament-<name>`: setup names each agent's server after it, so agents in
+  different folders don't share a sign-in.
 - Else the server is `filament`.
 
 1. **Who you are.** Load `mcp__<server>__get_self` (step 2's ToolSearch note
@@ -168,8 +171,8 @@ call it that.
 
 - **Not signed in yet, expired, or reconnected from the app** (`401`, `403`,
   `-32001`, or needs authentication). In the Claude app:
-  > 1. In the panel on the right, under **Connectors**, find the **Filament**
-  >    connector. It shows an orange **Reconnect**. (If the panel is hidden,
+  > 1. In the panel on the right, under **Connectors**, find this agent's
+  >    connector, **<server>**. It shows an orange **Reconnect**. (If the panel is hidden,
   >    open it with the panel button at the top right.)
   > 2. Click **Reconnect**, sign in to Filament in the browser window that
   >    opens, and approve.
