@@ -65,15 +65,14 @@ Save the name for the agent's first run, then send your user exactly this, fille
 printf '%s\n' "<the name>" > .filament-agent-name
 ```
 
-> Your agent's folder is ready: **<folder name>**. Three steps to finish:
+> Your agent's folder is ready: **<folder name>**. Two steps to finish:
 >
 > 1. In the sidebar, click the **+** next to **<folder name>**. That starts a new session in this folder.
-> 2. In that new session's panel on the right, under **Connectors**, the **Filament** connector shows an orange **Reconnect**. Click it, sign in to Filament in the browser window that opens, and approve. You're signed in when **Reconnect** has gone.
-> 3. Send **/filament-agent <slug>** in that new session.
+> 2. In that new session, send **/filament-agent <slug>**. Your agent then walks you through signing in: it asks you to click **Reconnect** on the **Filament** connector in the panel on the right (the panel appears once the session has started).
 >
 > Your agent then says hello to you in the Filament app within a minute. You can close this session.
 
-In a terminal, steps 1 and 2 are: `cd "<folder>"`, run `claude`, then type **/mcp**, choose **filament**, then **Authenticate**.
+In a terminal, step 1 is `cd "<folder>"` then `claude`, and the agent asks for **/mcp**, **filament**, **Authenticate** instead of the panel.
 
 The skill's first run takes it from there in the new session: it reads `.filament-agent-name`, confirms who it is, writes the agent file and starts waiting for work. If your user comes back here with a problem, help with the step they are on.
 
