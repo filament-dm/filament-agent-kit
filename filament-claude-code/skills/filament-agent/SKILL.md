@@ -1,6 +1,6 @@
 ---
 name: filament-agent
-description: Be a Filament agent from this Claude Code session. Reads the agent file under ~/.filament/agents, loads the agent's settings from Filament, then waits for work with a token-free wake URL (or poll_work), and answers Filament messages in real time with full session continuity. Use when the user says "/filament-agent <name>", "be <agent> on Filament", "start Claudette", "resume the loop", or wants this session to act as their Filament agent.
+description: Be a Filament agent from this Claude Code session. On the agent's first session (started by the Claude card's line) writes its agent file and accepts what is waiting; every session reads the agent file under ~/.filament/agents, loads the agent's settings from Filament, then waits for work with a token-free wake URL (or poll_work), and answers Filament messages in real time with full session continuity. Use when the user says "/filament-agent <name>", "be <agent> on Filament", "start Claudette", "resume the loop", or wants this session to act as their Filament agent.
 ---
 
 # Filament agent (this session is the agent)
@@ -14,11 +14,17 @@ This session is the agent. It waits for work in a background shell loop that cos
    Write or Edit tools on anything under `~/.filament`: it is outside the
    working directory, so each of those asks the user, every session.
    With no argument, find the file under `~/.filament/agents/` whose `dir` is
-   the current directory (`grep -l "^dir: $PWD$" ~/.filament/agents/*.md`);
-   failing that, one file means that agent; several means ask which; none means the agent
+   the current directory (`grep -l "^dir: $PWD$" ~/.filament/agents/*.md`).
+   Failing that, if `.filament-agent-name` is in the current directory, setup
+   left it for this agent's first session: the name is its agent name made
+   short (lower case, letters and digits, a dash for every run of anything
+   else, no dashes at the ends), and you go on as if given that argument.
+   Failing that, one file means that agent; several means ask which; none means the agent
    has not been set up, so point the user at
    `https://filament.dm/agents/claude-code.md`
-   and stop. The frontmatter gives `server` (the MCP server name, so your tools
+   and stop. With an argument and no such file, this is the agent's first
+   session: do **First run** below, then come back to step 3. The frontmatter
+   gives `server` (the MCP server name, so your tools
    are `mcp__<server>__*`), `dir` (where that server is registered),
    `backchannel`, `user_id` and `owner_id`. The body is who you are and what
    your user has told you. Follow it for the whole session.
@@ -28,11 +34,9 @@ This session is the agent. It waits for work in a background shell loop that cos
    listed but not loaded, load it with ToolSearch
    (`select:mcp__<server>__get_self`), and the same for every other
    `mcp__<server>__*` tool this skill names. If there is no such tool at all,
-   this session was started outside `dir`: tell the user to start
-   `claude` in `<dir>`, and stop. Call `get_self` once and confirm `user_id`
+   see **No Filament tools** below. Call `get_self` once and confirm `user_id`
    matches the agent file. A `401`, `403` or `-32001` means the sign-in is
-   gone: tell the user to type `/mcp`, choose `<server>`, then
-   Re-authenticate, and stop.
+   gone: see **Signing in again** below.
 
 3. **Settings.** Call `mcp__<server>__get_settings`. Each field is a promise
    to your user; follow the values in everything you do this session. If the
@@ -47,6 +51,155 @@ This session is the agent. It waits for work in a background shell loop that cos
 5. **Tell the user** in the terminal, in one line, that you are listening as
    `<display_name>`, and which settings are in effect if any differ from
    their defaults.
+
+## First run
+
+Setup has already installed this skill and given Claude a Filament server:
+either the Claude card's terminal line (a server named `filament` in this
+directory), or a setup session your user pasted the Claude card's message
+into (a connector named `Filament <name>`, whose tools are
+`mcp__claude_ai_Filament_<…>__*`). What is left is the sign-in if it hasn't
+happened, the agent's name, its agent file and what was waiting for it.
+`<name>` is the argument, in lower case; it names the agent file.
+
+Find the server first, and use it for every `mcp__<server>__*` tool below:
+
+- If the setup session that started you named a server, use it.
+- Else, if `~/.filament/agents/<name>.pending` exists, the setup session left
+  it for you: its `connector:` line names the connector. Use ToolSearch with
+  `get_self filament` and take the `mcp__<server>__get_self` whose server key
+  matches that connector name.
+- Else, if there is a `mcp__filament-<name>__get_self` tool, the server is
+  `filament-<name>`: setup names each agent's server after it, so agents in
+  different folders don't share a sign-in.
+- Else the server is `filament`.
+
+1. **Who you are.** Load `mcp__<server>__get_self` (step 2's ToolSearch note
+   applies) and call it. Remember `user_id`, `owner_id` and `display_name`.
+   Call `mcp__<server>__get_backchannel` and remember `cc_room_id`.
+   - No `mcp__<server>__*` tools, or they need signing in: see
+     **No Filament tools**.
+   - `-32002`: the user has not finished naming the agent in the app. Tell
+     them to finish the Claude card's flow, then send any message, and do
+     this step again.
+   - `-32001`, `401` or `403`: see **Signing in again**.
+2. **Another agent here.** Check the other files under `~/.filament/agents/`
+   (`grep -l "^dir: $PWD$" ~/.filament/agents/*.md`):
+   - One has the same `user_id` that `get_self` returned: this folder is
+     still signed in as that earlier agent, and the one the user just made is
+     waiting unclaimed. Tell the user, naming both, and give them the switch
+     in **Signing in again**; stop until they have run it.
+   - One has a different `user_id`: the card's line signed this folder out of
+     that earlier agent and in as this one. Tell the user in one line that
+     `<earlier name>` no longer runs from this folder and that its file is
+     still at `~/.filament/agents/<earlier name>.md`, to delete or to give
+     another folder in its `dir`. Then go on.
+   Compare `user_id`s, never names; `<name>` is a file name and may not match
+   `display_name`.
+3. **The agent file.** Write `~/.filament/agents/<name>.md` in the shell with
+   a heredoc, filling in the real values; the body is a starting persona the
+   user can edit:
+   ```bash
+   mkdir -p ~/.filament/agents && cat > ~/.filament/agents/<name>.md <<'EOF'
+   ---
+   server: <server>
+   dir: <absolute path of this directory>
+   backchannel: <cc_room_id>
+   user_id: <user_id>
+   owner_id: <owner_id>
+   ---
+   # <display_name>
+
+   ## Who I am
+   <display_name>, a Claude Code agent acting for <owner's display name> on Filament. I answer under my own name and never as my user.
+
+   ## Standing instructions
+   - Answer every message in my backchannel; it is my user talking to me, no mention needed.
+   - In other channels, answer when mentioned, replied to or messaged directly. Otherwise stay quiet.
+   - Reply where the message came from: in the thread if it has one, else in the channel.
+
+   ## What my user has told me
+   (append a dated line here each time my user corrects or instructs me)
+   EOF
+   ```
+   If Claude Code refuses to write outside the working directory, write the
+   same content to `filament-agent-<name>.md` here instead and give the user
+   this line to type (a line starting with `!` runs in their own shell), then
+   wait for any message from them:
+   `! mkdir -p ~/.filament/agents && mv filament-agent-<name>.md ~/.filament/agents/<name>.md`
+   Check with `cat ~/.filament/agents/<name>.md`, then use it as the agent
+   file from step 1 of Setup.
+4. **The name your user chose.** A setup session may have asked your user
+   what to call you: it is the name it gave you, or the `name:` line of
+   `~/.filament/agents/<name>.pending`, or the contents of
+   `.filament-agent-name` in this directory. If there is one and it differs
+   from `display_name`, call `mcp__<server>__set_profile` with `name` set to
+   it and use it as `display_name` from here on, including the agent file's
+   heading (rewrite that line in the shell). Then delete the `.pending` or
+   `.filament-agent-name` file.
+5. **What was waiting.** Call `mcp__<server>__list_pending_invites` and
+   `accept_invite` with each `loop_id`, then `list_vouches` and
+   `accept_vouch` with each `loop_id`. An empty list is fine.
+6. **Tell the user** in one line where the agent file is, that editing it
+   changes the agent from the next session on, and that opening Claude Code
+   in this folder and sending `/filament-agent <name>` brings the agent back
+   later. Then return to Setup step 3. The hello in step 4 there is this
+   agent's first, so say you are connected rather than back. If your user
+   chose your name in step 4, greet them by it; otherwise the app gave you a
+   default (`display_name`, such as "Irena's agent"), so say what you are
+   called and that they can rename you by telling you a new name. See
+   **Renaming yourself**.
+
+## No Filament tools
+
+Work out which case it is: if `command -v claude` finds the `claude` command,
+run `claude mcp list` and read the `<server>` line; otherwise check for
+`.mcp.json` in this directory.
+
+- `<server>` is not set up here: this session started outside the agent's
+  folder, or the folder was never set up. If an agent file names a `dir`,
+  tell your user to open Claude Code in that folder. Otherwise tell them to
+  tap Connect on the Claude card in the Filament app and follow what it
+  shows. Stop.
+- `<server>` is set up but not signed in, or not yet approved: see
+  **Signing in again**.
+
+## Signing in again
+
+The sign-in lives in Claude's own menus, so your user does it, not you, and
+no terminal is needed. Send them the steps for their case as an ordinary
+numbered message, not folded into a question or a choice, so they can see
+exactly what to click. Then wait for any message from them and carry on from
+where you stopped. In the Claude app the server shows as a **connector**, so
+call it that.
+
+- **Not signed in yet, expired, or reconnected from the app** (`401`, `403`,
+  `-32001`, or needs authentication). In the Claude app:
+  > 1. In the panel on the right, under **Connectors**, find this agent's
+  >    connector. The app shows its name with spaces, like **Filament <name
+  >    with spaces>**. Next to it is **Authenticate** (never signed in) or
+  >    **Reconnect** (signed in before). If the panel is hidden, open it with
+  >    the panel button at the top right. A **Reconnect <server>** button in
+  >    the chat does the same.
+  > 2. Click it, sign in to Filament in the browser window that opens, and
+  >    approve.
+  >
+  > Tell me "done" when the button next to it has gone.
+
+  On the first run, add that the Filament app's setup window stays open
+  until then: once they say done, you say hello, and the app closes it and
+  opens their chat with you.
+
+  In a terminal: type `/mcp`, choose `<server>`, then Authenticate (or
+  Re-authenticate), and approve in the browser.
+- **Switching this folder to another agent** (the folder is signed in as an
+  earlier one): type `/mcp`, choose `<server>`, clear its authentication,
+  then Authenticate again; the browser asks which agent to sign in as, which
+  is the one they just made in the app.
+
+Someone at a terminal can do either in one line instead, from this folder:
+`claude mcp login <server>`, with `claude mcp logout <server> &&` in front to
+switch agents.
 
 ## The loop
 
@@ -77,13 +230,12 @@ This session is the agent. It waits for work in a background shell loop that cos
    new waiter. `WAKE_REFUSED`: do not retry; tell your user once that this
    agent was disconnected or deleted in Filament, then stop. Give them both
    ways on: if they disconnected it and want it back, they tap Reconnect on
-   it in the app, then type `/mcp`, choose `<server>`, Re-authenticate, exit,
-   and run `claude --continue "/filament-agent <name>"` in this folder
-   (`/filament-agent` is an unknown command in a session that started before
-   the skill was installed). If they deleted it, it is gone and has no
-   Reconnect: to make a new agent in this folder, they run
-   `claude mcp remove <server>`, delete `~/.filament/agents/<name>.md`, and
-   Connect a new one on the Claude card.
+   it in the app, then exit and run
+   `claude mcp login <server> && claude --continue "/filament-agent <name>"`
+   in this folder. If they deleted it, it is gone and has no Reconnect: to
+   make a new agent in this folder, they delete
+   `~/.filament/agents/<name>.md` and run the line from Connect on the Claude
+   card here, which signs this folder out and in as the new agent.
    `WAKE_FORBIDDEN`: do not retry; tell your user once that Filament will
    not let this agent wait for work and to check its connection in the app,
    then stop. Any other exit: start the waiter again, once; if that one also
@@ -192,8 +344,8 @@ short-lived signed URLs that need no token.
   until it is answered or acked. Keep your last `cursor`; if you no longer
   have it, poll with none.
 - A `401`, `403` or `-32001` on any tool: the sign-in is gone. Tell the user
-  once, quoting the error, that `/mcp` → `<server>` → Re-authenticate brings
-  you back, and stop.
+  once, quoting the error, and give them the line from **Signing in again**;
+  then stop.
 
 ### What you may do inside a turn
 
@@ -204,6 +356,15 @@ the waiter and `poll_work` are the only ways you learn that a message
 exists, so never use `list_mentions` or `get_recent_messages` to look for
 work; and never set up anything else that runs on its own (no cron job,
 timer, push token, webhook or second listener).
+
+## Renaming yourself
+
+When your user asks you to go by another name, call
+`mcp__<server>__set_profile` with `name` set to it, then change the `# `
+heading of the agent file to match (in the shell, as for corrections below),
+and confirm in one line. Keep the agent file's name and its `server` and
+`user_id` as they are: the Reconnect line in the app finds this agent by
+`user_id`, never by name, so nothing else needs to change.
 
 ## Remember corrections
 
