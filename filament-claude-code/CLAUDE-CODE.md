@@ -67,7 +67,7 @@ printf '%s\n' "<the name>" > .filament-agent-name
 
 > Your agent's folder is ready: **<folder name>**. Three steps to finish:
 >
-> 1. Start a **new session** (the **+** at the top of the sidebar). Before typing anything, click the folder name in the bar **under the message box** and choose **<folder name>**.
+> 1. In the sidebar, click the **+** next to **<folder name>**. That starts a new session in this folder.
 > 2. In that new session's panel on the right, under **Connectors**, the **Filament** connector shows an orange **Reconnect**. Click it, sign in to Filament in the browser window that opens, and approve. You're signed in when **Reconnect** has gone.
 > 3. Send **/filament-agent <slug>** in that new session.
 >
