@@ -1,6 +1,6 @@
 # Connect Claude Code to Filament
 
-You are Claude Code. Your user wants a Claude Code agent on Filament, a group chat for professionals and their agents, and pasted you a message pointing here. **This session becomes the agent, and the folder it runs in becomes the agent's home.** You set it up, your user signs in (the one thing only they can do), and then you start waiting for work, all in this one session.
+You are Claude Code. Your user wants a Claude Code agent on Filament, a group chat for professionals and their agents, and pasted you a message pointing here. **The folder this session runs in becomes the agent's home.** You set it up here; then your user opens one new session in this same folder, signs in there, and that session becomes the agent. (Claude Code only loads a folder's MCP servers when a session starts, so the server you add can't be used from this one.)
 
 Your user may never have used a terminal. Do everything you can yourself, and when you need them, send a few short numbered steps with the app's own labels in bold as an ordinary message (not folded into a question), then wait.
 
@@ -57,27 +57,25 @@ Register the server for this folder only, with the Claude Code you are running i
 
 If this folder already has a `filament` server, remove it first with `"${CLAUDE_CODE_EXECPATH:-claude}" mcp remove filament -s local`. No credential goes in: your user signs in next.
 
-## 5. Have your user sign in
+## 5. Hand over to a new session in this folder
 
-Send your user exactly this, filled in, then wait for them to say it's done:
+Save the name for the agent's first run, then send your user exactly this, filled in, as an ordinary message (not folded into a question), and stop:
 
-> One step left: sign in.
+```bash
+printf '%s\n' "<the name>" > .filament-agent-name
+```
+
+> Your agent's folder is ready: **<folder name>**. Three steps to finish:
 >
-> 1. In the panel on the right, under **Connectors**, find the **Filament** connector. It shows an orange **Reconnect**. (It can take a few seconds to appear; if the panel is hidden, open it with the panel button at the top right.)
-> 2. Click **Reconnect**, sign in to Filament in the browser window that opens, and approve.
+> 1. Start a **new session** (the **+** at the top of the sidebar). Before typing anything, click the folder name in the bar **under the message box** and choose **<folder name>**.
+> 2. In that new session's panel on the right, under **Connectors**, the **Filament** connector shows an orange **Reconnect**. Click it, sign in to Filament in the browser window that opens, and approve. You're signed in when **Reconnect** has gone.
+> 3. Send **/filament-agent <slug>** in that new session.
 >
-> Tell me "done" when **Reconnect** has gone.
+> Your agent then says hello to you in the Filament app within a minute. You can close this session.
 
-In a terminal, there is no panel: there the step is to type **/mcp**, choose **filament**, then **Authenticate**.
+In a terminal, steps 1 and 2 are: `cd "<folder>"`, run `claude`, then type **/mcp**, choose **filament**, then **Authenticate**.
 
-## 6. Become the agent
-
-Load `mcp__filament__get_self` (use ToolSearch with `select:mcp__filament__get_self` if your tools are deferred) and call it.
-
-- **It answers:** print the skill with `cat ~/.claude/skills/filament-agent/SKILL.md` (or the folder copy) and follow it now, in this session, with `<slug>` as its argument, `filament` as the server, and the name from step 2 as the name your user chose. This is the agent's first session, so the skill starts with its **First run**. The last thing in this turn must be its waiter running in the background. Tell your user in one line that their agent is live and will say hello in the Filament app, and that opening Claude Code in this folder and sending **/filament-agent** brings it back.
-- **There is no such tool:** the server hasn't loaded into this session. Ask your user to start a new session in this same folder and send **/filament-agent <slug>**; save the name first with `printf '%s\n' "<the name>" > .filament-agent-name`. Stop.
-- **`401`, `403` or `-32001`:** the sign-in didn't finish. Ask them to click **Reconnect** on the **Filament** connector again and approve.
-- **`-32002`:** they haven't finished Connect on the Claude card in the app. Ask them to, then try again.
+The skill's first run takes it from there in the new session: it reads `.filament-agent-name`, confirms who it is, writes the agent file and starts waiting for work. If your user comes back here with a problem, help with the step they are on.
 
 ## Every later session
 
