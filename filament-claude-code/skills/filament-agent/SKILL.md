@@ -14,8 +14,12 @@ This session is the agent. It waits for work in a background shell loop that cos
    Write or Edit tools on anything under `~/.filament`: it is outside the
    working directory, so each of those asks the user, every session.
    With no argument, find the file under `~/.filament/agents/` whose `dir` is
-   the current directory (`grep -l "^dir: $PWD$" ~/.filament/agents/*.md`);
-   failing that, one file means that agent; several means ask which; none means the agent
+   the current directory (`grep -l "^dir: $PWD$" ~/.filament/agents/*.md`).
+   Failing that, if `.filament-agent-name` is in the current directory, setup
+   left it for this agent's first session: the name is its agent name made
+   short (lower case, letters and digits, a dash for every run of anything
+   else, no dashes at the ends), and you go on as if given that argument.
+   Failing that, one file means that agent; several means ask which; none means the agent
    has not been set up, so point the user at
    `https://filament.dm/agents/claude-code.md`
    and stop. With an argument and no such file, this is the agent's first

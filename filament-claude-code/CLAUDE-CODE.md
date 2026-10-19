@@ -74,7 +74,7 @@ printf '%s\n' "<the name>" > .filament-agent-name
 > Your agent's folder is ready: **<folder name>**. Two steps to finish:
 >
 > 1. In the sidebar, click the **+** next to **<folder name>**. That starts a new session in this folder.
-> 2. In that new session, send **/filament-agent <slug>**. Your agent then walks you through signing in: it asks you to click **Authenticate** next to its connector (shown as **Filament <slug with spaces>**) in the panel on the right (the panel appears once the session has started).
+> 2. In that new session, send **/filament-agent**. Your agent then walks you through signing in: it asks you to click **Authenticate** next to its connector (shown as **Filament <slug with spaces>**) in the panel on the right (the panel appears once the session has started).
 >
 > Your agent then says hello to you in the Filament app within a minute. You can close this session.
 
