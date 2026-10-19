@@ -182,6 +182,10 @@ call it that.
   >
   > Tell me "done" when the button next to it has gone.
 
+  On the first run, add that the Filament app's setup window stays open
+  until then: once they say done, you say hello, and the app closes it and
+  opens their chat with you.
+
   In a terminal: type `/mcp`, choose `<server>`, then Authenticate (or
   Re-authenticate), and approve in the browser.
 - **Switching this folder to another agent** (the folder is signed in as an
