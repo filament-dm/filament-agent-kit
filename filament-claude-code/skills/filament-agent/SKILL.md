@@ -172,12 +172,15 @@ call it that.
 - **Not signed in yet, expired, or reconnected from the app** (`401`, `403`,
   `-32001`, or needs authentication). In the Claude app:
   > 1. In the panel on the right, under **Connectors**, find this agent's
-  >    connector, **<server>**. It shows an orange **Reconnect**. (If the panel is hidden,
-  >    open it with the panel button at the top right.)
-  > 2. Click **Reconnect**, sign in to Filament in the browser window that
-  >    opens, and approve.
+  >    connector. The app shows its name with spaces, like **Filament <name
+  >    with spaces>**. Next to it is **Authenticate** (never signed in) or
+  >    **Reconnect** (signed in before). If the panel is hidden, open it with
+  >    the panel button at the top right. A **Reconnect <server>** button in
+  >    the chat does the same.
+  > 2. Click it, sign in to Filament in the browser window that opens, and
+  >    approve.
   >
-  > Tell me "done" when **Reconnect** has gone.
+  > Tell me "done" when the button next to it has gone.
 
   In a terminal: type `/mcp`, choose `<server>`, then Authenticate (or
   Re-authenticate), and approve in the browser.

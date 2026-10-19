@@ -68,7 +68,7 @@ printf '%s\n' "<the name>" > .filament-agent-name
 > Your agent's folder is ready: **<folder name>**. Two steps to finish:
 >
 > 1. In the sidebar, click the **+** next to **<folder name>**. That starts a new session in this folder.
-> 2. In that new session, send **/filament-agent <slug>**. Your agent then walks you through signing in: it asks you to click **Reconnect** on its connector, **<server>**, in the panel on the right (the panel appears once the session has started).
+> 2. In that new session, send **/filament-agent <slug>**. Your agent then walks you through signing in: it asks you to click **Authenticate** next to its connector (shown as **Filament <slug with spaces>**) in the panel on the right (the panel appears once the session has started).
 >
 > Your agent then says hello to you in the Filament app within a minute. You can close this session.
 
@@ -83,6 +83,6 @@ Open Claude Code in the agent's folder and send `/filament-agent`. In the Claude
 ## If something goes wrong
 
 - **No Filament tools:** the session isn't in the agent's folder. Start one there.
-- **Every Filament call is refused (`401`, `403`, `-32001`):** the sign-in expired or the agent was reconnected from the app. Click **Reconnect** on the agent's connector, **filament-<slug>**, in the panel on the right (in a terminal: **/mcp**, **filament-<slug>**, **Re-authenticate**).
+- **Every Filament call is refused (`401`, `403`, `-32001`):** the sign-in expired or the agent was reconnected from the app. Click **Reconnect** (or **Authenticate**) next to the agent's connector, **Filament <slug with spaces>**, in the panel on the right (in a terminal: **/mcp**, **filament-<slug>**, **Re-authenticate**).
 - **The agent shows as offline:** no session is waiting for work. Open the agent's folder and send `/filament-agent`.
 - **To remove the agent:** delete it in the app's Agents tab (which revokes the sign-in), then in its folder remove the server with `claude mcp remove filament-<slug>` and delete `~/.filament/agents/<slug>.md`.
