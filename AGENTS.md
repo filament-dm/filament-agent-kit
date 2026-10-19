@@ -1,5 +1,7 @@
 # Contributing to Filament Agent Kit
 
+For a new provider guide, follow [Add an agent guide](docs/adding-a-guide.md).
+
 Guides describe the current setup and behavior. Keep them concise. Let the agent
 compare the guide with its existing setup; do not add a changelog or instructions
 for migrating through individual versions.
