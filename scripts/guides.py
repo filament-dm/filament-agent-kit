@@ -15,6 +15,9 @@ from dataclasses import dataclass
 from datetime import date
 from pathlib import Path, PurePosixPath
 
+if sys.version_info < (3, 10):
+    raise SystemExit("Guide tooling requires Python 3.10 or newer.")
+
 ROOT = Path(__file__).resolve().parents[1]
 INVENTORY = "guides.json"
 Reader = Callable[[str], bytes | None]
@@ -207,23 +210,25 @@ def working_reader(path: str) -> bytes | None:
     return target.read_bytes() if target.is_file() else None
 
 
-def command_escape(text: str) -> str:
+def message_escape(text: str) -> str:
     for char, escaped in (
         ("%", "%25"),
         ("\r", "%0D"),
         ("\n", "%0A"),
-        (":", "%3A"),
-        (",", "%2C"),
     ):
         text = text.replace(char, escaped)
     return text
+
+
+def property_escape(text: str) -> str:
+    return message_escape(text).replace(":", "%3A").replace(",", "%2C")
 
 
 def print_check(findings: list[Finding], github: bool) -> None:
     for error in findings:
         if github:
             print(
-                f"::error file={command_escape(error.path)},line=1,title=Guide version::{command_escape(error.message)}"
+                f"::error file={property_escape(error.path)},line=1,title=Guide version::{message_escape(error.message)}"
             )
         else:
             print(f"ERROR {error.path}: {error.message}")

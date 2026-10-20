@@ -145,6 +145,25 @@ class CheckTests(unittest.TestCase):
             self.assertIn("::error file=", output.getvalue())
             self.assertIn("Missing bump", summary.read_text())
 
+    def test_annotation_message_preserves_punctuation_and_escapes_newlines(self):
+        output = io.StringIO()
+        with redirect_stdout(output):
+            guides.print_check(
+                [guides.Finding(PATH, "grokbot: bump required, 100%\r\nnext line")],
+                github=True,
+            )
+        self.assertEqual(
+            output.getvalue().splitlines()[0],
+            f"::error file={PATH},line=1,title=Guide version::"
+            "grokbot: bump required, 100%25%0D%0Anext line",
+        )
+
+    def test_annotation_properties_escape_delimiters(self):
+        output = io.StringIO()
+        with redirect_stdout(output):
+            guides.print_check([guides.Finding("a:b,c%/GUIDE.md", "Missing bump")], github=True)
+        self.assertIn("file=a%3Ab%2Cc%25/GUIDE.md,line=1,", output.getvalue())
+
     def test_check_command_exits_one_for_missing_bump(self):
         with (
             patch.object(guides, "resolve", return_value="a" * 40),
