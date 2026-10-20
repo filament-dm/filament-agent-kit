@@ -48,7 +48,8 @@ This session is the agent. It waits for work in a background shell loop that cos
 4. **Say hello in Filament.** Post one short line to `backchannel` with
    `mcp__<server>__post_message`, in your own name, saying you are back and
    listening. Skip it when the newest message there is already a greeting
-   from you, so a quick restart does not greet twice.
+   from you, so a quick restart does not greet twice. On the agent's first
+   session, make your avatar next (**First run** step 7).
 
 5. **Tell the user** in the terminal, in one line, that you are listening as
    `<display_name>`, and which settings are in effect if any differ from
