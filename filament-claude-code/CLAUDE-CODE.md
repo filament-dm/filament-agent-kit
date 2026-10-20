@@ -61,11 +61,13 @@ Put the command on the clipboard (a link can't type a slash command, since the a
 printf '/filament-agent' | pbcopy
 ```
 
-Don't open the session yourself; your user reads your message first. Percent-encode `<folder>` as an absolute path (`/` stays, a space becomes `%20`) and send this, filled in, then stop:
+Send your user this as an ordinary message:
 
-> Done. [Open your agent's session](claude://code/new?folder=<encoded folder>), click **Trust workspace** if it asks, then press **⌘V** and **Enter**. It will walk you through signing in.
+> Your agent needs a new session: Claude Code only loads the Filament connector when a session starts, so this one can't use it. We've put **/filament-agent** on your clipboard. In the new session, press **⌘V** and **Enter**.
 
-In a terminal (`CLAUDE_CODE_ENTRYPOINT` is `cli`), the link is `claude-cli://open?cwd=<encoded folder>` instead. Without `pbcopy` (not a Mac), say "type **/filament-agent** and press **Enter**" instead of the paste. If the link doesn't open, give them the manual way: in the app, start a new session, click the folder name under the message box, choose **<folder>**, and send **/filament-agent**; in a terminal, `cd "<folder>"` then `claude`, then **/filament-agent**.
+Then ask with AskUserQuestion, "Open your agent's session?", options "Open new session" and "I'll open it myself". On "Open new session", percent-encode `<folder>` as an absolute path (`/` stays, a space becomes `%20`) and run `open "claude://code/new?folder=<encoded folder>"` in the Claude app, or `open "claude-cli://open?cwd=<encoded folder>"` in a terminal (`CLAUDE_CODE_ENTRYPOINT` is `cli`; `xdg-open` on Linux). Then stop.
+
+On "I'll open it myself", or if nothing opened: in the app, start a new session, click the folder name under the message box and choose **<folder>**; in a terminal, `cd "<folder>"` then `claude`. Without `pbcopy` (not a Mac), say "type **/filament-agent** and press **Enter**" instead of the paste.
 
 The skill's first run does the rest. If your user comes back here with a problem, help with the step they are on.
 
