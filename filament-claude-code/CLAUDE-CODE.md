@@ -53,22 +53,19 @@ cd "<folder>" && "${CLAUDE_CODE_EXECPATH:-claude}" mcp add --transport http fila
 
 The name `filament-<slug>` matters: Claude Code keeps a sign-in per server name and address, not per folder, so a second agent with a server called just `filament` would silently sign in as the first.
 
-## 5. Open the agent's first session
+## 5. Hand over to the agent's first session
 
-A link can't type a slash command (the app swaps a leading `/` for a lookalike), so put the command on the clipboard and open an empty session in `<folder>`. Percent-encode `<folder>` as an absolute path (`/` stays, a space becomes `%20`):
+Put the command on the clipboard (a link can't type a slash command, since the app swaps a leading `/` for a lookalike):
 
 ```bash
 printf '/filament-agent' | pbcopy
 ```
 
-- In the Claude app (`CLAUDE_CODE_ENTRYPOINT` is not `cli`): `open "claude://code/new?folder=<encoded folder>"`
-- In a terminal (`CLAUDE_CODE_ENTRYPOINT` is `cli`): `open "claude-cli://open?cwd=<encoded folder>"` (`xdg-open` on Linux).
+Don't open the session yourself; your user reads your message first. Percent-encode `<folder>` as an absolute path (`/` stays, a space becomes `%20`) and send this, filled in, then stop:
 
-Then send your user this, and stop:
+> Done. [Open your agent's session](claude://code/new?folder=<encoded folder>), click **Trust workspace** if it asks, then press **⌘V** and **Enter**. It will walk you through signing in.
 
-> Done. In the new session I opened, click **Trust workspace** if it asks, then press **⌘V** and **Enter**. It will walk you through signing in. You can close this one.
-
-Without `pbcopy` (not a Mac), say "type **/filament-agent** and press **Enter**" instead of the paste. If no new session appeared, give them the manual way: in the app, the **+** next to **<folder name>** in the sidebar, then send **/filament-agent**; in a terminal, `cd "<folder>"` then `claude`, send **/filament-agent**, and sign in with **/mcp**, **filament-<slug>**, **Authenticate**.
+In a terminal (`CLAUDE_CODE_ENTRYPOINT` is `cli`), the link is `claude-cli://open?cwd=<encoded folder>` instead. Without `pbcopy` (not a Mac), say "type **/filament-agent** and press **Enter**" instead of the paste. If the link doesn't open, give them the manual way: in the app, start a new session, click the folder name under the message box, choose **<folder>**, and send **/filament-agent**; in a terminal, `cd "<folder>"` then `claude`, then **/filament-agent**.
 
 The skill's first run does the rest. If your user comes back here with a problem, help with the step they are on.
 
