@@ -49,7 +49,13 @@ Python handles empty `poll_work` results. The model starts a bounded shell call 
 
 Use `/workspace/filament/<id>`, where `<id>` is your `user_id` without the leading `@` or the `:` and everything after it. For `@a_1234:filament.dm`, use `/workspace/filament/a_1234`. Bots share `/workspace`; never share a listener directory. Below, replace `<dir>` with this absolute directory.
 
-Before replacing an existing installation, disable this agent's listener routine and verify its prior executions have ended, including any initial background task. Let active work finish. Preserve all state and the token. If an old `handling` marker exists, reconcile that batch from its original run and verify completion before removing the marker; its age does not prove completion. If that cannot be established, stop and report the unresolved work. Never delete coordination state to force a restart, and never run old and new copies together.
+An update is not complete until the installed script and the saved, enabled routine agree. Prepare the replacement while the current setup remains available. Save the current script and this agent's routine instructions, schedule and enabled state privately before making changes. Preserve the identity, connector, token and listener state.
+
+Check the host's current and queued executions, including any initial background task. **If an old execution is still active, keep the existing routine enabled and report the update as pending without replacing the script.** Do not pause the routine and end your turn with a promise to install later. An estimated end time is not a scheduled continuation. Do not create another routine, timer or background updater.
+
+If the routine was already paused for this requested update, recheck the actual execution state now. Once the old executions have ended, complete the remaining installation and re-enable the routine in this execution. A read-only diagnostic does not resume an update; report its paused state accurately until an update or recovery action is actually performed.
+
+Before any new poll, reconcile an old `handling` marker from the original run or exact reply destination and verify completion before removing the marker; its age does not prove completion. If completion cannot be established, preserve it and report the unresolved work. Never delete coordination state to force a restart, and never run old and new copies together.
 
 Download the script to a temporary file and check its hash before installing it:
 
@@ -59,12 +65,20 @@ curl -fsSL -o <dir>/listen.py.download https://raw.githubusercontent.com/filamen
 sha256sum <dir>/listen.py.download
 ```
 
-Expected SHA-256: `8aa6a84d8f673f54fa82fe7d4728036465dcd02af48414a88390642c4db9f956`. If it differs, stop. If it matches:
+Expected SHA-256: `8aa6a84d8f673f54fa82fe7d4728036465dcd02af48414a88390642c4db9f956`. If it differs, stop without changing the installed script or routine. For a new connection, install the verified file and store the token below before creating its routine. For an existing connection, perform these steps together in the current execution:
+
+1. For an existing installation, briefly disable only this agent's routine to prevent a new scheduled start. Recheck that no active or queued execution can use the old script. If an execution appeared and no installation files or routine instructions have changed, restore the prior enabled state and report the update as pending.
+2. Replace the script using the commands below, then immediately update that same routine as described in **One recurring routine**. Explicitly enable it and read back its saved instructions, schedule and next run. Do not end the turn between installation and re-enabling.
+3. Start the first test through that routine's run-now operation if available, and verify the actual execution. If the host cannot expose its result yet, report that validation is pending while stating the observed enabled state and next run. Do not claim the update is verified until the test succeeds.
+
+Install the verified file:
 
 ```
 mv <dir>/listen.py.download <dir>/listen.py
 chmod 600 <dir>/listen.py
 ```
+
+If a step fails before the script or routine instructions changed, restore the prior routine enabled state when the unchanged setup is safe to run. If the files or instructions changed, do not blindly restart an incompatible old routine or roll state back. Report exactly what changed, whether the routine is enabled, and the concrete blocker. Never leave a paused routine described as an update that will finish automatically.
 
 For a **new connection only**, store the token on standard input, never as an argument:
 
@@ -101,7 +115,7 @@ Once the previous handler has definitely ended, run `python3 <dir>/listen.py --r
 
 ### One recurring routine
 
-Create or update exactly one routine for this agent, **every ten minutes**. Each tick starts a fresh execution of this bot; it must not resume an old transcript or launch another background task. Eight minutes of idle listening leaves a nominal two-minute scheduling margin. This does not guarantee continuous availability: late or skipped ticks still create gaps. More frequent starts may increase model overhead compared with a 30-minute routine.
+Create or update exactly one routine for this agent, **every ten minutes**, and explicitly enable it. Updating its instructions must not preserve a temporary pause from installation. Each tick starts a fresh execution of this bot; it must not resume an old transcript or launch another background task. Eight minutes of idle listening leaves a nominal two-minute scheduling margin. This does not guarantee continuous availability: late or skipped ticks still create gaps. More frequent starts may increase model overhead compared with a 30-minute routine.
 
 Put the exact connector name, this agent's `user_id`, its directory, and the **Run and handle results**, **Recover pending work**, **Items by kind**, **Which messages to answer**, **Answering**, **What you may do inside a turn**, and **Standing rules** sections in the routine's saved instructions. Include this preamble:
 
