@@ -1,51 +1,31 @@
 #!/usr/bin/env python3
-"""Wait for Filament work without the model.
+"""Bounded Filament polling, with durable handoff and read-only diagnostics.
 
-The bot's turn makes one shell call to this script. The script calls
-poll_work over HTTP in a loop and returns only when there is work, when its
-time is up, or when something needs the bot. While it waits, the model is
-idle and spends no tokens.
-
-The first line of output is always one verb:
-
-  WORK n        n items follow as JSON. Handle them, then run with --done.
-  AGAIN         this call's time is up, the run's is not. Run with --again.
-  END           the run is over. End the run without a report.
-  RUNNING       another run is listening. End the run without a report.
-  BUSY          another run is handling work. End the run without a report.
-  DISCONNECTED  Filament has been unreachable for 15 minutes. Tell the owner
-                once, then end the run. Later runs print END until it is back.
-  AUTH_FAILED   the token was revoked or the agent deleted. Stop for good.
-  TOKEN_SET     --token stored the token.
-  ERROR <why>   a local problem (no token, bad arguments).
-
-Python 3.6+ standard library only. State lives next to the script (or in
-FM_STATE): token, endpoint, cursor, acks, session, handling, fail_since,
-notified, listen.lock/, listen.log. One owner's bots share one /workspace,
-so each agent installs its own copy in its own directory.
-
-Grok moves a shell call to the background after 13 minutes (780 s), and
-the turn gets control back with no output. A call must return before that:
-the default budget of 690 s, plus at most 30 s for the last poll, stays
-under it.
+Python owns empty polls. The model still handles WORK and scheduled starts.
+This script cannot measure model tokens or guarantee provider scheduling.
+State is private to one agent. Only --status is a read-only operation.
 """
 import argparse
+import contextlib
+import fcntl
+import hashlib
 import json
+import math
 import os
-import shutil
 import sys
 import time
 import urllib.error
 import urllib.request
+import uuid
 
+REVISION = '2026-10-20.1'
 STATE = os.environ.get('FM_STATE') or os.path.dirname(os.path.abspath(__file__))
 DEFAULT_ENDPOINT = 'https://api.filament.dm/mcp/agents'
-POLL_WAIT = 60          # seconds; the server caps wait_seconds at 60
-HTTP_SLACK = 30         # a poll open this long past its wait is abandoned
-BEAT_STALE = 150        # a listener silent this long is dead
-HANDLING_STALE = 1200   # a turn handling work this long is presumed dead
-DISCONNECT_AFTER = int(os.environ.get('FM_DISCONNECT_AFTER', '900'))  # failing this long = disconnected
+POLL_WAIT = 60
+HTTP_SLACK = 30
+DISCONNECT_AFTER = int(os.environ.get('FM_DISCONNECT_AFTER', '900'))
 BACKOFF_CAP = 600
+LOG_LIMIT = 512 * 1024
 
 
 class AuthFailed(Exception):
@@ -56,125 +36,230 @@ class Transient(Exception):
     pass
 
 
+class StateError(Exception):
+    pass
+
+
 def path(name):
     return os.path.join(STATE, name)
 
 
 def read(name, default=None):
     try:
-        with open(path(name)) as f:
-            return f.read().strip()
-    except OSError:
+        with open(path(name)) as stream:
+            return stream.read().strip()
+    except FileNotFoundError:
         return default
 
 
-def write(name, text, mode=0o600):
-    tmp = path(name + '.tmp')
-    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, mode)
-    with os.fdopen(fd, 'w') as f:
-        f.write(text)
-    os.replace(tmp, path(name))
-
-
-def remove(name):
+def write(name, text):
+    """Replace one private file, flushing before exposing the new state."""
+    target = path(name)
+    temporary = target + '.' + uuid.uuid4().hex + '.tmp'
     try:
-        os.remove(path(name))
+        fd = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(fd, 'w') as stream:
+            stream.write(text)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, target)
+        directory = os.open(STATE, os.O_RDONLY)
+        try:
+            os.fsync(directory)
+        finally:
+            os.close(directory)
+    finally:
+        with contextlib.suppress(FileNotFoundError):
+            os.unlink(temporary)
+
+
+def save(state):
+    write('state.json', json.dumps(state, separators=(',', ':')))
+
+
+def number(value):
+    return type(value) in (int, float) and math.isfinite(value)
+
+
+def valid_state(state):
+    if not isinstance(state, dict) or state.get('format') != 2:
+        return False
+    if state['cursor'] is not None and not isinstance(state['cursor'], str):
+        return False
+    if not isinstance(state['acks'], list) or not all(isinstance(v, str) for v in state['acks']):
+        return False
+    for key in ('failed_since', 'last_poll_at', 'last_success_at'):
+        if state[key] is not None and not number(state[key]):
+            return False
+    if not all(type(state[key]) is bool for key in ('auth_failed', 'notified')):
+        return False
+    if not isinstance(state['counts'], dict):
+        return False
+    for key in ('attempts', 'empty', 'work_batches', 'work_items', 'errors'):
+        if type(state['counts'][key]) is not int or state['counts'][key] < 0:
+            return False
+    session, pending = state['session'], state['pending']
+    if session is not None:
+        if not isinstance(session, dict) or not isinstance(session['id'], str) or not number(session['started_at']):
+            return False
+    if pending is not None:
+        if not isinstance(pending, dict) or not isinstance(pending['batch_id'], str):
+            return False
+        if not session or pending['session_id'] != session['id'] or not number(pending['created_at']):
+            return False
+        if not isinstance(pending['work'], list) or not all(isinstance(v, dict) for v in pending['work']):
+            return False
+    return True
+
+
+def load():
+    raw = read('state.json')
+    if raw is not None:
+        try:
+            state = json.loads(raw)
+            if not valid_state(state):
+                raise ValueError('invalid state')
+            return state
+        except (ValueError, KeyError, TypeError):
+            raise StateError('invalid state.json; preserve it and investigate, do not reset the cursor')
+    # The old listener did not save its returned work. Never infer completion
+    # from the age of its handling marker, or silently acknowledge that batch.
+    if read('handling') is not None:
+        raise StateError('legacy handling marker exists; reconcile that work before upgrading')
+    try:
+        acks = json.loads(read('acks', '[]'))
+        if not isinstance(acks, list) or not all(isinstance(v, str) for v in acks):
+            raise ValueError('invalid acks')
+    except ValueError:
+        raise StateError('invalid legacy acks; preserve state and investigate')
+    return {'format': 2, 'cursor': read('cursor'), 'acks': acks,
+            'session': None, 'pending': None, 'failed_since': None,
+            'notified': False, 'auth_failed': False,
+            'last_poll_at': None, 'last_success_at': None,
+            'counts': {'attempts': 0, 'empty': 0, 'work_batches': 0, 'work_items': 0, 'errors': 0}}
+
+
+def event(kind, **fields):
+    """No tokens, message bodies, reply targets or server error bodies in logs."""
+    record = dict(fields, event=kind, at=time.time(), pid=os.getpid(), revision=REVISION)
+    try:
+        target = path('listen.jsonl')
+        if os.path.exists(target) and os.path.getsize(target) > LOG_LIMIT:
+            os.replace(target, target + '.1')
+        fd = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
+        try:
+            os.fchmod(fd, 0o600)
+            os.write(fd, (json.dumps(record, separators=(',', ':')) + '\n').encode())
+        finally:
+            os.close(fd)
     except OSError:
+        # Work safety depends on state.json, not telemetry availability.
         pass
 
-
-def age(name):
-    try:
-        return time.time() - os.stat(path(name)).st_mtime
-    except OSError:
-        return None
-
-
-def log(line):
-    try:
-        if (os.path.getsize(path('listen.log')) if os.path.exists(path('listen.log')) else 0) > 512 * 1024:
-            os.replace(path('listen.log'), path('listen.log.1'))
-        with open(path('listen.log'), 'a') as f:
-            f.write('%s %d %s\n' % (time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()), os.getpid(), line))
-    except OSError:
-        pass
-
-
-def say(verb, body=None):
-    print(verb)
-    if body is not None:
-        print(body)
-    sys.stdout.flush()
-
-
-# ---- the lock: one listener at a time ------------------------------------
 
 def pid_alive(pid):
     try:
+        pid = int(pid)
+        if pid <= 0:
+            return False
         os.kill(pid, 0)
         return True
-    except ProcessLookupError:
+    except (ValueError, TypeError, ProcessLookupError):
         return False
-    except OSError:
+    except PermissionError:
         return True
 
 
+def legacy_running():
+    return pid_alive(read('listen.lock/pid'))
+
+
+@contextlib.contextmanager
 def lock():
-    """Take listen.lock/. Return False when a live listener holds it."""
-    lock_dir = path('listen.lock')
-    for _ in range(2):
+    # Never unlink this file: replacement would create a second lock domain.
+    fd = os.open(path('listener.lock'), os.O_RDWR | os.O_CREAT, 0o600)
+    acquired = False
+    try:
+        os.fchmod(fd, 0o600)
         try:
-            os.mkdir(lock_dir)
-        except FileExistsError:
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            acquired = True
+        except BlockingIOError:
+            pass
+        yield acquired
+    finally:
+        if acquired:
+            fcntl.flock(fd, fcntl.LOCK_UN)
+        os.close(fd)
+
+
+def lock_held():
+    """Observe an existing lock without creating files or changing state."""
+    try:
+        fd = os.open(path('listener.lock'), os.O_RDONLY)
+    except FileNotFoundError:
+        return False
+    try:
+        try:
+            fcntl.flock(fd, fcntl.LOCK_SH | fcntl.LOCK_NB)
+        except BlockingIOError:
+            return True
+        fcntl.flock(fd, fcntl.LOCK_UN)
+        return False
+    finally:
+        os.close(fd)
+
+
+def pending_summary(pending):
+    return {'batch_id': pending['batch_id'], 'session_id': pending['session_id'],
+            'created_at': pending['created_at'], 'items': len(pending['work'])}
+
+
+def status():
+    records = []
+    for name in ('listen.jsonl.1', 'listen.jsonl'):
+        for line in (read(name, '') or '').splitlines():
             try:
-                pid = int(read('listen.lock/pid', '0') or 0)
-            except ValueError:
-                pid = 0
-            silent = age('listen.lock/beat')
-            if silent is None:
-                silent = age('listen.lock')
-            if pid and pid_alive(pid) and silent is not None and silent < BEAT_STALE:
-                return False
-            log('LOCK-STALE pid=%s silent=%s' % (pid, silent))
-            shutil.rmtree(lock_dir, ignore_errors=True)
-            continue
-        write('listen.lock/pid', str(os.getpid()))
-        beat()
-        return True
-    return False
+                row = json.loads(line)
+                if row.get('event') in ('CALL_START', 'CALL_END'):
+                    records.append(row)
+            except (ValueError, AttributeError):
+                continue
+    try:
+        state = load()
+        error = None
+    except StateError as exc:
+        state, error = None, str(exc)
+    with open(os.path.abspath(__file__), 'rb') as stream:
+        digest = hashlib.sha256(stream.read()).hexdigest()
+    return {'revision': REVISION, 'script_sha256': digest, 'observed_at': time.time(),
+            'lock_held': lock_held(), 'legacy_process_alive': legacy_running(),
+            'state_error': error,
+            'session': state['session'] if state else None,
+            'pending': pending_summary(state['pending']) if state and state['pending'] else None,
+            'poll_counts': state['counts'] if state else None,
+            'last_poll_at': state.get('last_poll_at') if state else None,
+            'last_success_at': state.get('last_success_at') if state else None,
+            'recent_calls': records[-40:], 'model_tokens': None,
+            'limits': 'Counts cover this script only. Scheduler starts, model turns, cached tokens and billing are not observable here. A held lock may mean polling or retry backoff.'}
 
-
-def beat():
-    write('listen.lock/beat', str(int(time.time())))
-
-
-def unlock():
-    if read('listen.lock/pid') == str(os.getpid()):
-        shutil.rmtree(path('listen.lock'), ignore_errors=True)
-
-
-# ---- one poll_work call ---------------------------------------------------
 
 def parse(body):
     body = body.strip()
     if body.startswith('{'):
         return json.loads(body)
-    # Server-sent events: take the last data: payload that is a JSON-RPC reply.
-    for event in reversed(body.split('\n\n')):
-        data = '\n'.join(line[5:].lstrip() for line in event.splitlines() if line.startswith('data:'))
-        if not data:
-            continue
+    for block in reversed(body.split('\n\n')):
+        data = '\n'.join(line[5:].lstrip() for line in block.splitlines() if line.startswith('data:'))
         try:
             reply = json.loads(data)
         except ValueError:
             continue
         if isinstance(reply, dict) and ('result' in reply or 'error' in reply):
             return reply
-    raise ValueError('no JSON-RPC reply in body')
+    raise ValueError('no JSON-RPC reply')
 
 
-def poll(cursor, acks, wait):
-    token = read('token')
+def poll(cursor, acks, wait, timeout):
     args = {'wait_seconds': wait}
     if cursor:
         args['cursor'] = cursor
@@ -183,164 +268,212 @@ def poll(cursor, acks, wait):
     payload = json.dumps({'jsonrpc': '2.0', 'id': 1, 'method': 'tools/call',
                           'params': {'name': 'poll_work', 'arguments': args}}).encode()
     request = urllib.request.Request(read('endpoint') or DEFAULT_ENDPOINT, data=payload, method='POST', headers={
-        'Authorization': 'Bearer ' + token,
-        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + read('token'), 'Content-Type': 'application/json',
         'Accept': 'application/json, text/event-stream'})
     try:
-        with urllib.request.urlopen(request, timeout=wait + HTTP_SLACK) as response:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
             body = response.read().decode('utf-8')
-    except urllib.error.HTTPError as e:
-        if e.code in (401, 403):
-            raise AuthFailed('HTTP %d' % e.code)
-        raise Transient('HTTP %d' % e.code)
-    except Exception as e:  # timeouts, DNS, refused, reset
-        raise Transient(type(e).__name__)
+    except urllib.error.HTTPError as exc:
+        if exc.code in (401, 403):
+            raise AuthFailed('HTTP %d' % exc.code)
+        raise Transient('HTTP %d' % exc.code)
+    except Exception as exc:
+        raise Transient(type(exc).__name__)
     try:
         reply = parse(body)
-    except ValueError as e:
-        raise Transient('bad body: %s' % e)
-    if 'error' in reply:
-        # A JSON-RPC error inside HTTP 200 (for example, the owner paused the
-        # agent) is not a disconnection: keep polling.
-        raise Transient('RPC %s: %s' % (reply['error'].get('code'), reply['error'].get('message')))
-    result = reply.get('result') or {}
-    text = result['content'][0]['text'] if result.get('content') else '{}'
-    if result.get('isError'):
-        raise Transient('tool error: %s' % text[:300])
-    try:
-        return json.loads(text)
-    except ValueError:
-        raise Transient('tool returned non-JSON')
+        if 'error' in reply:
+            raise Transient('RPC error')
+        result = reply.get('result') or {}
+        if result.get('isError'):
+            raise Transient('tool error')
+        response = json.loads(result['content'][0]['text'])
+        if not isinstance(response, dict) or not isinstance(response.get('work', []), list):
+            raise ValueError('invalid response')
+        if not all(isinstance(v, dict) for v in response.get('work', [])):
+            raise ValueError('invalid work')
+        if response.get('cursor') is not None and not isinstance(response['cursor'], str):
+            raise ValueError('invalid cursor')
+        if not number(response.get('next_poll_ms', 1000)):
+            raise ValueError('invalid poll delay')
+        return response
+    except (ValueError, KeyError, IndexError, TypeError, AttributeError):
+        raise Transient('invalid response body')
 
 
-# ---- the listener ---------------------------------------------------------
-
-def pending_acks():
-    try:
-        return json.loads(read('acks', '[]'))
-    except ValueError:
-        return []
+def work_result(pending):
+    return 'WORK %d' % len(pending['work']), {
+        'batch_id': pending['batch_id'], 'session_id': pending['session_id'], 'work': pending['work']}
 
 
-def listen(budget, session_max):
-    started = time.time()
-    try:
-        session_start = float(read('session', '0'))
-    except ValueError:
-        session_start = 0.0
-    if not session_start:
-        session_start = started
-        write('session', str(session_start))
-    deadline = min(started + budget, session_start + session_max)
-    session_over = session_start + session_max <= started
-
-    wait_s = 1
+def listen(state, budget, session_max, call_id, metrics):
+    started = time.monotonic()
+    session_left = state['session']['started_at'] + session_max - time.time()
+    duration = max(0, min(budget, session_left))
+    deadline = started + duration
+    delay = 1
     while True:
-        beat()
-        acks = pending_acks()
-        # Past the deadline, still make one non-blocking poll when acks are
-        # owed: they must reach the server, and it may hand back new work.
-        remaining = deadline - time.time()
-        if remaining <= 0 and not acks:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0 and not state['acks']:
             break
-        wait = 0 if session_over or remaining <= 0 else max(0, min(POLL_WAIT, int(remaining)))
+        # Flushing an explicit acknowledgment after the session ends can return
+        # new work. Persist and hand it over before allowing any subsequent poll.
+        wait = max(0, min(POLL_WAIT, int(remaining)))
+        timeout = min(wait + HTTP_SLACK, remaining) if remaining > 0 else HTTP_SLACK
+        state['counts']['attempts'] += 1
+        metrics['poll_attempts'] += 1
+        state['last_poll_at'] = time.time()
+        save(state)
         try:
-            response = poll(read('cursor'), acks, wait)
-        except AuthFailed as e:
-            log('AUTH_FAILED %s' % e)
-            return 'AUTH_FAILED', str(e)
-        except Transient as e:
-            fail_since = read('fail_since')
-            if not fail_since:
-                write('fail_since', str(time.time()))
-                fail_since = str(time.time())
-            log('POLL-FAILED %s retry_in=%ds' % (e, wait_s))
-            if time.time() - float(fail_since) >= DISCONNECT_AFTER and not read('notified'):
-                write('notified', '1')
-                return 'DISCONNECTED', str(e)
-            if time.time() + wait_s >= deadline:
+            response = poll(state['cursor'], state['acks'], wait, max(0.05, timeout))
+        except AuthFailed as exc:
+            state['counts']['errors'] += 1
+            metrics['poll_errors'] += 1
+            state['auth_failed'] = True
+            save(state)
+            return 'AUTH_FAILED', str(exc)
+        except Transient as exc:
+            state['counts']['errors'] += 1
+            metrics['poll_errors'] += 1
+            state['failed_since'] = state['failed_since'] or time.time()
+            save(state)
+            event('POLL_FAILED', call_id=call_id, reason=str(exc), retry_seconds=delay)
+            if time.time() - state['failed_since'] >= DISCONNECT_AFTER and not state['notified']:
+                state['notified'] = True
+                save(state)
+                return 'DISCONNECTED', str(exc)
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
                 break
-            time.sleep(wait_s)
-            wait_s = min(wait_s * 2, BACKOFF_CAP)
+            time.sleep(min(delay, remaining))
+            delay = min(delay * 2, BACKOFF_CAP)
             continue
-
-        wait_s = 1
-        remove('fail_since')
-        remove('notified')
+        delay = 1
+        state['failed_since'], state['notified'] = None, False
+        state['last_success_at'] = time.time()
+        state['acks'] = []
         if response.get('cursor'):
-            write('cursor', response['cursor'])
-        if acks:
-            left = [a for a in pending_acks() if a not in acks]
-            write('acks', json.dumps(left)) if left else remove('acks')
+            state['cursor'] = response['cursor']
         work = response.get('work') or []
         if work:
-            write('handling', str(time.time()))
-            log('WORK n=%d' % len(work))
-            return 'WORK %d' % len(work), json.dumps(work, ensure_ascii=False, indent=1)
-        if session_over or time.time() >= deadline:
+            state['counts']['work_batches'] += 1
+            state['counts']['work_items'] += len(work)
+            metrics['work_items'] += len(work)
+            state['pending'] = {'batch_id': uuid.uuid4().hex, 'session_id': state['session']['id'],
+                                'created_at': time.time(), 'work': work}
+            # Cursor and payload are one atomic commit. No later run may poll
+            # until --done names this batch, even if its owner disappeared.
+            save(state)
+            return work_result(state['pending'])
+        state['counts']['empty'] += 1
+        metrics['empty_polls'] += 1
+        save(state)
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
             break
-        time.sleep(min(max(response.get('next_poll_ms', 1000), 0), 5000) / 1000.0)
-
-    # The session, not this call's budget, set the deadline: the run is over.
-    if session_over or deadline >= session_start + session_max:
-        remove('session')
-        log('END')
+        pause = min(max(response.get('next_poll_ms', 1000), 0), 5000) / 1000.0
+        time.sleep(min(max(pause, 0.05 if wait == 0 else 0), remaining))
+    if duration >= session_left:
+        state['session'] = None
+        save(state)
         return 'END', None
-    log('AGAIN')
-    return 'AGAIN', None
+    return 'AGAIN', {'session_id': state['session']['id']}
+
+
+def execute(args, call_id, metrics):
+    with lock() as acquired:
+        if not acquired or legacy_running():
+            return 'RUNNING', None
+        state = load()
+        if state['auth_failed']:
+            return 'AUTH_FAILED', 'previous authentication failure; reconnect explicitly'
+        pending = state['pending']
+        if args.done:
+            if not pending or pending['batch_id'] != args.done:
+                raise StateError('--done must name the current pending batch')
+            skipped = {value for value in args.ack.split(',') if value}
+            delivered = {message.get('event_id') for item in pending['work']
+                         for message in (item.get('messages') or []) if isinstance(message, dict)}
+            if not skipped <= delivered:
+                raise StateError('--ack may only name messages in this pending batch')
+            state['acks'] = sorted(set(state['acks']) | skipped)
+            state['pending'] = None
+            # Completion, cursor and acks are saved together, before polling.
+            save(state)
+        elif args.resume:
+            if not pending or pending['batch_id'] != args.resume:
+                raise StateError('--resume must name the current pending batch')
+            state['session'] = {'id': uuid.uuid4().hex, 'started_at': time.time()}
+            # A late completion from the prior owner must not clear this handoff.
+            pending['batch_id'] = uuid.uuid4().hex
+            pending['session_id'] = state['session']['id']
+            save(state)
+            return work_result(pending)
+        elif pending:
+            return 'PENDING', pending_summary(pending)
+        elif args.again:
+            if not state['session'] or state['session']['id'] != args.again:
+                raise StateError('--again must name the current session')
+        else:
+            state['session'] = {'id': uuid.uuid4().hex, 'started_at': time.time()}
+            save(state)
+        if not state['session']:
+            raise StateError('missing session; inspect state before continuing')
+        metrics['session_id'] = state['session']['id']
+        return listen(state, args.budget, args.session, call_id, metrics)
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Wait for Filament work without the model.')
-    parser.add_argument('--token', action='store_true', help='read the connect token from stdin and store it')
-    parser.add_argument('--endpoint', help='store a non-default MCP URL')
-    parser.add_argument('--done', action='store_true', help='finished handling the last WORK')
-    parser.add_argument('--again', action='store_true', help='continue after AGAIN')
-    parser.add_argument('--ack', default='', help='comma-separated event ids to skip')
-    parser.add_argument('--budget', type=int, default=int(os.environ.get('FM_BUDGET', '690')),
-                        help='longest this call may block, in seconds')
-    parser.add_argument('--session', type=int, default=int(os.environ.get('FM_SESSION', '1680')),
-                        help='longest one run listens, in seconds')
+    parser = argparse.ArgumentParser(description=__doc__)
+    operations = parser.add_mutually_exclusive_group()
+    operations.add_argument('--status', action='store_true', help='read-only JSON diagnostics; no poll or state writes')
+    operations.add_argument('--token', action='store_true', help='store token from stdin, never command arguments')
+    operations.add_argument('--done', metavar='BATCH_ID', help='all work in this batch was handled; resume polling')
+    operations.add_argument('--resume', metavar='BATCH_ID', help='recover saved work only after verifying its prior owner ended')
+    operations.add_argument('--again', metavar='SESSION_ID', help='continue this session after AGAIN')
+    parser.add_argument('--endpoint', help='store a non-default endpoint with --token')
+    parser.add_argument('--ack', default='', help='skipped event ids, comma-separated, with --done only')
+    parser.add_argument('--budget', type=int, default=int(os.environ.get('FM_BUDGET', '480')))
+    parser.add_argument('--session', type=int, default=int(os.environ.get('FM_SESSION', '480')))
     args = parser.parse_args()
-
+    if args.status:
+        print(json.dumps(status(), indent=2))
+        return
+    if args.endpoint and not args.token:
+        parser.error('--endpoint requires --token')
+    if args.ack and not args.done:
+        parser.error('--ack requires --done BATCH_ID')
+    if not 0 < args.budget <= 690 or not 0 < args.session <= 2400:
+        parser.error('budget must be 1..690 seconds and session 1..2400 seconds')
     os.makedirs(STATE, mode=0o700, exist_ok=True)
-
-    if args.token or args.endpoint:
-        if args.token:
-            token = sys.stdin.readline().strip()
-            if not token.startswith('fmcp_'):
-                return say('ERROR the token must start with fmcp_')
-            write('token', token)
+    if args.token:
+        token = sys.stdin.readline().strip()
+        if not token.startswith('fmcp_'):
+            print('ERROR the token must start with fmcp_')
+            return
+        write('token', token)
         if args.endpoint:
-            write('endpoint', args.endpoint.strip())
-        return say('TOKEN_SET')
-
-    acks = [a.strip() for a in args.ack.split(',') if a.strip()]
-    continuing = args.done or args.again
-
+            write('endpoint', args.endpoint)
+        print('TOKEN_SET')
+        return
     if not read('token'):
-        return say('ERROR no token; run with --token first')
-    if acks:
-        # Written before the lock: whichever listener polls next sends them.
-        write('acks', json.dumps(sorted(set(pending_acks() + acks))))
-
-    handling = age('handling')
-    if handling is not None and not args.done:
-        if handling < HANDLING_STALE:
-            return say('BUSY')
-        log('HANDLING-STALE age=%ds' % handling)
-    if not lock():
-        return say('RUNNING')
+        print('ERROR no token; run with --token first')
+        return
+    call_id = uuid.uuid4().hex
+    started = time.monotonic()
+    mode = 'done' if args.done else 'resume' if args.resume else 'again' if args.again else 'start'
+    event('CALL_START', call_id=call_id, mode=mode, budget=args.budget, session_limit=args.session)
+    result, body = 'ERROR', None
+    metrics = {'poll_attempts': 0, 'empty_polls': 0, 'work_items': 0, 'poll_errors': 0}
     try:
-        remove('handling')
-        if not continuing:
-            remove('session')  # a new run starts a new session
-        verb, body = listen(args.budget, args.session)
-        if verb == 'DISCONNECTED' or verb == 'AUTH_FAILED':
-            remove('session')
-        say(verb, body)
+        result, body = execute(args, call_id, metrics)
+    except (StateError, OSError) as exc:
+        body = str(exc)
     finally:
-        unlock()
+        event('CALL_END', call_id=call_id, result=result, elapsed_seconds=round(time.monotonic() - started, 3), **metrics)
+    print(result)
+    if body is not None:
+        print(json.dumps(body, ensure_ascii=False) if not isinstance(body, str) else body)
+    sys.stdout.flush()
 
 
 if __name__ == '__main__':
