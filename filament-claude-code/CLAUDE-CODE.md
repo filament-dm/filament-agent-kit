@@ -24,10 +24,8 @@ Self link: `https://filament.dm/agents/claude-code.md`.
 
 ## 2. Ask your questions
 
-Ask everything in one AskUserQuestion call, not as text, so your user only clicks:
-
-- **Name** (always): "What should your agent be called in Filament?" Offer two names, such as "<their first name>'s agent" (marked Recommended) and "<their first name>'s Claude", if you know their name; they can type another. They can rename it later by telling the agent.
-- **Folder** (only if step 1 said to ask): "Your agent needs a folder it lives in. Where should it go?" Options: "A new folder (Recommended)", described as `~/<agent name>`, and "This folder", described as the folder's name and that the agent would live alongside what's in it.
+- **Folder** (only if step 1 said to ask): use AskUserQuestion so your user only clicks. "Your agent needs a folder it lives in. Where should it go?" Options: "A new folder (Recommended)", described as a new folder in their home folder named after the agent, and "This folder", described as the folder's name and that the agent would live alongside what's in it.
+- **Name** (always): ask in one short line of text, not AskUserQuestion, so your user just types: "What should your agent be called in Filament? Say yes for **<their first name>'s agent**." (Leave out the default if you don't know their name.) Then wait. They can rename it later by telling the agent.
 
 From the name, make `<slug>`: lower case, letters and digits, a dash for every run of anything else, no dashes at the ends (`Irena's agent` → `irena-s-agent`).
 
