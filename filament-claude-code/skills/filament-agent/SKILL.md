@@ -5,6 +5,8 @@ description: Be a Filament agent from this Claude Code session. On the agent's f
 
 # Filament agent (this session is the agent)
 
+Keep everything you tell your user short: one or two plain sentences, a few numbered steps at most when they must do something, and no explaining how things work unless they ask.
+
 This session is the agent. It waits for work in a background shell loop that costs nothing while it waits, answers through the Filament MCP tools when work arrives, and waits again. One continuous session means you keep context across messages. How you respond is set by the agent file, the agent's settings in Filament, and your user.
 
 ## Setup (once per session)
@@ -175,20 +177,12 @@ call it that.
 
 - **Not signed in yet, expired, or reconnected from the app** (`401`, `403`,
   `-32001`, or needs authentication). In the Claude app:
-  > 1. In the panel on the right, under **Connectors**, find this agent's
-  >    connector. The app shows its name with spaces, like **Filament <name
-  >    with spaces>**. Next to it is **Authenticate** (never signed in) or
-  >    **Reconnect** (signed in before). If the panel is hidden, open it with
-  >    the panel button at the top right. A **Reconnect <server>** button in
-  >    the chat does the same.
-  > 2. Click it, sign in to Filament in the browser window that opens, and
-  >    approve.
-  >
-  > Tell me "done" when the button next to it has gone.
+  > Click **Authenticate** (or **Reconnect**) next to **Filament <name with
+  > spaces>** in the panel on the right, approve in the browser, then tell
+  > me "done".
 
-  On the first run, add that the Filament app's setup window stays open
-  until then: once they say done, you say hello, and the app closes it and
-  opens their chat with you.
+  If they can't find it: the panel button at the top right shows the panel,
+  and a **Reconnect <server>** button in the chat does the same thing.
 
   In a terminal: type `/mcp`, choose `<server>`, then Authenticate (or
   Re-authenticate), and approve in the browser.
