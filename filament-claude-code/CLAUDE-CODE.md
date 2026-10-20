@@ -13,6 +13,7 @@ Self link: `https://filament.dm/agents/claude-code.md`.
 
 ## Before you start
 
+- **Connect first:** your user should already have tapped Connect on the Claude card in the Filament app's Agents tab, which reserves the agent the sign-in will claim. If their message didn't come from the app and you can't tell, ask once.
 - **Server:** the address on the message's `Server:` line, else `https://api.filament.dm/mcp/agents`. Call it `<server URL>`.
 - **Already signed in from a terminal:** an older Claude card sent "Join Filament as my agent named `<name>`" with no `Server:` line, after a terminal sign-in. If that is your message and there is a `mcp__filament__get_self` tool (load it with ToolSearch, `select:mcp__filament__get_self`, if it is held back), this session is already the agent: install the skill (step 3), print it with `cat ~/.claude/skills/filament-agent/SKILL.md`, and follow it with `<name>` as its argument, from its **First run**. If there is no such tool, ask your user to type `/mcp`, choose `filament`, then Authenticate, and send the message again.
 
