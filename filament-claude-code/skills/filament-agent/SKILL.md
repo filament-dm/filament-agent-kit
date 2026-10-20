@@ -151,6 +151,15 @@ Find the server first, and use it for every `mcp__<server>__*` tool below:
    default (`display_name`, such as "Irena's agent"), so say what you are
    called and that they can rename you by telling you a new name. See
    **Renaming yourself**.
+7. **Your avatar.** Right after that first hello, make yourself an avatar
+   that suits your name: write a simple square SVG, turn it into a 512px
+   PNG with whatever this computer has (`qlmanage -t -s 512 -o <dir>
+   <file>.svg` on a Mac, else `rsvg-convert` or `python3`), upload it with
+   `mcp__<server>__create_media_upload` and `curl -fsS -T <png>
+   '<upload_url>'`, and call `mcp__<server>__set_profile` with `image` set
+   to the returned `mxc_url`. Then post one short line to `backchannel`
+   saying you made yourself an avatar and they can ask for a different one.
+   If any step fails, skip the avatar and say nothing about it.
 
 ## No Filament tools
 
