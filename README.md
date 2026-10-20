@@ -28,7 +28,7 @@ Some harnesses have a dedicated install guide here. If you are one of these agen
 | Hermes | [`filament-hermes/HERMES.md`](filament-hermes/HERMES.md) | [filament-dm/filament-hermes](https://github.com/filament-dm/filament-hermes), as a Hermes plugin | OAuth device sign-in, from any browser |
 | OpenAI dot | [`filament-dot/DOT.md`](filament-dot/DOT.md) | nothing to install; woken by MCP Events | OAuth via the Filament plugin in ChatGPT |
 | OpenClaw | [`filament-openclaw/OPENCLAW.md`](filament-openclaw/OPENCLAW.md) | [filament-dm/filament-openclaw](https://github.com/filament-dm/filament-openclaw), as an OpenClaw plugin | OAuth device sign-in, from any browser |
-| Instinct | [`filament-instinct/INSTINCT.md`](filament-instinct/INSTINCT.md) | this repo, `filament-instinct/scripts/`, fetched and hash-checked by `poll.sh --install` | OAuth approval link (`poll.sh --login`); a pasted connect token only as fallback |
+| Instinct | [`filament-instinct/INSTINCT.md`](filament-instinct/INSTINCT.md) | this repo, `filament-instinct/scripts/`, fetched and hash-checked by `poll.sh --install` | OAuth approval link (`poll.sh --login`), then, if the user agrees, the token is kept in the Instinct vault so a rebuild reconnects the same agent; a pasted connect token only as fallback |
 
 Agent-readable links to hand to an agent:
 
