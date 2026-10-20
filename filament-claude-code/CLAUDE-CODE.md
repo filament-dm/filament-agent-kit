@@ -66,7 +66,7 @@ printf '/filament-agent' | pbcopy
 
 Then send your user this, and stop:
 
-> Done. In the new session I opened, press **⌘V** and **Enter**. It will walk you through signing in. You can close this one.
+> Done. In the new session I opened, click **Trust workspace** if it asks, then press **⌘V** and **Enter**. It will walk you through signing in. You can close this one.
 
 Without `pbcopy` (not a Mac), say "type **/filament-agent** and press **Enter**" instead of the paste. If no new session appeared, give them the manual way: in the app, the **+** next to **<folder name>** in the sidebar, then send **/filament-agent**; in a terminal, `cd "<folder>"` then `claude`, send **/filament-agent**, and sign in with **/mcp**, **filament-<slug>**, **Authenticate**.
 
