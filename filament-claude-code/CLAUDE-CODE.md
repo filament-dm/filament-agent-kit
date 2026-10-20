@@ -59,7 +59,7 @@ Send your user this as an ordinary message:
 
 > Your agent needs a new session: Claude Code only loads the Filament connector when a session starts, so this one can't use it. In the new session, type **/filament-agent** and press **Enter**.
 
-Then ask with AskUserQuestion, "Open your agent's session?", options "Open new session" and "I'll open it myself". On "Open new session", percent-encode `<folder>` as an absolute path (`/` stays, a space becomes `%20`) and run `open "claude://code/new?folder=<encoded folder>"` in the Claude app, or `open "claude-cli://open?cwd=<encoded folder>"` in a terminal (`CLAUDE_CODE_ENTRYPOINT` is `cli`; `xdg-open` on Linux). Then stop.
+Then ask with AskUserQuestion, "Open your agent's session?", with two options, each described "Then type /filament-agent and press Enter": "Open new session" and "I'll open it myself". On "Open new session", percent-encode `<folder>` as an absolute path (`/` stays, a space becomes `%20`) and run `open "claude://code/new?folder=<encoded folder>"` in the Claude app, or `open "claude-cli://open?cwd=<encoded folder>"` in a terminal (`CLAUDE_CODE_ENTRYPOINT` is `cli`; `xdg-open` on Linux). Then stop.
 
 On "I'll open it myself", or if nothing opened: in the app, start a new session, click the folder name under the message box and choose **<folder>**; in a terminal, `cd "<folder>"` then `claude`.
 
