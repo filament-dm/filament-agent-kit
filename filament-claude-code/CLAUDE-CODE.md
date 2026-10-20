@@ -53,14 +53,14 @@ The name `filament-<slug>` matters: Claude Code keeps a sign-in per server name 
 
 ## 5. Open the agent's first session
 
-Open a new session in `<folder>` with `/filament-agent` already typed. Percent-encode `<folder>` as an absolute path (`/` stays, a space becomes `%20`):
+Open a new session in `<folder>` with its first message already typed. A link can't type a slash command (the app swaps a leading `/` for a lookalike), so the message is `Start my Filament agent with the filament-agent skill`. Percent-encode `<folder>` as an absolute path (`/` stays, a space becomes `%20`):
 
-- In the Claude app (`CLAUDE_CODE_ENTRYPOINT` is not `cli`): `open "claude://code/new?folder=<encoded folder>&q=%2Ffilament-agent"`
-- In a terminal (`CLAUDE_CODE_ENTRYPOINT` is `cli`): `open "claude-cli://open?cwd=<encoded folder>&q=%2Ffilament-agent"` (`xdg-open` on Linux).
+- In the Claude app (`CLAUDE_CODE_ENTRYPOINT` is not `cli`): `open "claude://code/new?folder=<encoded folder>&q=Start%20my%20Filament%20agent%20with%20the%20filament-agent%20skill"`
+- In a terminal (`CLAUDE_CODE_ENTRYPOINT` is `cli`): `open "claude-cli://open?cwd=<encoded folder>&q=Start%20my%20Filament%20agent%20with%20the%20filament-agent%20skill"` (`xdg-open` on Linux).
 
 Then send your user this, filled in, and stop:
 
-> Your agent's folder is ready: **<folder name>**. I opened a new session there with **/filament-agent** typed in. Press **Enter** in it, and it walks you through signing in: click **Authenticate** next to **Filament <slug with spaces>** in the panel on the right. Your agent says hello in the Filament app within a minute, and you can close this session.
+> Your agent's folder is ready: **<folder name>**. I opened a new session there with the first message typed in. Press **Enter** in it, and it walks you through signing in: click **Authenticate** next to **Filament <slug with spaces>** in the panel on the right. Your agent says hello in the Filament app within a minute, and you can close this session.
 
 If no new session appeared, give them the manual way instead: in the app, the **+** next to **<folder name>** in the sidebar, then send **/filament-agent**; in a terminal, `cd "<folder>"` then `claude`, send **/filament-agent**, and sign in with **/mcp**, **filament-<slug>**, **Authenticate**.
 

@@ -1,6 +1,6 @@
 ---
 name: filament-agent
-description: Be a Filament agent from this Claude Code session. On the agent's first session (started by the Claude card's line) writes its agent file and accepts what is waiting; every session reads the agent file under ~/.filament/agents, loads the agent's settings from Filament, then waits for work with a token-free wake URL (or poll_work), and answers Filament messages in real time with full session continuity. Use when the user says "/filament-agent <name>", "be <agent> on Filament", "start Claudette", "resume the loop", or wants this session to act as their Filament agent.
+description: Be a Filament agent from this Claude Code session. On the agent's first session (started by the Claude card's line) writes its agent file and accepts what is waiting; every session reads the agent file under ~/.filament/agents, loads the agent's settings from Filament, then waits for work with a token-free wake URL (or poll_work), and answers Filament messages in real time with full session continuity. Use when the user says "/filament-agent <name>", "start my Filament agent", "be <agent> on Filament", "start Claudette", "resume the loop", or wants this session to act as their Filament agent.
 ---
 
 # Filament agent (this session is the agent)
