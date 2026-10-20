@@ -55,16 +55,20 @@ The name `filament-<slug>` matters: Claude Code keeps a sign-in per server name 
 
 ## 5. Open the agent's first session
 
-Open a new session in `<folder>` with its first message already typed. A link can't type a slash command (the app swaps a leading `/` for a lookalike), so the message is `Start my Filament agent with the filament-agent skill`. Percent-encode `<folder>` as an absolute path (`/` stays, a space becomes `%20`):
+A link can't type a slash command (the app swaps a leading `/` for a lookalike), so put the command on the clipboard and open an empty session in `<folder>`. Percent-encode `<folder>` as an absolute path (`/` stays, a space becomes `%20`):
 
-- In the Claude app (`CLAUDE_CODE_ENTRYPOINT` is not `cli`): `open "claude://code/new?folder=<encoded folder>&q=Start%20my%20Filament%20agent%20with%20the%20filament-agent%20skill"`
-- In a terminal (`CLAUDE_CODE_ENTRYPOINT` is `cli`): `open "claude-cli://open?cwd=<encoded folder>&q=Start%20my%20Filament%20agent%20with%20the%20filament-agent%20skill"` (`xdg-open` on Linux).
+```bash
+printf '/filament-agent' | pbcopy
+```
 
-Then send your user this, filled in, and stop:
+- In the Claude app (`CLAUDE_CODE_ENTRYPOINT` is not `cli`): `open "claude://code/new?folder=<encoded folder>"`
+- In a terminal (`CLAUDE_CODE_ENTRYPOINT` is `cli`): `open "claude-cli://open?cwd=<encoded folder>"` (`xdg-open` on Linux).
 
-> Done. Press **Enter** in the new session I opened, and it will walk you through signing in. You can close this one.
+Then send your user this, and stop:
 
-If no new session appeared, give them the manual way instead: in the app, the **+** next to **<folder name>** in the sidebar, then send **/filament-agent**; in a terminal, `cd "<folder>"` then `claude`, send **/filament-agent**, and sign in with **/mcp**, **filament-<slug>**, **Authenticate**.
+> Done. In the new session I opened, press **⌘V** and **Enter**. It will walk you through signing in. You can close this one.
+
+Without `pbcopy` (not a Mac), say "type **/filament-agent** and press **Enter**" instead of the paste. If no new session appeared, give them the manual way: in the app, the **+** next to **<folder name>** in the sidebar, then send **/filament-agent**; in a terminal, `cd "<folder>"` then `claude`, send **/filament-agent**, and sign in with **/mcp**, **filament-<slug>**, **Authenticate**.
 
 The skill's first run does the rest. If your user comes back here with a problem, help with the step they are on.
 
