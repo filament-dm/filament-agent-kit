@@ -24,7 +24,7 @@ Self link: `https://filament.dm/agents/claude-code.md`.
 
 ## 2. Ask your questions
 
-- **Folder** (only if step 1 said to ask): use AskUserQuestion so your user only clicks. Question: "Where should your agent live? It works from one folder: it can read and change the files there, you start it by opening Claude Code in that folder, and each folder holds one agent." Options: "A new folder (Recommended)", described as "A new, empty folder in your home folder named after the agent, so it only sees its own files", and "This folder", described as "<folder name>: the agent can read and change everything here".
+- **Folder** (only if step 1 said to ask): use AskUserQuestion so your user only clicks. Question: "Where should your agent live? It works from one folder: it can read and change the files there, you start it by opening Claude Code in that folder, and each folder holds one agent." Options: "A new folder (Recommended)", described as "A new, empty folder in your home folder named after the agent, kept apart from your other files", and "This folder", described as "<folder name>: the agent can read and change everything here".
 - **Name** (always): use AskUserQuestion too. "What should your agent be called in Filament?" Two options, neither marked recommended: "<their first name>'s agent" and "<their first name>'s Claude" (if you don't know their name, "My agent" and "Claude"). Your user picks one or types their own under Other. They can rename it later by telling the agent.
 
 Ask both in one AskUserQuestion call when both apply. Say nothing before asking, not even what step 1 found.
