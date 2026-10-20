@@ -60,10 +60,11 @@ Send your user this, filled in, and stop. Don't open the session yourself: auto 
 
 > Your agent needs a new session: Claude Code only loads the Filament connector when a session starts, so this one can't use it.
 >
-> 1. Click the **+** next to **<folder name>** in the sidebar to start a new session there.
-> 2. Type **/filament-agent** and press **Enter**.
+> 1. Copy this: `/filament-agent`
+> 2. Click the **+** next to **<folder name>** in the sidebar to start a new session there.
+> 3. Paste it and press **Enter**.
 
-If `<folder>` is a new folder rather than this one, step 1 is instead: start a new session, click the folder name under the message box, and choose **<folder name>**. In a terminal (`CLAUDE_CODE_ENTRYPOINT` is `cli`), step 1 is `cd "<folder>"` then `claude`.
+If `<folder>` is a new folder rather than this one, step 2 is instead: start a new session, click the folder name under the message box, and choose **<folder name>**. In a terminal (`CLAUDE_CODE_ENTRYPOINT` is `cli`), step 2 is `cd "<folder>"` then `claude`.
 
 The skill's first run does the rest. If your user comes back here with a problem, help with the step they are on.
 
