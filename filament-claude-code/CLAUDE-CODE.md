@@ -28,7 +28,7 @@ Self link: `https://filament.dm/agents/claude-code.md`.
 - **Folder** (only if step 1 said to ask): use AskUserQuestion so your user only clicks. Question: "Where should your agent live? It works from one folder: it can read and change the files there, you start it by opening Claude Code in that folder, and each folder holds one agent." Options, in this order and neither marked recommended: "This folder", described as "<folder name>: the agent can read and change everything here", and "A new folder", described as "A new, empty folder in your home folder named after the agent, kept apart from your other files".
 - **Name** (always): use AskUserQuestion too. "What should your agent be called in Filament?" Two options, neither marked recommended: "<their first name>'s agent" and "<their first name>'s Claude" (if you don't know their name, "My agent" and "Claude"). Your user picks one or types their own under Other. They can rename it later by telling the agent.
 
-Ask both in one AskUserQuestion call when both apply. Say nothing before asking, not even what step 1 found.
+Ask both in one AskUserQuestion call when both apply. Do step 1's checks and then call AskUserQuestion with no text in between: not what step 1 found, not a note to yourself, nothing.
 
 From the name, make `<slug>`: lower case, letters and digits, a dash for every run of anything else, no dashes at the ends (`Irena's agent` → `irena-s-agent`).
 
@@ -64,7 +64,7 @@ Send your user this, filled in, and stop. Don't open the session yourself: auto 
 > 2. Click the **+** next to **<folder name>** in the sidebar to start a new session there.
 > 3. Paste it and press **Enter**.
 
-If `<folder>` is a new folder rather than this one, step 2 is instead: start a new session, click the folder name under the message box, and choose **<folder name>**. In a terminal (`CLAUDE_CODE_ENTRYPOINT` is `cli`), step 2 is `cd "<folder>"` then `claude`.
+If an agent already lives in this folder (step 1), start the message with: "An agent already lives in this folder, so yours has its own: **<folder name>**." If `<folder>` is a new folder rather than this one, step 2 is instead: start a new session, click the folder name under the message box, and choose **<folder name>**. In a terminal (`CLAUDE_CODE_ENTRYPOINT` is `cli`), step 2 is `cd "<folder>"` then `claude`.
 
 The skill's first run does the rest. If your user comes back here with a problem, help with the step they are on.
 
