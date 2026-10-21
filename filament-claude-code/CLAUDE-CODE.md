@@ -64,7 +64,7 @@ Send your user this, filled in, and stop. Don't open the session yourself: auto 
 > 2. Click the **+** next to **<folder name>** in the sidebar to start a new session there.
 > 3. Paste it and press **Enter**.
 
-If an agent already lives in this folder (step 1), start the message with: "An agent already lives in this folder, so yours has its own: **<folder name>**." If `<folder>` is a new folder rather than this one, step 2 is instead: start a new session, click the folder name under the message box, and choose **<folder name>**. In a terminal (`CLAUDE_CODE_ENTRYPOINT` is `cli`), step 2 is `cd "<folder>"` then `claude`.
+If an agent already lives in this folder (step 1), start the message with: "An agent already lives in this folder, so yours has its own: **<folder name>**." If `<folder>` is a new folder rather than this one, step 2 is instead: start a new session (**+ New** at the top of the sidebar), click the folder name under the message box, choose **Open folder…**, and open **<folder name>** in your home folder. (The app has never opened it, so it isn't in that menu's Recent list.) In a terminal (`CLAUDE_CODE_ENTRYPOINT` is `cli`), step 2 is `cd "<folder>"` then `claude`.
 
 The skill's first run does the rest. If your user comes back here with a problem, help with the step they are on.
 
