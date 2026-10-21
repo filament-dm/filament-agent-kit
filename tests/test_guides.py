@@ -19,10 +19,17 @@ PATH = "filament-grokbot/GROKBOT.md"
 INVENTORY = json.dumps(
     {"grokbot": {"path": "filament-grokbot", "guide": "GROKBOT.md"}}
 ).encode()
+RETIRED = json.dumps({"grokbot": {
+    "path": "filament-grokbot",
+    "guide": "GROKBOT.md",
+    "retired": {
+        "reason": "New agents use grokbot-mcp (MCP Events); existing agents stay here"
+    },
+}}).encode()
 
 
-def document(version="2026-10-15.1", body="Current setup."):
-    return f'---\nguide_id: grokbot\nversion: "{version}"\n---\n\n{body}\n'.encode()
+def document(version="2026-10-15.1", body="Current setup.", guide_id="grokbot"):
+    return f'---\nguide_id: {guide_id}\nversion: "{version}"\n---\n\n{body}\n'.encode()
 
 
 def snapshot(version="2026-10-15.1", body="Current setup."):
@@ -103,9 +110,47 @@ class CheckTests(unittest.TestCase):
 
     def test_removed_registration_fails(self):
         after = {"guides.json": b"{}"}
-        self.assertIn(
-            "removed", self.check(snapshot(), after, ["guides.json"])[0].message
-        )
+        message = self.check(snapshot(), after, ["guides.json"])[0].message
+        self.assertIn("removed", message)
+        self.assertIn("mark it retired", message)
+
+    def test_retiring_needs_no_bump(self):
+        after = snapshot()
+        after["guides.json"] = RETIRED
+        self.assertEqual(self.check(snapshot(), after, ["guides.json"]), [])
+
+    def test_retired_guide_still_requires_bump(self):
+        before, after = snapshot(), snapshot(body="Retired for new agents; see grokbot-mcp.")
+        before["guides.json"] = after["guides.json"] = RETIRED
+        self.assertEqual(len(self.check(before, after, [PATH])), 1)
+
+    def test_retired_guide_file_must_remain(self):
+        after = {"guides.json": RETIRED}
+        self.assertIn("missing", self.check(snapshot(), after, [PATH])[0].message)
+
+    def test_retired_requires_only_a_reason(self):
+        for retired in (
+            True,
+            "Retired",
+            {},
+            {"reason": " "},
+            {"reason": "Retired", "superseded_by": "grokbot-mcp"},
+        ):
+            spec = {"path": "filament-grokbot", "guide": "GROKBOT.md", "retired": retired}
+            after = {"guides.json": json.dumps({"grokbot": spec}).encode()}
+            with self.subTest(retired=retired), self.assertRaises(guides.GuideError):
+                self.check(snapshot(), after, ["guides.json"])
+
+    def test_changed_guide_id_fails(self):
+        after = {
+            "guides.json": json.dumps(
+                {"grok": {"path": "filament-grokbot", "guide": "GROKBOT.md"}}
+            ).encode(),
+            PATH: document("2026-10-15.2", guide_id="grok"),
+        }
+        renamed, removed = self.check(snapshot(), after, ["guides.json", PATH])
+        self.assertIn("grok: this guide was 'grokbot' on the base branch", renamed.message)
+        self.assertIn("grokbot: removed", removed.message)
 
     def test_tests_and_documentation_in_directory_require_bump(self):
         for path in ("filament-grokbot/tests/test_loop.py", "filament-grokbot/README.md"):

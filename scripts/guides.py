@@ -11,7 +11,7 @@ import re
 import subprocess
 import sys
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path, PurePosixPath
 
@@ -50,6 +50,7 @@ class Version:
 class Guide:
     directory: str
     name: str
+    retired: str | None = field(default=None, compare=False)
 
     @property
     def path(self) -> str:
@@ -94,18 +95,32 @@ def inventory(read: Reader, *, optional: bool = False) -> dict[str, Guide]:
     for guide_id, spec in entries.items():
         if not re.fullmatch(r"[a-z][a-z0-9-]{0,63}", guide_id):
             raise GuideError(f"Invalid guide ID: {guide_id!r}")
-        if not isinstance(spec, dict) or set(spec) != {"path", "guide"}:
-            raise GuideError(f"{guide_id}: expected path and guide")
+        if not isinstance(spec, dict) or set(spec) - {"retired"} != {"path", "guide"}:
+            raise GuideError(f"{guide_id}: expected path, guide and optional retired")
         directory = source_path(spec["path"]).rstrip("/")
         name = source_path(spec["guide"])
         if "/" in name or not name.endswith(".md") or directory in paths:
             raise GuideError(f"{guide_id}: expected a Markdown filename and unique directory")
         paths.add(directory)
-        result[guide_id] = Guide(directory, name)
+        result[guide_id] = Guide(directory, name, retirement(guide_id, spec))
     return result
 
 
-def guide_version(raw: bytes | None, guide_id: str) -> Version:
+def retirement(guide_id: str, spec: dict) -> str | None:
+    if "retired" not in spec:
+        return None
+    retired = spec["retired"]
+    if (
+        not isinstance(retired, dict)
+        or set(retired) != {"reason"}
+        or not isinstance(retired["reason"], str)
+        or not retired["reason"].strip()
+    ):
+        raise GuideError(f"{guide_id}: retired must be an object with a non-empty reason")
+    return retired["reason"]
+
+
+def frontmatter(raw: bytes | None) -> dict[str, str]:
     if raw is None:
         raise GuideError("Guide file is missing")
     try:
@@ -127,6 +142,11 @@ def guide_version(raw: bytes | None, guide_id: str) -> Version:
                 raise GuideError("Unclosed frontmatter quote")
             value = value[1:-1]
         fields[match[1]] = value
+    return fields
+
+
+def guide_version(raw: bytes | None, guide_id: str) -> Version:
+    fields = frontmatter(raw)
     if fields.get("guide_id") != guide_id:
         raise GuideError(f"Frontmatter guide_id must be {guide_id!r}")
     return Version.parse(fields.get("version", ""))
@@ -143,7 +163,8 @@ def check_versions(before: Reader, after: Reader, changed: set[str]) -> list[Fin
             findings.append(
                 Finding(
                     INVENTORY,
-                    f"{guide_id}: removed from version checks; review this explicitly",
+                    f"{guide_id}: removed from {INVENTORY}; guide IDs are permanent, "
+                    "so keep the entry and mark it retired with a reason instead",
                 )
             )
             continue
@@ -168,6 +189,14 @@ def check_versions(before: Reader, after: Reader, changed: set[str]) -> list[Fin
                         f"{guide_id}: base version cannot be compared ({exc}); review the initial version",
                     )
                 )
+            elif (previous_id := base_guide_id(before(guide.path))) not in (None, guide_id):
+                findings.append(
+                    Finding(
+                        guide.path,
+                        f"{guide_id}: this guide was {previous_id!r} on the base branch; "
+                        f"guide IDs are permanent, so keep {previous_id!r}",
+                    )
+                )
             continue
         if current <= previous:
             findings.append(
@@ -177,6 +206,14 @@ def check_versions(before: Reader, after: Reader, changed: set[str]) -> list[Fin
                 )
             )
     return findings
+
+
+def base_guide_id(raw: bytes | None) -> str | None:
+    """The ID a guide file declared on the base branch; None before enrollment."""
+    try:
+        return frontmatter(raw).get("guide_id")
+    except GuideError:
+        return None
 
 
 def git(*args: str) -> bytes:

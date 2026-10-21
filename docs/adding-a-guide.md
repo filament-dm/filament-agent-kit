@@ -75,8 +75,9 @@ entries. Do not replace the inventory with this single-entry example:
 }
 ```
 
-The key must match the guide's `guide_id`. The version lives only in the
-guide's frontmatter; do not duplicate it in the inventory. Each registered
+The key must match the guide's `guide_id` and is permanent: choose it as the
+long-term name, since it can later be retired but not renamed or removed. The
+version lives only in the guide's frontmatter; do not duplicate it in the inventory. Each registered
 directory belongs to one guide. Put its supporting files under that directory
 so their changes participate in the version check.
 

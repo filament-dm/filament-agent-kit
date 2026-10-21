@@ -15,9 +15,16 @@ for migrating through individual versions.
   including tests and supporting documentation, requires a version bump.
 - The guide's frontmatter is the only source of its `guide_id` and `version`.
   Use `YYYY-MM-DD.N`, with a UTC date and a positive daily sequence number.
-- Keep `guide_id` stable when renaming a guide. Titles, filenames and directories
-  may change; update the inventory path and bump the same guide's version.
+- Guide IDs are permanent. Titles, filenames and directories may change; update
+  the inventory path and bump the same guide's version. Changing a `guide_id`
+  or removing an inventory entry fails the check: release tooling tracks each
+  agent's adopted version by ID, so a new ID would leave existing agents unknown.
   Preserve published URLs used by existing agents when moving files.
+- To retire a guide, keep its directory, file and entry, and add
+  `"retired": {"reason": "..."}` to the entry. The reason says why, and which
+  guide replaces it if any. Retiring needs no version bump; a retired guide's
+  files stay under the version check. Remove it from the README and other
+  onboarding links by hand; agents already using it keep reading the same URLs.
 - When a PR changes a registered guide or any of its covered files, bump that
   guide before opening the PR. One bump covers the PR's changes; do not bump for
   each review commit. Recheck against the current base before merging.
