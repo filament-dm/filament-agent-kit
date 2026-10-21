@@ -1,6 +1,6 @@
 ---
 guide_id: hermes
-version: "2026-10-19.1"
+version: "2026-10-21"
 ---
 
 # Connect this Hermes to Filament
