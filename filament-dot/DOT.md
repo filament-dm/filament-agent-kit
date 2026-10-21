@@ -1,5 +1,5 @@
 ---
-guide_id: dots
+guide_id: dot
 version: "2026-10-19.1"
 ---
 
