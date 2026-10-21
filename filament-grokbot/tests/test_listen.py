@@ -85,7 +85,7 @@ class ListenTest(unittest.TestCase):
         self.state = Path(self.temporary.name)
         self.fake = Fake()
         self.processes = []
-        self.env = dict(os.environ, FM_STATE=str(self.state))
+        self.env = dict(os.environ, FM_STATE=str(self.state), FM_LOCK_WAIT='0')
         self.run_script('--token', '--endpoint', self.fake.url, stdin=TOKEN + '\n')
 
     def tearDown(self):
@@ -126,7 +126,7 @@ class ListenTest(unittest.TestCase):
 
     def work(self, *events):
         self.fake.queue = [{'work': [item(event) for event in events]}]
-        output = self.run_script()
+        output = self.run_script('--check', '1')
         self.assertEqual(output[0], 'WORK %d' % len(events))
         return self.body(output)
 
@@ -164,15 +164,35 @@ class ListenTest(unittest.TestCase):
         self.assertEqual(self.fake.calls[1]['args']['cursor'], 'c1')
         self.assertEqual((self.state / 'state.json').stat().st_mode & 0o777, 0o600)
 
-    def test_pending_batch_never_expires_into_another_poll(self):
+    def test_young_pending_batch_is_left_to_its_handler(self):
         batch = self.work('e1')
-        state = self.state_data()
-        state['pending']['created_at'] = 1
-        self.save_state(state)
         output = self.run_script()
         self.assertEqual(output[0], 'PENDING')
         self.assertEqual(self.body(output)['batch_id'], batch['batch_id'])
         self.assertEqual(len(self.fake.calls), 1)
+
+    def test_abandoned_pending_batch_is_recovered_without_polling(self):
+        batch = self.work('e1')
+        state = self.state_data()
+        state['pending']['created_at'] = time.time() - 3600
+        self.save_state(state)
+        output = self.run_script()
+        recovered = self.body(output)
+        self.assertEqual(output[0], 'RECOVER 1')
+        self.assertEqual(recovered['work'], batch['work'])
+        self.assertEqual(recovered['received_at'], state['pending']['created_at'])
+        self.assertNotEqual(recovered['batch_id'], batch['batch_id'])
+        self.assertEqual(len(self.fake.calls), 1)
+        # The abandoned handler cannot complete the recovered batch.
+        self.assertEqual(self.run_script('--done', batch['batch_id']), ['STALE'])
+        self.assertEqual(self.state_data()['pending']['batch_id'], recovered['batch_id'])
+        self.assertEqual(self.run_script('--done', recovered['batch_id'], '--budget', '1')[0], 'AGAIN')
+        self.assertIsNone(self.state_data()['pending'])
+
+    def test_recovery_timeout_is_configurable(self):
+        self.work('e1')
+        env = dict(self.env, FM_HANDLER_TIMEOUT='0')
+        self.assertEqual(self.run_script(env=env)[0], 'RECOVER 1')
 
     def test_done_flushes_skipped_acks(self):
         batch = self.work('e1', 'e2')
@@ -187,7 +207,7 @@ class ListenTest(unittest.TestCase):
         batch = self.work('e1')
         before = (self.state / 'state.json').read_bytes()
         output = self.run_script('--done', 'wrong', '--ack', 'e1')
-        self.assertEqual(output[0], 'ERROR')
+        self.assertEqual(output, ['STALE'])
         self.assertEqual(before, (self.state / 'state.json').read_bytes())
         self.assertEqual(self.state_data()['pending']['batch_id'], batch['batch_id'])
         self.assertEqual(len(self.fake.calls), 1)
@@ -211,7 +231,7 @@ class ListenTest(unittest.TestCase):
     def test_prior_owner_cannot_complete_a_resumed_batch(self):
         batch = self.work('e1')
         resumed = self.body(self.run_script('--resume', batch['batch_id']))
-        self.assertEqual(self.run_script('--done', batch['batch_id'])[0], 'ERROR')
+        self.assertEqual(self.run_script('--done', batch['batch_id']), ['STALE'])
         self.assertEqual(self.state_data()['pending']['batch_id'], resumed['batch_id'])
         self.assertEqual(len(self.fake.calls), 1)
 
@@ -226,9 +246,62 @@ class ListenTest(unittest.TestCase):
         first = self.work('e1')
         self.fake.queue = [{'work': [item('e2')]}]
         second = self.body(self.run_script('--done', first['batch_id']))
-        self.assertEqual(self.run_script('--done', first['batch_id'])[0], 'ERROR')
+        self.assertEqual(self.run_script('--done', first['batch_id']), ['STALE'])
         self.assertEqual(self.state_data()['pending']['batch_id'], second['batch_id'])
         self.assertEqual(len(self.fake.calls), 2)
+
+    def test_scheduled_start_is_a_short_check(self):
+        started = time.monotonic()
+        self.assertEqual(self.run_script('--check', '1'), ['END'])
+        self.assertLess(time.monotonic() - started, 5)
+        self.assertGreaterEqual(len(self.fake.calls), 1)
+        self.assertIsNone(self.state_data()['session'])
+
+    def test_handled_work_opens_follow_up_window(self):
+        self.fake.queue = [{'work': [item('e1')]}]
+        batch = self.body(self.run_script('--check', '1'))
+        self.fake.queue = [{}, {'work': [item('e2')]}]
+        output = self.run_script('--done', batch['batch_id'], '--follow', '30')
+        self.assertEqual(output[0], 'WORK 1')
+        self.assertEqual(self.body(output)['work'][0]['messages'][0]['event_id'], 'e2')
+        self.assertEqual(self.body(output)['session_id'], batch['session_id'])
+
+    def test_follow_up_window_ends_the_session(self):
+        batch = self.work('e1')
+        started = time.monotonic()
+        self.assertEqual(self.run_script('--done', batch['batch_id'], '--follow', '1'), ['END'])
+        self.assertLess(time.monotonic() - started, 5)
+        self.assertIsNone(self.state_data()['session'])
+
+    def test_follow_up_cannot_outlast_session_limit(self):
+        batch = self.work('e1')
+        state = self.state_data()
+        state['session']['started_at'] = time.time() - 1799
+        self.save_state(state)
+        started = time.monotonic()
+        self.assertEqual(self.run_script('--done', batch['batch_id'], '--follow', '600'), ['END'])
+        self.assertLess(time.monotonic() - started, 5)
+
+    def test_previous_revision_session_is_accepted(self):
+        batch = self.work('e1')
+        state = self.state_data()
+        del state['session']['listen_until']
+        self.save_state(state)
+        self.assertEqual(self.run_script('--done', batch['batch_id'], '--follow', '1'), ['END'])
+
+    def test_done_waits_for_a_brief_lock(self):
+        batch = self.work('e1')
+        import fcntl
+        fd = os.open(self.state / 'listener.lock', os.O_RDWR)
+        fcntl.flock(fd, fcntl.LOCK_EX)
+        timer = threading.Timer(0.5, lambda: (fcntl.flock(fd, fcntl.LOCK_UN), os.close(fd)))
+        timer.start()
+        try:
+            output = self.run_script('--done', batch['batch_id'], '--follow', '1', env=dict(self.env, FM_LOCK_WAIT='5'))
+        finally:
+            timer.join()
+        self.assertEqual(output, ['END'])
+        self.assertIsNone(self.state_data()['pending'])
 
     def test_session_end(self):
         self.assertEqual(self.run_script('--budget', '30', '--session', '1'), ['END'])
@@ -245,13 +318,13 @@ class ListenTest(unittest.TestCase):
         second = self.body(self.run_script('--budget', '1'))['session_id']
         count = len(self.fake.calls)
         self.assertNotEqual(first, second)
-        self.assertEqual(self.run_script('--again', first)[0], 'ERROR')
+        self.assertEqual(self.run_script('--again', first), ['END'])
         self.assertEqual(len(self.fake.calls), count)
 
     def test_done_after_session_end_flushes_ack(self):
         batch = self.work('e1')
         state = self.state_data()
-        state['session']['started_at'] = time.time() - 600
+        state['session']['started_at'] = time.time() - 1800
         self.save_state(state)
         self.assertEqual(self.run_script('--done', batch['batch_id'], '--ack', 'e1'), ['END'])
         self.assertEqual(self.fake.calls[-1]['args']['wait_seconds'], 0)
@@ -260,7 +333,7 @@ class ListenTest(unittest.TestCase):
     def test_ack_flush_new_work_is_persisted_even_after_session_end(self):
         batch = self.work('e1')
         state = self.state_data()
-        state['session']['started_at'] = time.time() - 600
+        state['session']['started_at'] = time.time() - 1800
         self.save_state(state)
         self.fake.queue = [{'work': [item('e2')]}]
         output = self.run_script('--done', batch['batch_id'], '--ack', 'e1')

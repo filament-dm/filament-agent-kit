@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
-"""Bounded Filament polling, with durable handoff and read-only diagnostics.
+"""Short Filament checks with a follow-up window, durable work and diagnostics.
 
-Python owns empty polls. The model still handles WORK and scheduled starts.
-This script cannot measure model tokens or guarantee provider scheduling.
-State is private to one agent. Only --status is a read-only operation.
+A scheduled start checks briefly and ends. Handled work opens a follow-up
+window so a conversation continues without waiting for the next start.
+Python owns empty polls; the model handles WORK. This script cannot measure
+model tokens or guarantee provider scheduling. State is private to one agent.
+Only --status is a read-only operation.
 """
 import argparse
 import contextlib
@@ -18,12 +20,16 @@ import urllib.error
 import urllib.request
 import uuid
 
-REVISION = '2026-10-20.1'
+REVISION = '2026-10-21.1'
 STATE = os.environ.get('FM_STATE') or os.path.dirname(os.path.abspath(__file__))
 DEFAULT_ENDPOINT = 'https://api.filament.dm/mcp/agents'
 POLL_WAIT = 60
 HTTP_SLACK = 30
 DISCONNECT_AFTER = int(os.environ.get('FM_DISCONNECT_AFTER', '900'))
+# No Grok execution has been observed past about 50 minutes, so a batch this
+# old has no live handler. Younger batches are left to their handler.
+HANDLER_TIMEOUT = int(os.environ.get('FM_HANDLER_TIMEOUT', '3600'))
+LOCK_WAIT = float(os.environ.get('FM_LOCK_WAIT', '15'))
 BACKOFF_CAP = 600
 LOG_LIMIT = 512 * 1024
 
@@ -101,6 +107,9 @@ def valid_state(state):
     session, pending = state['session'], state['pending']
     if session is not None:
         if not isinstance(session, dict) or not isinstance(session['id'], str) or not number(session['started_at']):
+            return False
+        # Revision 2026-10-20.1 sessions have no listen_until.
+        if session.get('listen_until') is not None and not number(session['listen_until']):
             return False
     if pending is not None:
         if not isinstance(pending, dict) or not isinstance(pending['batch_id'], str):
@@ -181,11 +190,17 @@ def lock():
     acquired = False
     try:
         os.fchmod(fd, 0o600)
-        try:
-            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-            acquired = True
-        except BlockingIOError:
-            pass
+        # A brief wait lets --done survive another start's millisecond check.
+        give_up = time.monotonic() + LOCK_WAIT
+        while True:
+            try:
+                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                acquired = True
+                break
+            except BlockingIOError:
+                if time.monotonic() >= give_up:
+                    break
+                time.sleep(0.2)
         yield acquired
     finally:
         if acquired:
@@ -240,6 +255,7 @@ def status():
             'poll_counts': state['counts'] if state else None,
             'last_poll_at': state.get('last_poll_at') if state else None,
             'last_success_at': state.get('last_success_at') if state else None,
+            'handler_timeout_seconds': HANDLER_TIMEOUT,
             'recent_calls': records[-40:], 'model_tokens': None,
             'limits': 'Counts cover this script only. Scheduler starts, model turns, cached tokens and billing are not observable here. A held lock may mean polling or retry backoff.'}
 
@@ -300,15 +316,28 @@ def poll(cursor, acks, wait, timeout):
         raise Transient('invalid response body')
 
 
-def work_result(pending):
-    return 'WORK %d' % len(pending['work']), {
-        'batch_id': pending['batch_id'], 'session_id': pending['session_id'], 'work': pending['work']}
+def work_result(pending, verb='WORK'):
+    body = {'batch_id': pending['batch_id'], 'session_id': pending['session_id'], 'work': pending['work']}
+    if verb == 'RECOVER':
+        body['received_at'] = pending['created_at']
+    return '%s %d' % (verb, len(pending['work'])), body
+
+
+def take_over(state, pending, follow):
+    now = time.time()
+    state['session'] = {'id': uuid.uuid4().hex, 'started_at': now, 'listen_until': now + follow}
+    # A late completion from the prior owner must not clear this handoff.
+    pending['batch_id'] = uuid.uuid4().hex
+    pending['session_id'] = state['session']['id']
+    save(state)
 
 
 def listen(state, budget, session_max, call_id, metrics):
     started = time.monotonic()
-    session_left = state['session']['started_at'] + session_max - time.time()
-    duration = max(0, min(budget, session_left))
+    session = state['session']
+    session_end = session['started_at'] + session_max
+    window = min(session.get('listen_until') or session_end, session_end) - time.time()
+    duration = max(0, min(budget, window))
     deadline = started + duration
     delay = 1
     while True:
@@ -372,7 +401,7 @@ def listen(state, budget, session_max, call_id, metrics):
             break
         pause = min(max(response.get('next_poll_ms', 1000), 0), 5000) / 1000.0
         time.sleep(min(max(pause, 0.05 if wait == 0 else 0), remaining))
-    if duration >= session_left:
+    if duration >= window:
         state['session'] = None
         save(state)
         return 'END', None
@@ -387,9 +416,11 @@ def execute(args, call_id, metrics):
         if state['auth_failed']:
             return 'AUTH_FAILED', 'previous authentication failure; reconnect explicitly'
         pending = state['pending']
+        now = time.time()
         if args.done:
             if not pending or pending['batch_id'] != args.done:
-                raise StateError('--done must name the current pending batch')
+                # Already completed, or recovered by a later execution.
+                return 'STALE', None
             skipped = {value for value in args.ack.split(',') if value}
             delivered = {message.get('event_id') for item in pending['work']
                          for message in (item.get('messages') or []) if isinstance(message, dict)}
@@ -397,24 +428,26 @@ def execute(args, call_id, metrics):
                 raise StateError('--ack may only name messages in this pending batch')
             state['acks'] = sorted(set(state['acks']) | skipped)
             state['pending'] = None
+            session = state['session']
+            session['listen_until'] = max(session.get('listen_until') or 0, now + args.follow)
             # Completion, cursor and acks are saved together, before polling.
             save(state)
         elif args.resume:
             if not pending or pending['batch_id'] != args.resume:
                 raise StateError('--resume must name the current pending batch')
-            state['session'] = {'id': uuid.uuid4().hex, 'started_at': time.time()}
-            # A late completion from the prior owner must not clear this handoff.
-            pending['batch_id'] = uuid.uuid4().hex
-            pending['session_id'] = state['session']['id']
-            save(state)
+            take_over(state, pending, args.follow)
             return work_result(pending)
         elif pending:
-            return 'PENDING', pending_summary(pending)
+            if now - pending['created_at'] < HANDLER_TIMEOUT:
+                return 'PENDING', pending_summary(pending)
+            take_over(state, pending, args.follow)
+            return work_result(pending, 'RECOVER')
         elif args.again:
             if not state['session'] or state['session']['id'] != args.again:
-                raise StateError('--again must name the current session')
+                # Ended or replaced by another execution; nothing to continue.
+                return 'END', None
         else:
-            state['session'] = {'id': uuid.uuid4().hex, 'started_at': time.time()}
+            state['session'] = {'id': uuid.uuid4().hex, 'started_at': now, 'listen_until': now + args.check}
             save(state)
         if not state['session']:
             raise StateError('missing session; inspect state before continuing')
@@ -432,8 +465,14 @@ def main():
     operations.add_argument('--again', metavar='SESSION_ID', help='continue this session after AGAIN')
     parser.add_argument('--endpoint', help='store a non-default endpoint with --token')
     parser.add_argument('--ack', default='', help='skipped event ids, comma-separated, with --done only')
-    parser.add_argument('--budget', type=int, default=int(os.environ.get('FM_BUDGET', '480')))
-    parser.add_argument('--session', type=int, default=int(os.environ.get('FM_SESSION', '480')))
+    parser.add_argument('--budget', type=int, default=int(os.environ.get('FM_BUDGET', '600')),
+                        help='longest single call, seconds')
+    parser.add_argument('--check', type=int, default=int(os.environ.get('FM_CHECK', '60')),
+                        help='listening window of a scheduled start, seconds')
+    parser.add_argument('--follow', type=int, default=int(os.environ.get('FM_FOLLOW', '600')),
+                        help='listening window after handled work, seconds')
+    parser.add_argument('--session', type=int, default=int(os.environ.get('FM_SESSION', '1800')),
+                        help='longest session, seconds')
     args = parser.parse_args()
     if args.status:
         print(json.dumps(status(), indent=2))
@@ -444,6 +483,8 @@ def main():
         parser.error('--ack requires --done BATCH_ID')
     if not 0 < args.budget <= 690 or not 0 < args.session <= 2400:
         parser.error('budget must be 1..690 seconds and session 1..2400 seconds')
+    if not 0 < args.check <= 2400 or not 0 < args.follow <= 2400:
+        parser.error('check and follow must be 1..2400 seconds')
     os.makedirs(STATE, mode=0o700, exist_ok=True)
     if args.token:
         token = sys.stdin.readline().strip()
@@ -461,7 +502,8 @@ def main():
     call_id = uuid.uuid4().hex
     started = time.monotonic()
     mode = 'done' if args.done else 'resume' if args.resume else 'again' if args.again else 'start'
-    event('CALL_START', call_id=call_id, mode=mode, budget=args.budget, session_limit=args.session)
+    event('CALL_START', call_id=call_id, mode=mode, budget=args.budget, check=args.check,
+          follow=args.follow, session_limit=args.session)
     result, body = 'ERROR', None
     metrics = {'poll_attempts': 0, 'empty_polls': 0, 'work_items': 0, 'poll_errors': 0}
     try:
