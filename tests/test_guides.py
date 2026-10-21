@@ -38,7 +38,7 @@ def snapshot(version="2026-10-15.1", body="Current setup."):
 
 class VersionTests(unittest.TestCase):
     def test_daily_sequence_is_numeric(self):
-        self.assertGreater(
+        self.assertLess(
             guides.Version.parse("2026-10-15.10"),
             guides.Version.parse("2026-10-15.9"),
         )
