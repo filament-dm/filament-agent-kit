@@ -12,6 +12,8 @@ from pathlib import Path
 
 SCRIPT = str(Path(__file__).resolve().parents[1] / 'listen.py')
 TOKEN = 'fmcp_test_token'
+WAKE_URL = 'https://api2.cursor.sh/automations/webhook/routine-1'
+WAKE_KEY = 'crsr_' + 'b' * 64
 
 
 def item(event):
@@ -23,6 +25,7 @@ def item(event):
 class Fake:
     def __init__(self):
         self.queue, self.calls = [], []
+        self.events, self.event_calls = [], []
         self.lock = threading.Lock()
         self.stopped = False
         fake = self
@@ -33,6 +36,22 @@ class Fake:
 
             def do_POST(self):
                 body = json.loads(self.rfile.read(int(self.headers['Content-Length'])))
+                if body['method'].startswith('events/'):
+                    with fake.lock:
+                        fake.event_calls.append({'method': body['method'], 'params': body['params']})
+                        step = fake.events.pop(0) if fake.events else {}
+                    reply = {'jsonrpc': '2.0', 'id': 1}
+                    if step.get('error'):
+                        reply['error'] = {'code': -32602, 'message': 'no', 'data': {'reason': step['error']}}
+                    else:
+                        reply['result'] = {'id': 'sub_1', 'refreshBefore': '2026-10-29T00:00:00.000Z'}
+                    raw = json.dumps(reply).encode()
+                    self.send_response(200)
+                    self.send_header('Content-Type', 'application/json')
+                    self.send_header('Content-Length', str(len(raw)))
+                    self.end_headers()
+                    self.wfile.write(raw)
+                    return
                 args = body['params']['arguments']
                 with fake.lock:
                     fake.calls.append({'auth': self.headers.get('Authorization'), 'args': args})
@@ -491,6 +510,82 @@ class ListenTest(unittest.TestCase):
                                 capture_output=True, text=True, timeout=10)
         self.assertNotEqual(result.returncode, 0)
         self.assertEqual(self.fake.calls, [])
+
+    def wake(self):
+        return self.run_script('--wake', stdin=WAKE_URL + '\n' + WAKE_KEY + '\n')
+
+    def test_wake_registers_the_routine_webhook(self):
+        self.assertEqual(self.wake(), ['WAKE_SET', '2026-10-29T00:00:00.000Z'])
+        (call,) = self.fake.event_calls
+        self.assertEqual(call['method'], 'events/subscribe')
+        self.assertEqual(call['params']['name'], 'work.available')
+        self.assertIsNone(call['params']['ttlMs'])
+        self.assertEqual(call['params']['delivery'],
+                         {'mode': 'webhook', 'url': WAKE_URL, 'bearer': WAKE_KEY, 'payload': 'nudge'})
+        self.assertEqual((self.state / 'wake.json').stat().st_mode & 0o777, 0o600)
+        self.assertEqual(self.fake.calls, [])
+
+    def test_wake_rejects_other_urls_and_keys_without_network(self):
+        for url, key in (('https://example.com/hook', WAKE_KEY), ('http://api2.cursor.sh/automations/webhook/x', WAKE_KEY),
+                         ('https://api2.cursor.sh/', WAKE_KEY), (WAKE_URL, 'has space'), (WAKE_URL, '')):
+            output = self.run_script('--wake', stdin=url + '\n' + key + '\n')
+            self.assertEqual(output[0], 'WAKE_FAILED', (url, key))
+        self.assertEqual(self.fake.event_calls, [])
+        self.assertFalse((self.state / 'wake.json').exists())
+
+    def test_refused_wake_is_not_stored(self):
+        self.fake.events = [{'error': 'bearer_host_not_allowed'}]
+        self.assertEqual(self.wake(), ['WAKE_FAILED', 'bearer_host_not_allowed'])
+        self.assertFalse((self.state / 'wake.json').exists())
+
+    def test_status_shows_the_wake_without_secrets(self):
+        self.wake()
+        output = '\n'.join(self.run_script('--status'))
+        wake = json.loads(output)['wake']
+        self.assertEqual((wake['configured'], wake['host'], wake['error']), (True, 'api2.cursor.sh', None))
+        self.assertNotIn(WAKE_KEY, output)
+        self.assertNotIn('routine-1', output)
+
+    def test_start_renews_an_old_wake_before_polling(self):
+        self.wake()
+        wake = json.loads((self.state / 'wake.json').read_text())
+        wake['refreshed_at'] = 1
+        (self.state / 'wake.json').write_text(json.dumps(wake))
+        self.fake.queue = [{'work': [item('e1')]}]
+        self.assertEqual(self.run_script('--check', '1')[0], 'WORK 1')
+        self.assertEqual(len(self.fake.event_calls), 2)
+        self.assertGreater(json.loads((self.state / 'wake.json').read_text())['refreshed_at'], 1)
+
+    def test_start_does_not_renew_a_fresh_wake(self):
+        self.wake()
+        self.fake.queue = [{'work': [item('e1')]}]
+        self.assertEqual(self.run_script('--check', '1')[0], 'WORK 1')
+        self.assertEqual(len(self.fake.event_calls), 1)
+
+    def test_failed_renewal_never_blocks_polling(self):
+        self.wake()
+        wake = json.loads((self.state / 'wake.json').read_text())
+        wake['refreshed_at'] = 1
+        (self.state / 'wake.json').write_text(json.dumps(wake))
+        self.fake.events = [{'error': 'invalid_bearer'}]
+        self.fake.queue = [{'work': [item('e1')]}]
+        self.assertEqual(self.run_script('--check', '1')[0], 'WORK 1')
+        self.assertEqual(json.loads((self.state / 'wake.json').read_text())['error'], 'invalid_bearer')
+        log = (self.state / 'listen.jsonl').read_text()
+        self.assertIn('WAKE_RENEW_FAILED', log)
+        self.assertNotIn(WAKE_KEY, log)
+
+    def test_corrupt_wake_never_blocks_polling(self):
+        (self.state / 'wake.json').write_text('{broken')
+        self.fake.queue = [{'work': [item('e1')]}]
+        self.assertEqual(self.run_script('--check', '1')[0], 'WORK 1')
+
+    def test_wake_off_unsubscribes_and_forgets(self):
+        self.wake()
+        self.assertEqual(self.run_script('--wake-off'), ['WAKE_OFF'])
+        self.assertEqual(self.fake.event_calls[-1]['method'], 'events/unsubscribe')
+        self.assertNotIn('bearer', self.fake.event_calls[-1]['params']['delivery'])
+        self.assertFalse((self.state / 'wake.json').exists())
 
 
 if __name__ == '__main__':
