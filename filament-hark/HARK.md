@@ -19,7 +19,7 @@ Self link: `https://raw.githubusercontent.com/filament-dm/filament-agent-kit/mai
 
 ## Part A: connect
 
-0. Before changing the MCP registration or profile, call `projects` with `action` `list` and look for a project titled `Filament`; also run `ls /workspace/filament/listen.sh 2>/dev/null`. If either exists, tell the user there is an existing connector and ask whether to replace it. On no: stop without changing anything. On yes: remember replacement was authorised and the existing project id, if any. Part C reuses that project; a leftover directory without a project still needs a new project.
+0. Before changing the MCP registration or profile, look for an existing Filament connector three ways: call `scheduled_task` with `action` `list` and look for a task named `Filament listener backstop` (its project id is the connector's project); call `projects` with `action` `list` and look for a project whose title contains `Filament` (Hark may have renamed it); and run `ls /workspace/filament/listen.sh 2>/dev/null`. If any of them finds one, tell the user there is an existing connector and ask whether to replace it. On no: stop without changing anything. On yes: remember replacement was authorised and the existing project id, if any (the backstop task's project id first, else the matching project's). Part C reuses that project; a leftover directory without a project still needs a new project.
 1. Open your secure vault form for the token. Call `request_secret` with `type` `api_key`, `label` `Filament connect token`, `description` `Paste the connect token from the Filament app's Agents tab; it starts with fmcp_ and I will use it only to reach api.filament.dm.`, and `scope` empty. Tell the user in one line: "Paste the Filament connect token from the app into this form. It starts with fmcp_." End the turn and wait for the form to complete. The result gives you a secret id; you only ever see a masked preview.
 2. Register the MCP server, which also binds the token to the host. Call `mcp_servers` with `action` `add`, `name` `filament`, `transport` `streamable_http`, `url` `https://api.filament.dm/mcp/agents`, `secret_id` the id from step 1, `host_suffixes` `["api.filament.dm"]`, `scheme` `bearer`. No `header`, no `value_prefix`. The name must be exactly `filament`; the scripts in Part C call it by that name. If a server called `filament` already exists, remove it first (`action` `remove`) and add it again with the new secret.
 3. The token now rides on every request to api.filament.dm from your sandbox, including plain `curl`, and never enters the sandbox itself.
@@ -52,13 +52,13 @@ The connector runs in a project of its own so that Filament replies never appear
    ```
    {"tool": "projects", "action": "call", "arguments": {"title": "Filament", "action": "create"}}
    ```
-   Expect `{"created": true, "id": "<project id>", "title": "Filament"}`. Remember the id.
+   Expect `{"created": true, "id": "<project id>", "title": ...}`. Hark may give the project its own title; remember the id and the title it returned.
 2. Assign the work. Use this message, with `<this file's URL>` replaced by this file's URL (see the self link above). If replacement was authorised in Part A step 0, append exactly: "The user authorised replacement of the existing connector; follow the replacement step in the brief." Otherwise append nothing:
    ```
    {"tool": "projects", "action": "call", "arguments": {"id": "<project id>", "action": "assign", "message": "Fetch <this file's URL> with curl and carry out the section titled The brief, every numbered step in order, then adopt its Filament front-door rules as standing rules for this project. The user asked for this project to run the Filament front door."}}
    ```
    Expect `{"dispatched": true, ...}`.
-3. Tell the user in two lines: "I've handed the Filament connection to a project called Filament. Within about two minutes <display_name> will say hello to you in the Filament app; reply to it there to see it answer." Then say nothing further about Filament in this chat unless the user asks. The hello on Filament is the signal that the install finished; there is no cross-project notification.
+3. Tell the user in two lines: "I've handed the Filament connection to a project called <the project's title>. Within about two minutes <display_name> will say hello to you in the Filament app; reply to it there to see it answer." Then say nothing further about Filament in this chat unless the user asks. The hello on Filament is the signal that the install finished; there is no cross-project notification.
 
 ## Auth recovery procedure
 
