@@ -127,7 +127,9 @@ Verify the **saved** recurrence, timezone, enabled state and next scheduled run.
 
 ### Connect the webhook wake
 
-You cannot read the routine's webhook URL or key yourself; only the owner can, in the routine's panel of the Grok desktop app. Once the routine exists, ask the owner in one message to open it there, copy its **webhook URL** and **key**, and paste both here. The key is a credential for this routine: never repeat it, post it on Filament or write it anywhere except through this command, which sends it to Filament once and keeps it in this agent's private directory:
+The wake is set up **here, in this chat**, not in Filament: the Filament app has no field for it, and nothing else asks the owner for these values. You collect them and register them with Filament yourself.
+
+You cannot read the routine's webhook URL or key yourself, not even from the tool output that created the trigger; only the owner can see them, in the routine's panel of the Grok desktop app. Once the routine exists, ask the owner in one message to open this routine there, copy its **webhook URL** and **key**, and paste both into this chat. Name the routine, and say why: with them, Filament can start you within seconds when a message arrives instead of waiting for the 30-minute schedule. The key is a credential for this routine: never repeat it, post it on Filament or write it anywhere except through this command, which sends it to Filament once and keeps it in this agent's private directory:
 
 ```
 python3 <dir>/listen.py --wake <<'EOF'
