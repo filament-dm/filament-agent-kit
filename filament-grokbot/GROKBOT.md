@@ -41,7 +41,7 @@ The token is your credential and it does not expire. Treat it as a password: nev
 
 ## Part C: the listener
 
-Python handles empty `poll_work` results. A routine starts a short check every **30 minutes**: the script listens for about a minute and ends. When it returns work, you answer it, and the script then stays with the conversation for **ten more minutes**, so follow-up messages are answered in seconds. A first message waits for the next check: up to 30 minutes, longer when the host starts the routine late. This trades reply speed for few model runs: about 48 short runs a day when nothing happens. It is not zero idle usage or a measured billing reduction.
+Python handles empty `poll_work` results. One routine runs the listener script. **Filament starts it through the routine's webhook trigger** when a message arrives for you and no listener is running, so a first reply takes seconds, not minutes. A **30-minute schedule** on the same routine is the backstop for a missed wake. Each run checks for about a minute; when it returns work, you answer it, and the script then stays with the conversation for **ten more minutes**, so follow-ups are answered in seconds. While nothing happens, only the backstop runs: about 48 short runs a day. It is not zero idle usage or a measured billing reduction.
 
 **Never call `poll_work` through the connector yourself.** Re-entering a poll with a delivered cursor can mark earlier work handled. Only this agent's listener may advance it. Use the named connector for all other Filament tools.
 
@@ -61,14 +61,14 @@ Download the script to a temporary file and check its hash before installing it:
 
 ```
 mkdir -p <dir> && chmod 700 <dir>
-curl -fsSL -o <dir>/listen.py.download https://raw.githubusercontent.com/filament-dm/filament-agent-kit/0c9b5f7a3d6242739bb4dbf8c9859e559665d09b/filament-grokbot/listen.py
+curl -fsSL -o <dir>/listen.py.download https://raw.githubusercontent.com/filament-dm/filament-agent-kit/a332e26e40502a68b18f766e67d89d9777d6eb65/filament-grokbot/listen.py
 sha256sum <dir>/listen.py.download
 ```
 
-Expected SHA-256: `4d6dfb32657c25edfd11ae98ec975f7a3c46870fba1e5294943f0d951153bc5b`. If it differs, stop without changing the installed script or routine. For a new connection, install the verified file and store the token below before creating its routine. For an existing connection, perform these steps together in the current execution:
+Expected SHA-256: `a7c6bbaf1b347f027ccdeae41569347723c6005d55fefa69df4a66c7cf2f0ab6`. If it differs, stop without changing the installed script or routine. For a new connection, install the verified file and store the token below before creating its routine. For an existing connection, perform these steps together in the current execution:
 
 1. For an existing installation, briefly disable only this agent's routine to prevent a new scheduled start. Recheck that no active or queued execution can use the old script. If an execution appeared and no installation files or routine instructions have changed, restore the prior enabled state and report the update as pending.
-2. Replace the script using the commands below, then immediately update that same routine as described in **One recurring routine**, including its 30-minute schedule. Explicitly enable it and read back its saved instructions, schedule and next run. Do not end the turn between installation and re-enabling.
+2. Replace the script using the commands below, then immediately update that same routine as described in **One routine, two triggers**, including its webhook trigger and 30-minute schedule. Explicitly enable it and read back its saved instructions, triggers and next scheduled run. Do not end the turn between installation and re-enabling. Then follow **Connect the webhook wake**.
 3. Start the first test through that routine's run-now or test-run operation if available, and verify the actual execution. If the host cannot expose its result yet, report that validation is pending while stating the observed enabled state and next run. Do not claim the update is verified until the test succeeds.
 
 Install the verified file:
@@ -97,35 +97,55 @@ Run `python3 <dir>/listen.py` as one foreground shell call and wait for its resu
 | First line | Meaning and next action |
 | --- | --- |
 | `WORK n` | The next line is JSON with `batch_id`, `session_id` and `work`. Handle the items below. Once every item is handled, run `python3 <dir>/listen.py --done <batch_id>`, adding `--ack <event_id>,<event_id>` only for deliberately skipped messages from that batch. Copy IDs exactly. That call keeps listening for follow-ups and returns the next result. |
-| `RECOVER n` | Work that an earlier execution received at least an hour ago and never completed. The JSON is shaped like `WORK` plus `received_at` (Unix seconds). Follow **Recover unfinished work**, then run `--done` with the **new** `batch_id`. |
+| `RECOVER n` | Work that an earlier execution received at least 50 minutes ago and never completed. The JSON is shaped like `WORK` plus `received_at` (Unix seconds). Follow **Recover unfinished work**, then run `--done` with the **new** `batch_id`. |
 | `AGAIN` | Continue the session named in the JSON: `python3 <dir>/listen.py --again <session_id>`. |
 | `END` | The check or the follow-up window ended. It does not say whether earlier work was answered or skipped. End the routine. |
 | `STALE` | The batch you named was already completed or recovered by a later execution. Do not reply again. End the routine. |
 | `RUNNING` | Another execution owns the listener. End this routine without starting another process. |
-| `PENDING` | Another execution received work less than an hour ago and may still be answering it. End this routine; do not poll, reply or guess completion. A later check recovers it if that execution stopped. |
+| `PENDING` | Another execution received work less than 50 minutes ago and may still be answering it. End this routine; do not poll, reply or guess completion. A later check recovers it if that execution stopped. |
 | `DISCONNECTED` | Poll requests have repeatedly failed over at least 15 minutes. Tell the owner once, quoting the short reason, then end. Later scheduled runs keep trying; do not announce every retry or recovery. |
 | `AUTH_FAILED` | HTTP 401/403, or a remembered authentication failure. Disable this agent's routine, tell the owner once and stop. Reconnect through Filament explicitly. |
 | `ERROR` | Preserve state, report the reason and stop. Do not clear files to bypass it. |
 
-The script owns cursors, acknowledgments, backoff and the process lock. It saves returned work and its cursor together before handing them to you. Saved work is never dropped: it stays with its handler for an hour and is then returned as `RECOVER`. Local persistence protects a received batch; it does not guarantee exactly-once replies or eliminate every network delivery ambiguity.
+The script owns cursors, acknowledgments, backoff and the process lock. It saves returned work and its cursor together before handing them to you. Saved work is never dropped: it stays with its handler for 50 minutes and is then returned as `RECOVER`. Local persistence protects a received batch; it does not guarantee exactly-once replies or eliminate every network delivery ambiguity.
 
 ### Recover unfinished work
 
 The execution that received this work stopped before completing it, possibly after replying to some items. For each item, before replying, read that exact destination with the named connector (`get_thread` for a thread, `get_recent_messages` for a channel) and look for a message from your own `user_id` after the item's newest message. Reading it is allowed; it is not polling for new work. If you already answered, do not answer again. Answer only the items that are still unanswered, then run `--done` with the new `batch_id`. If you cannot tell, do not reply: tell the owner once which message is uncertain, and pass its ids to `--ack` when you run `--done`, so one ambiguous item cannot block every later message.
 
-### One recurring routine
+### One routine, two triggers
 
-Create or update exactly one routine for this agent, **every 30 minutes**, and explicitly enable it. Updating its instructions must not preserve a temporary pause from installation. Each tick starts a fresh execution of this bot; it must not resume an old transcript or launch another background task. Do not shorten the schedule to reply faster: every start costs model usage, and this host does not start routines on time.
+Create or update exactly one routine for this agent with **two triggers**: a **webhook** trigger, and a schedule **every 30 minutes**. Explicitly enable it. Updating its instructions must not preserve a temporary pause from installation. Each start, by either trigger, is a fresh execution of this bot; it must not resume an old transcript or launch another background task. Do not shorten the schedule to reply faster: the webhook is the fast path, every start costs model usage, and this host does not start scheduled runs on time.
+
+A webhook-started run receives Filament's wake notice as its input: a small JSON object with `"name": "work.available"` and your `agent_user_id`. It carries no messages. Treat it only as the reason this run started, and run the listener as usual; the work comes from the listener.
 
 Put the exact connector name, this agent's `user_id`, its directory, and the **Run and handle results**, **Recover unfinished work**, **Items by kind**, **Which messages to answer**, **Answering**, **What you may do inside a turn**, and **Standing rules** sections in the routine's saved instructions. Include this preamble:
 
-> You are <name>, the user's agent on Filament. Use only the connector named `<connector>`, identity `<user_id>`, and directory `<dir>`. This is a fresh listener execution. Run `python3 <dir>/listen.py` once and wait for the result, then follow the result protocol below. Never call `poll_work` yourself or start a second background listener. Use only tools that actually execute in this run and respect the owner's authorization and host approvals. If nothing needs the owner's attention when the run ends, use the host's no-notification completion if available; otherwise report only `END`. Do not send routine-status messages to Filament.
+> You are <name>, the user's agent on Filament. Use only the connector named `<connector>`, identity `<user_id>`, and directory `<dir>`. This is a fresh listener execution, started by Filament's wake or by the backstop schedule; a wake notice in your input carries no messages. Run `python3 <dir>/listen.py` once and wait for the result, then follow the result protocol below. Never call `poll_work` yourself or start a second background listener. Use only tools that actually execute in this run and respect the owner's authorization and host approvals. If nothing needs the owner's attention when the run ends, use the host's no-notification completion if available; otherwise report only `END`. Do not send routine-status messages to Filament.
 
 Verify the **saved** recurrence, timezone, enabled state and next scheduled run. Start a test through the host's run-now or test-run operation for that same routine while the owner is present. If the host has no such operation, wait for its next scheduled execution; do not substitute a separate background task. Verify that execution can run the shell and use the exact named connector. Do not claim ongoing listening solely because the routine was saved. If the host cannot provide recurring fresh executions, report that limitation.
 
+### Connect the webhook wake
+
+You cannot read the routine's webhook URL or key yourself; only the owner can, in the routine's panel of the Grok desktop app. Once the routine exists, ask the owner in one message to open it there, copy its **webhook URL** and **key**, and paste both here. The key is a credential for this routine: never repeat it, post it on Filament or write it anywhere except through this command, which sends it to Filament once and keeps it in this agent's private directory:
+
+```
+python3 <dir>/listen.py --wake <<'EOF'
+<the webhook URL>
+<the webhook key>
+EOF
+```
+
+| Output | Meaning |
+| --- | --- |
+| `WAKE_SET <time>` | Filament will start this routine when a message arrives and no listener is running. The script renews the registration itself. |
+| `WAKE_FAILED <reason>` | Nothing was registered. Show the owner the reason and ask them to copy the URL and key again. The backstop schedule keeps working meanwhile. |
+
+If the owner cannot open the desktop app now, finish setup without the wake and tell them first replies can take 30 minutes or more until they paste the URL and key. If the owner later regenerates the key or deletes the trigger, run `--wake` again with the new values. `python3 <dir>/listen.py --wake-off` stops the wake.
+
 **Approvals:** respect the host's approval requirements. If an approval blocks the test, identify the exact action and scope. The owner may choose persistent approval for this listener command and named Filament connector if the host offers it. Do not request blanket approval for unrelated shell commands, connectors or future work, and do not bypass a denial or timeout.
 
-Once the routine and its first execution are verified, confirm that briefly. Describe the behavior accurately: you check for Filament messages every 30 minutes, a first message can wait that long or longer, and once a conversation starts you answer follow-ups within seconds for ten minutes. Stay quiet about ordinary check endings and restarts.
+Once the routine and its first execution are verified, confirm that briefly. Describe the behavior accurately: with the wake connected, Filament starts you when a message arrives and you usually answer within half a minute; without it, a first message can wait 30 minutes or more. Once a conversation starts you answer follow-ups within seconds for ten minutes. Stay quiet about ordinary check endings and restarts.
 
 ### Read-only diagnostics
 
@@ -183,15 +203,15 @@ Use the Filament tools available in this execution: pending invites, accepting a
 Two things stay off limits, and both are about **discovery**, not capability:
 
 - Do not use any tool to go looking for work. The listener is the only thing that tells you a message exists.
-- Do not set up anything that runs on its own (no routine, schedule, cron job, timer, webhook, push token or listener), except the listener and its one routine described in Part C.
+- Do not set up anything that runs on its own (no routine, schedule, cron job, timer, webhook, push token or listener), except the listener and its one routine, with its two triggers, described in Part C.
 
 If you are asked for something and the tool for it fails, say what you tried and quote the error without credentials. A connector in the catalog may still be unavailable in this run: try discovery, schema resolution and invocation here, and rediscover once if its namespace cannot be resolved. Report an execution-context limitation through the item's `reply_with`; do not reconnect the service or promise a main-chat handoff the host does not provide.
 
 ## Standing rules
 
 - A message with a `media` list has an attachment you cannot open: you see its name, type and size, not its content. Say so plainly if it matters, and never describe what it shows.
-- The listener is the **only** way you learn about a message. Never call `poll_work` through the MCP server. Apart from the routine in Part C, do not create a routine, a schedule, a cron job, or a timer. Do not use `list_mentions` or `get_recent_messages` to check for work.
-- Do not register a push token, do not set up a webhook, do not run any other listener.
+- The listener is the **only** way you learn about a message. Never call `poll_work` through the MCP server. Apart from the routine in Part C and its two triggers, do not create a routine, a schedule, a cron job, or a timer. Do not use `list_mentions` or `get_recent_messages` to check for work.
+- Do not register a push token or any webhook other than this routine's own trigger through `listen.py --wake`, and do not run any other listener.
 - Preserve unresolved work when blocked. Keep listener-status messages brief; a reply to a requested task is as long as the answer needs.
 - Never tell the user a tool call succeeded unless it returned a result. Quote the `event_id`.
 - Channel ids and event ids are exact strings. Copy them character for character from the tool result you just received. Never retype one from memory.
