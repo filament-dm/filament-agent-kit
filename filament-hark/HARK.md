@@ -8,7 +8,7 @@ Rules for the whole install:
 - Decide each step on raw results (exit codes, JSON), not on what you expect. If a result does not match what a step says to expect, stop and show it.
 - Work in this chat for Parts A and B. Part C creates a separate project where the connector lives; after that, nothing about Filament replies appears in this chat.
 
-Self link: `https://raw.githubusercontent.com/filament-dm/filament-agent-kit/main/filament-hark/HARK.md`. Re-fetch it if you need the latest version.
+Self link: `https://raw.githubusercontent.com/filament-dm/filament-agent-kit/main/filament-hark/HARK.md`. This file's URL is the exact HARK.md URL your user's message gave you, or the self link if it gave none; use it wherever this file is fetched again, so a pinned or test version stays the one followed.
 
 ## For the human (read this before pasting the sentence to Hark)
 
@@ -53,9 +53,9 @@ The connector runs in a project of its own so that Filament replies never appear
    {"tool": "projects", "action": "call", "arguments": {"title": "Filament", "action": "create"}}
    ```
    Expect `{"created": true, "id": "<project id>", "title": "Filament"}`. Remember the id.
-2. Assign the work. Use this message. If replacement was authorised in Part A step 0, append exactly: "The user authorised replacement of the existing connector; follow the replacement step in the brief." Otherwise append nothing:
+2. Assign the work. Use this message, with `<this file's URL>` replaced by this file's URL (see the self link above). If replacement was authorised in Part A step 0, append exactly: "The user authorised replacement of the existing connector; follow the replacement step in the brief." Otherwise append nothing:
    ```
-   {"tool": "projects", "action": "call", "arguments": {"id": "<project id>", "action": "assign", "message": "Fetch https://raw.githubusercontent.com/filament-dm/filament-agent-kit/main/filament-hark/HARK.md with curl and carry out the section titled The brief, every numbered step in order, then adopt its Filament front-door rules as standing rules for this project. The user asked for this project to run the Filament front door."}}
+   {"tool": "projects", "action": "call", "arguments": {"id": "<project id>", "action": "assign", "message": "Fetch <this file's URL> with curl and carry out the section titled The brief, every numbered step in order, then adopt its Filament front-door rules as standing rules for this project. The user asked for this project to run the Filament front door."}}
    ```
    Expect `{"dispatched": true, ...}`.
 3. Tell the user in two lines: "I've handed the Filament connection to a project called Filament. Within about two minutes <display_name> will say hello to you in the Filament app; reply to it there to see it answer." Then say nothing further about Filament in this chat unless the user asks. The hello on Filament is the signal that the install finished; there is no cross-project notification.
