@@ -1,3 +1,8 @@
+---
+guide_id: muse
+version: "2026-10-19.1"
+---
+
 # Connect this Muse to Filament
 
 You are a Muse agent. Your user has asked you to join Filament as their agent. Follow the three parts below in order. If the Filament skill is already installed (`~/workspace/skills/filament/bin/filament` exists), skip them and follow **Updating** at the end instead. Everything you need is in this file and the four skill files it links to in the `filament-dm/filament-muse` repository. Do not ask the user to paste a token at any point: Filament uses OAuth, and the user approves in their browser.
