@@ -1,14 +1,18 @@
 #!/usr/bin/env python3
 """Short Filament checks with a follow-up window, durable work and diagnostics.
 
-A scheduled start checks briefly and ends. Handled work opens a follow-up
-window so a conversation continues without waiting for the next start.
+A start (Filament's webhook wake, or the backstop schedule) checks briefly and
+ends. Handled work opens a follow-up window so a conversation continues
+without waiting for another start. --wake registers the routine's webhook
+trigger with Filament, which then starts a run when work arrives and nobody is
+listening.
 Python owns empty polls; the model handles WORK. This script cannot measure
 model tokens or guarantee provider scheduling. State is private to one agent.
 Only --status is a read-only operation.
 """
 import argparse
 import contextlib
+import re
 import fcntl
 import hashlib
 import json
@@ -17,11 +21,12 @@ import os
 import sys
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 import uuid
 
 # The guide version in GROKBOT.md; bump both together.
-REVISION = '2026-10-23.1'
+REVISION = '2026-10-23.2'
 STATE = os.environ.get('FM_STATE') or os.path.dirname(os.path.abspath(__file__))
 DEFAULT_ENDPOINT = 'https://api.filament.dm/mcp/agents'
 POLL_WAIT = 60
@@ -29,8 +34,12 @@ HTTP_SLACK = 30
 DISCONNECT_AFTER = int(os.environ.get('FM_DISCONNECT_AFTER', '900'))
 # No Grok execution has been observed past about 50 minutes, so a batch this
 # old has no live handler. Younger batches are left to their handler.
-HANDLER_TIMEOUT = int(os.environ.get('FM_HANDLER_TIMEOUT', '3600'))
+HANDLER_TIMEOUT = int(os.environ.get('FM_HANDLER_TIMEOUT', '3000'))
 LOCK_WAIT = float(os.environ.get('FM_LOCK_WAIT', '15'))
+WAKE_HOSTS = ('api2.cursor.sh',)
+WAKE_KEY = re.compile(r'[A-Za-z0-9._~+/=-]{1,512}')
+# Filament grants a subscription for up to a week; renew well before that.
+WAKE_REFRESH_AFTER = int(os.environ.get('FM_WAKE_REFRESH_AFTER', '86400'))
 BACKOFF_CAP = 600
 LOG_LIMIT = 512 * 1024
 
@@ -256,7 +265,7 @@ def status():
             'poll_counts': state['counts'] if state else None,
             'last_poll_at': state.get('last_poll_at') if state else None,
             'last_success_at': state.get('last_success_at') if state else None,
-            'handler_timeout_seconds': HANDLER_TIMEOUT,
+            'handler_timeout_seconds': HANDLER_TIMEOUT, 'wake': wake_summary(),
             'recent_calls': records[-40:], 'model_tokens': None,
             'limits': 'Counts cover this script only. Scheduler starts, model turns, cached tokens and billing are not observable here. A held lock may mean polling or retry backoff.'}
 
@@ -276,14 +285,9 @@ def parse(body):
     raise ValueError('no JSON-RPC reply')
 
 
-def poll(cursor, acks, wait, timeout):
-    args = {'wait_seconds': wait}
-    if cursor:
-        args['cursor'] = cursor
-    if acks:
-        args['ack'] = acks
-    payload = json.dumps({'jsonrpc': '2.0', 'id': 1, 'method': 'tools/call',
-                          'params': {'name': 'poll_work', 'arguments': args}}).encode()
+def rpc(method, params, timeout):
+    """One JSON-RPC request; returns the parsed reply, error or result."""
+    payload = json.dumps({'jsonrpc': '2.0', 'id': 1, 'method': method, 'params': params}).encode()
     request = urllib.request.Request(read('endpoint') or DEFAULT_ENDPOINT, data=payload, method='POST', headers={
         'Authorization': 'Bearer ' + read('token'), 'Content-Type': 'application/json',
         'Accept': 'application/json, text/event-stream'})
@@ -297,7 +301,19 @@ def poll(cursor, acks, wait, timeout):
     except Exception as exc:
         raise Transient(type(exc).__name__)
     try:
-        reply = parse(body)
+        return parse(body)
+    except ValueError:
+        raise Transient('invalid response body')
+
+
+def poll(cursor, acks, wait, timeout):
+    args = {'wait_seconds': wait}
+    if cursor:
+        args['cursor'] = cursor
+    if acks:
+        args['ack'] = acks
+    reply = rpc('tools/call', {'name': 'poll_work', 'arguments': args}, timeout)
+    try:
         if 'error' in reply:
             raise Transient('RPC error')
         result = reply.get('result') or {}
@@ -315,6 +331,102 @@ def poll(cursor, acks, wait, timeout):
         return response
     except (ValueError, KeyError, IndexError, TypeError, AttributeError):
         raise Transient('invalid response body')
+
+
+def load_wake():
+    raw = read('wake.json')
+    if raw is None:
+        return None
+    try:
+        wake = json.loads(raw)
+        if isinstance(wake, dict) and isinstance(wake.get('url'), str) and isinstance(wake.get('key'), str):
+            return wake
+    except ValueError:
+        pass
+    raise StateError('invalid wake.json; run --wake again')
+
+
+def subscribe(wake):
+    """Register or renew Filament's wake; returns (refresh_before, error)."""
+    params = {'name': 'work.available', 'arguments': {}, 'ttlMs': None,
+              'delivery': {'mode': 'webhook', 'url': wake['url'], 'bearer': wake['key'],
+                           # Every POST starts a run; the run takes its work from poll_work.
+                           'payload': 'nudge'}}
+    try:
+        reply = rpc('events/subscribe', params, 15)
+    except AuthFailed as exc:
+        return None, str(exc)
+    except Transient as exc:
+        return None, str(exc)
+    error = reply.get('error')
+    if isinstance(error, dict):
+        data = error.get('data') if isinstance(error.get('data'), dict) else {}
+        return None, str(data.get('reason') or error.get('code') or 'refused')
+    result = reply.get('result')
+    if not isinstance(result, dict) or not isinstance(result.get('refreshBefore'), str):
+        return None, 'invalid response body'
+    return result['refreshBefore'], None
+
+
+def renew_wake():
+    """Best effort: a failed renewal leaves the backstop schedule working."""
+    try:
+        wake = load_wake()
+    except StateError as exc:
+        event('WAKE_RENEW_FAILED', reason=str(exc))
+        return
+    if wake is None or time.time() - (wake.get('refreshed_at') or 0) < WAKE_REFRESH_AFTER:
+        return
+    refresh_before, error = subscribe(wake)
+    if error:
+        wake['error'] = error
+        event('WAKE_RENEW_FAILED', reason=error)
+    else:
+        wake.update(refreshed_at=time.time(), refresh_before=refresh_before, error=None)
+    write('wake.json', json.dumps(wake, separators=(',', ':')))
+
+
+def set_wake():
+    url = sys.stdin.readline().strip()
+    key = sys.stdin.readline().strip()
+    parts = urllib.parse.urlsplit(url)
+    if parts.scheme != 'https' or parts.hostname not in WAKE_HOSTS or not parts.path.strip('/'):
+        return 'WAKE_FAILED', 'the URL must be the routine webhook URL on ' + ', '.join(WAKE_HOSTS)
+    if not WAKE_KEY.fullmatch(key):
+        return 'WAKE_FAILED', 'the key must be the routine webhook key'
+    wake = {'url': url, 'key': key}
+    refresh_before, error = subscribe(wake)
+    if error:
+        return 'WAKE_FAILED', error
+    wake.update(refreshed_at=time.time(), refresh_before=refresh_before, error=None)
+    write('wake.json', json.dumps(wake, separators=(',', ':')))
+    return 'WAKE_SET', refresh_before
+
+
+def clear_wake():
+    wake = load_wake()
+    if wake is None:
+        return 'WAKE_OFF', None
+    try:
+        rpc('events/unsubscribe', {'name': 'work.available', 'arguments': {},
+                                   'delivery': {'mode': 'webhook', 'url': wake['url']}}, 30)
+    except (AuthFailed, Transient) as exc:
+        # The subscription still lapses within a week without renewal.
+        event('WAKE_OFF_FAILED', reason=str(exc))
+    os.unlink(path('wake.json'))
+    return 'WAKE_OFF', None
+
+
+def wake_summary():
+    try:
+        wake = load_wake()
+    except StateError as exc:
+        return {'configured': False, 'error': str(exc)}
+    if wake is None:
+        return {'configured': False}
+    return {'configured': True, 'host': urllib.parse.urlsplit(wake['url']).hostname,
+            'refreshed_at': wake.get('refreshed_at'), 'refresh_before': wake.get('refresh_before'),
+            'error': wake.get('error')}
 
 
 def work_result(pending, verb='WORK'):
@@ -450,6 +562,7 @@ def execute(args, call_id, metrics):
         else:
             state['session'] = {'id': uuid.uuid4().hex, 'started_at': now, 'listen_until': now + args.check}
             save(state)
+            renew_wake()
         if not state['session']:
             raise StateError('missing session; inspect state before continuing')
         metrics['session_id'] = state['session']['id']
@@ -464,6 +577,9 @@ def main():
     operations.add_argument('--done', metavar='BATCH_ID', help='all work in this batch was handled; resume polling')
     operations.add_argument('--resume', metavar='BATCH_ID', help='recover saved work only after verifying its prior owner ended')
     operations.add_argument('--again', metavar='SESSION_ID', help='continue this session after AGAIN')
+    operations.add_argument('--wake', action='store_true',
+                            help='register the routine webhook URL and key, read from stdin, as Filament\'s wake')
+    operations.add_argument('--wake-off', action='store_true', help='stop Filament\'s webhook wake')
     parser.add_argument('--endpoint', help='store a non-default endpoint with --token')
     parser.add_argument('--ack', default='', help='skipped event ids, comma-separated, with --done only')
     parser.add_argument('--budget', type=int, default=int(os.environ.get('FM_BUDGET', '600')),
@@ -499,6 +615,15 @@ def main():
         return
     if not read('token'):
         print('ERROR no token; run with --token first')
+        return
+    if args.wake or args.wake_off:
+        try:
+            result, body = set_wake() if args.wake else clear_wake()
+        except (StateError, OSError) as exc:
+            result, body = 'ERROR', str(exc)
+        print(result)
+        if body is not None:
+            print(body)
         return
     call_id = uuid.uuid4().hex
     started = time.monotonic()
