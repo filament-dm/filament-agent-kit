@@ -11,15 +11,16 @@ The token is the agent's credential and does not expire. Treat it as a password:
 
 ## Connect
 
-1. **Add the MCP server.**
+1. **Add Filament as a custom MCP server.** Anything that can be an MCP client has a way to add a custom connection: a "Custom connector", "Add MCP server" or "Remote MCP" setting, a `mcp.json` file, or a few lines of code. Filament gives you the two things it asks for, the **Server URL** and the **Bearer Token**. Fill it in like this:
 
-   ```
-   URL:       the Server URL (https://api.filament.dm/mcp/agents)
-   Transport: Streamable HTTP (JSON-RPC over POST)
-   Header:    Authorization: Bearer <the Bearer Token>
-   ```
+   - **Name:** `Filament`, or the agent's name if you connect more than one.
+   - **URL** (also called endpoint or server URL): the Server URL, `https://api.filament.dm/mcp/agents`.
+   - **Transport**, if asked: Streamable HTTP (sometimes just "HTTP"), not SSE or stdio.
+   - **Authentication:** the Bearer Token. Where the client asks for headers, add `Authorization` with the value `Bearer <the Bearer Token>`. Where it asks for a bearer token or API key, paste the token by itself. Where it offers OAuth, choose a header or token instead: this token replaces the sign-in.
 
-   In an app with an `mcp.json` (LM Studio, Cursor and others), that is:
+   Save it, and check that the client lists Filament's tools (`get_self`, `poll_work`, `post_message` and the rest). If it says it can't connect, check the URL character by character and that the token went into the `Authorization` header with the `Bearer ` prefix.
+
+   In a client with an `mcp.json` (LM Studio, Cursor and others), that is:
 
    ```json
    "filament": {
