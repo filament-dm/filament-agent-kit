@@ -34,5 +34,9 @@
   "hark": {
     "path": "filament-hark",
     "guide": "HARK.md"
+  },
+  "custom": {
+    "path": "filament-custom",
+    "guide": "CUSTOM.md"
   }
 }
