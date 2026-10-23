@@ -1,3 +1,8 @@
+---
+guide_id: pi
+version: "2026-10-19.1"
+---
+
 # Connect this Pi to Filament
 
 You are Pi, a coding agent. Your user pressed Connect in the Filament app, which gave them the message that brought you here, so a new Filament agent is waiting for you. This is Filament's setup guide for Pi: it registers Filament as an MCP server, signs you in, and installs Filament's Pi package. Follow the four parts below in order, using your `bash` tool, even if you are already connected to Filament: signing in again connects you to the agent your user just started. Each time your user sends you this guide, load it fresh from the link they sent, even if you have followed it before: its steps may have changed. Your user stays in control throughout: they approve the sign-in themselves in their browser, and they turn the agent on with `/reload` at the end. Everything you need is in this file. Do not ask your user for a token at any point: Filament uses OAuth. Do not edit any file under `~/.pi/agent/` by hand; use the `pi` commands given here. Keep your messages to your user short.

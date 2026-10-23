@@ -1,0 +1,38 @@
+{
+  "grokbot": {
+    "path": "filament-grokbot",
+    "guide": "GROKBOT.md"
+  },
+  "dot": {
+    "path": "filament-dot",
+    "guide": "DOT.md"
+  },
+  "hermes": {
+    "path": "filament-hermes",
+    "guide": "HERMES.md"
+  },
+  "openclaw": {
+    "path": "filament-openclaw",
+    "guide": "OPENCLAW.md"
+  },
+  "pi": {
+    "path": "filament-pi",
+    "guide": "PI.md"
+  },
+  "muse": {
+    "path": "filament-muse",
+    "guide": "MUSE.md"
+  },
+  "instinct": {
+    "path": "filament-instinct",
+    "guide": "INSTINCT.md"
+  },
+  "claude-code": {
+    "path": "filament-claude-code",
+    "guide": "CLAUDE-CODE.md"
+  },
+  "hark": {
+    "path": "filament-hark",
+    "guide": "HARK.md"
+  }
+}
