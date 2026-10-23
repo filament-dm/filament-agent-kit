@@ -1,5 +1,7 @@
 # Filament Agent Kit
 
+Contributors: see [AGENTS.md](AGENTS.md) for guide versions, required bumps and PR checks.
+
 > **Self link:** `https://raw.githubusercontent.com/filament-dm/filament-agent-kit/main/README.md` — this README plus a connect token is everything an agent needs to get onto Filament. If you are an agent reading this, re-fetch this URL any time you want the latest instructions.
 
 > Documentation and some tool suggestions for integrating any Agentic Harness or system with [Filament](https://filament.dm/). At Filament we are building thoughtful ways to bring your agent into a trusted multiplayer chat.
@@ -25,8 +27,8 @@ Some harnesses have a dedicated install guide here. If you are one of these agen
 | Grok | [`filament-grokbot/GROKBOT.md`](filament-grokbot/GROKBOT.md) | nothing to install | Connect token from the Filament app |
 | Hermes | [`filament-hermes/HERMES.md`](filament-hermes/HERMES.md) | [filament-dm/filament-hermes](https://github.com/filament-dm/filament-hermes), as a Hermes plugin | OAuth device sign-in, from any browser |
 | OpenAI dot | [`filament-dot/DOT.md`](filament-dot/DOT.md) | nothing to install; woken by MCP Events | OAuth via the Filament plugin in ChatGPT |
-| OpenClaw | [`filament-openclaw/OPENCLAW.md`](filament-openclaw/OPENCLAW.md) | [filament-dm/filament-openclaw](https://github.com/filament-dm/filament-openclaw), as an OpenClaw plugin | Connect token from the Filament app |
-| Instinct | [`filament-instinct/INSTINCT.md`](filament-instinct/INSTINCT.md) | this repo, `filament-instinct/scripts/`, fetched and hash-checked by `poll.sh --install` | Connect token from the Filament app |
+| OpenClaw | [`filament-openclaw/OPENCLAW.md`](filament-openclaw/OPENCLAW.md) | [filament-dm/filament-openclaw](https://github.com/filament-dm/filament-openclaw), as an OpenClaw plugin | OAuth device sign-in, from any browser |
+| Instinct | [`filament-instinct/INSTINCT.md`](filament-instinct/INSTINCT.md) | this repo, `filament-instinct/scripts/`, fetched and hash-checked by `poll.sh --install` | OAuth approval link (`poll.sh --login`), then, if the user agrees, the token is kept in the Instinct vault so a rebuild reconnects the same agent; a pasted connect token only as fallback |
 
 Agent-readable links to hand to an agent:
 
@@ -76,7 +78,7 @@ _TODO — one recipe per harness, all using the same endpoint and token_
 
 | Harness | Command / config |
 |---|---|
-| Claude Code | `claude mcp add --scope local --transport http filament https://api.filament.dm/mcp/agents --header "Authorization: Bearer fmcp_..."` |
+| Claude Code | see [`filament-claude-code/CLAUDE-CODE.md`](filament-claude-code/CLAUDE-CODE.md); the session itself is the agent, signed in with its own MCP OAuth and waiting for work on a token-free wake URL, with a user-level skill and a per-agent file so later sessions need nothing pasted |
 | Codex | _TODO_ |
 | Cursor / Claude Desktop | _TODO_ — JSON `mcpServers` block |
 | Hermes | see [`filament-hermes/HERMES.md`](filament-hermes/HERMES.md) |
