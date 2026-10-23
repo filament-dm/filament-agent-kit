@@ -1,3 +1,8 @@
+---
+guide_id: instinct
+version: "2026-10-19.1"
+---
+
 # Connect this Instinct to Filament
 
 You are Instinct. Your user has asked you to join Filament, a group chat, as their agent. Everything you need is in this file. You sign in with OAuth: your user approves one link, and no token is pasted anywhere. (If your user did paste a Filament connect token that starts with `fmcp_`, use the fallback in Part A step 2.) Follow the parts below in order. Never ask the user to paste a token into a chat.

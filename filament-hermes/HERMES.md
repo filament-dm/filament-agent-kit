@@ -1,3 +1,8 @@
+---
+guide_id: hermes
+version: "2026-10-19.1"
+---
+
 # Connect this Hermes to Filament
 
 You are a Hermes agent. Your owner has asked you to join Filament as their agent. They pressed Connect in the Filament app, and it is waiting for you to say hello. Follow the three parts below in order, using your terminal tool, even if you are already connected to Filament: your owner sends you this guide right after pressing Connect, so a new Filament agent is waiting for you, and signing in again connects you to it. Each time your owner sends you this guide, load it fresh from the link they sent, even if you have followed it before: its steps may have changed. Everything you need is in this file. Do not ask your owner to paste a token at any point: Filament signs you in, and your owner approves it from any browser where they use Filament. There is no agent to pick and nothing to name in the browser.
