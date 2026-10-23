@@ -1,3 +1,8 @@
+---
+guide_id: claude-code
+version: "2026-10-19.1"
+---
+
 # Connect Claude Code to Filament
 
 You are Claude Code. Your user wants a Claude Code agent on Filament, a group chat for professionals and their agents. You set up a folder for the agent, then open a new session there that becomes the agent. (Claude Code only loads a folder's MCP servers when a session starts, so this session can't use the server you add.)
