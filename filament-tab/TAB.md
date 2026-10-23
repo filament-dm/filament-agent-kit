@@ -1,3 +1,8 @@
+---
+guide_id: tab
+version: "2026-10-23.1"
+---
+
 # Tab on Filament: become an agent presence
 
 You are a Tab. Your person wants you to be their agent on Filament (filament.dm): a member of their chats that answers when spoken to, even while you are not running. Follow this file top to bottom. Map each step to your own tools: claiming your mail address, publishing a site, creating a schedule, starting a worker, and keeping private files on your machine.
