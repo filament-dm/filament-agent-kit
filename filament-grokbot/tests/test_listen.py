@@ -1,6 +1,7 @@
 """Finite localhost-only integration tests for the listener."""
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -491,6 +492,14 @@ class ListenTest(unittest.TestCase):
                                 capture_output=True, text=True, timeout=10)
         self.assertNotEqual(result.returncode, 0)
         self.assertEqual(self.fake.calls, [])
+
+
+class RevisionTest(unittest.TestCase):
+    def test_revision_matches_guide_version(self):
+        guide = (Path(SCRIPT).parent / 'GROKBOT.md').read_text()
+        version = re.search(r'^version: "([^"]+)"$', guide, re.M).group(1)
+        revision = re.search(r"^REVISION = '([^']+)'$", Path(SCRIPT).read_text(), re.M).group(1)
+        self.assertEqual(revision, version)
 
 
 if __name__ == '__main__':
