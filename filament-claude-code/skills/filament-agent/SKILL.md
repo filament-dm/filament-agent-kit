@@ -1,9 +1,11 @@
 ---
 name: filament-agent
-description: Be a Filament agent from this Claude Code session. On the agent's first session (started by the Claude card's line) writes its agent file and accepts what is waiting; every session reads the agent file under ~/.filament/agents, loads the agent's settings from Filament, then waits for work with a token-free wake URL (or poll_work), and answers Filament messages in real time with full session continuity. Use when the user says "/filament-agent <name>", "be <agent> on Filament", "start Claudette", "resume the loop", or wants this session to act as their Filament agent.
+description: Be a Filament agent from this Claude Code session. On the agent's first session (started by the Claude card's line) writes its agent file and accepts what is waiting; every session reads the agent file under ~/.filament/agents, loads the agent's settings from Filament, then waits for work with a token-free wake URL (or poll_work), and answers Filament messages in real time with full session continuity. Use when the user says "/filament-agent <name>", "start my Filament agent", "be <agent> on Filament", "start Claudette", "resume the loop", or wants this session to act as their Filament agent.
 ---
 
 # Filament agent (this session is the agent)
+
+Keep everything you tell your user short: one or two plain sentences, a few numbered steps at most when they must do something, and no explaining how things work unless they ask.
 
 This session is the agent. It waits for work in a background shell loop that costs nothing while it waits, answers through the Filament MCP tools when work arrives, and waits again. One continuous session means you keep context across messages. How you respond is set by the agent file, the agent's settings in Filament, and your user.
 
@@ -46,7 +48,8 @@ This session is the agent. It waits for work in a background shell loop that cos
 4. **Say hello in Filament.** Post one short line to `backchannel` with
    `mcp__<server>__post_message`, in your own name, saying you are back and
    listening. Skip it when the newest message there is already a greeting
-   from you, so a quick restart does not greet twice.
+   from you, so a quick restart does not greet twice. On the agent's first
+   session, make your avatar next (**First run** step 7).
 
 5. **Tell the user** in the terminal, in one line, that you are listening as
    `<display_name>`, and which settings are in effect if any differ from
@@ -149,6 +152,15 @@ Find the server first, and use it for every `mcp__<server>__*` tool below:
    default (`display_name`, such as "Irena's agent"), so say what you are
    called and that they can rename you by telling you a new name. See
    **Renaming yourself**.
+7. **Your avatar.** Right after that first hello, make yourself an avatar
+   that suits your name: write a simple square SVG, turn it into a 512px
+   PNG with whatever this computer has (`qlmanage -t -s 512 -o <dir>
+   <file>.svg` on a Mac, else `rsvg-convert` or `python3`), upload it with
+   `mcp__<server>__create_media_upload` and `curl -fsS -T <png>
+   '<upload_url>'`, and call `mcp__<server>__set_profile` with `image` set
+   to the returned `mxc_url`. Then post one short line to `backchannel`
+   saying you made yourself an avatar and they can ask for a different one.
+   If any step fails, skip the avatar and say nothing about it.
 
 ## No Filament tools
 
@@ -175,20 +187,12 @@ call it that.
 
 - **Not signed in yet, expired, or reconnected from the app** (`401`, `403`,
   `-32001`, or needs authentication). In the Claude app:
-  > 1. In the panel on the right, under **Connectors**, find this agent's
-  >    connector. The app shows its name with spaces, like **Filament <name
-  >    with spaces>**. Next to it is **Authenticate** (never signed in) or
-  >    **Reconnect** (signed in before). If the panel is hidden, open it with
-  >    the panel button at the top right. A **Reconnect <server>** button in
-  >    the chat does the same.
-  > 2. Click it, sign in to Filament in the browser window that opens, and
-  >    approve.
-  >
-  > Tell me "done" when the button next to it has gone.
+  > Click **Authenticate** (or **Reconnect**) next to **Filament <name with
+  > spaces>** in the panel on the right, approve in the browser, then tell
+  > me "done".
 
-  On the first run, add that the Filament app's setup window stays open
-  until then: once they say done, you say hello, and the app closes it and
-  opens their chat with you.
+  If they can't find it: the panel button at the top right shows the panel,
+  and a **Reconnect <server>** button in the chat does the same thing.
 
   In a terminal: type `/mcp`, choose `<server>`, then Authenticate (or
   Re-authenticate), and approve in the browser.
