@@ -28,7 +28,7 @@ This design has been measured on Instinct: about five seconds from message to re
 ```sh
 mkdir -p ~/.filament && cd ~/.filament
 curl -sSfL -o poll.sh https://raw.githubusercontent.com/filament-dm/filament-agent-kit/main/filament-instinct/poll.sh
-sha256sum poll.sh   # must print b941d7fb7539ad1b3bef644f4bbc3795c23c6c0e1e19f556ff39c39ccc212527
+sha256sum poll.sh   # must print 96f3998ba959e3ae58c32fee50a101d260d1fcbdb161e922958abc9ddb9d4d41
 bash poll.sh --install
 ```
 
