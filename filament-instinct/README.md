@@ -50,7 +50,7 @@ Replies use stdin verbatim as UTF-8, stripping trailing LF characters as the har
 
 | Command | Output and exit status |
 | --- | --- |
-| Listener | Final line `run complete: WORK`, `HANDOFF` or `NO_WORK`: 0; `AUTH_FAILED`/`AGENT_RESERVED`: 2; `TOKEN_DEAD`, `LOCK_ALIVE`, `BATCH_IN_HAND`, startup `BACKOFF` or `BAD_BUDGET`: 3. A poll transport/tool failure prints `BACKOFF` and exits 0 after recording its deadline. |
+| Listener | Final line `run complete: WORK`, `HANDOFF` or `NO_WORK`: 0; `AUTH_FAILED`/`AGENT_RESERVED`: 2; `TOKEN_DEAD`, `LOCK_ALIVE`, `BATCH_IN_HAND`, startup `BACKOFF` or `BAD_BUDGET`: 3. A poll transport/tool failure is retried in the same run, waiting 1, 2, 4… seconds up to 30, and logged as `RETRY`. |
 | Plain wrapper | `STARTED`, `LISTENING age=...`, `BATCH_IN_HAND ...`, `BACKOFF ...`, `TOKEN_DEAD auth`, `AGENT_RESERVED` or the complete claimed batch: 0. It may also print `FAILED_UNNOTIFIED n`. |
 | Commit | `COMMITTED` then plain-path output: 0; `NOTHING_TO_COMMIT`: 0; `UNHANDLED n=...`: 1; `STALE_BATCH`: 2. |
 | Reply/ack | `sent <id or unknown>`, `landed <id>`, `already recorded`, `already answered`, `ACK-QUEUED`: 0; `FAILED ...`: 1; `BAD_ITEM`, `EMPTY_BODY`, `STALE_BATCH`: 2. |
