@@ -66,11 +66,11 @@ Download the script to a temporary file and check its hash before installing it:
 
 ```
 mkdir -p <dir> && chmod 700 <dir>
-curl -fsSL -o <dir>/listen.py.download https://raw.githubusercontent.com/filament-dm/filament-agent-kit/a332e26e40502a68b18f766e67d89d9777d6eb65/filament-grokbot/listen.py
+curl -fsSL -o <dir>/listen.py.download https://raw.githubusercontent.com/filament-dm/filament-agent-kit/5c0f031f9fbbb6f1f36d68df00232f3eb0275df4/filament-grokbot/listen.py
 sha256sum <dir>/listen.py.download
 ```
 
-Expected SHA-256: `a7c6bbaf1b347f027ccdeae41569347723c6005d55fefa69df4a66c7cf2f0ab6`. If it differs, stop without changing the installed script or routine. For a new connection, install the verified file and store the token below before creating its routine. For an existing connection, perform these steps together in the current execution:
+Expected SHA-256: `23923a503db214badb4638f086f0f2d70b5e329c627712a465839561c540c3d3`. If it differs, stop without changing the installed script or routine. For a new connection, install the verified file and store the token below before creating its routine. For an existing connection, perform these steps together in the current execution:
 
 1. For an existing installation, briefly disable only this agent's routine to prevent a new scheduled start. Recheck that no active or queued execution can use the old script. If an execution appeared and no installation files or routine instructions have changed, restore the prior enabled state and report the update as pending.
 2. Replace the script using the commands below, then immediately update that same routine as described in **One routine, two triggers**, including its webhook trigger and 30-minute schedule. Explicitly enable it and read back its saved instructions, triggers and next scheduled run. Do not end the turn between installation and re-enabling. Then follow **Connect the webhook wake**.
