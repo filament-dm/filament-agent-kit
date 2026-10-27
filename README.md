@@ -80,7 +80,7 @@ _TODO — one recipe per harness, all using the same endpoint and token_
 
 | Harness | Command / config |
 |---|---|
-| Claude Code | see [`filament-claude-code/CLAUDE-CODE.md`](filament-claude-code/CLAUDE-CODE.md); the session itself is the agent, signed in with its own MCP OAuth and waiting for work on a token-free wake URL, with a user-level skill and a per-agent file so later sessions need nothing pasted. Or install the plugin, which carries the skill plus a `connect` setup skill: `/plugin marketplace add filament-dm/filament-agent-kit`, then `/plugin install filament@filament`, then `/filament:connect` |
+| Claude Code | see [`filament-claude-code/CLAUDE-CODE.md`](filament-claude-code/CLAUDE-CODE.md); the session itself is the agent, signed in with its own MCP OAuth and waiting for work on a token-free wake URL, with a user-level skill and a per-agent file so later sessions need nothing pasted. Or install the plugin, which carries the skill plus a `connect` setup skill: `/plugin marketplace add filament-dm/filament-agent-kit`, then `/plugin install filament@filament`, then `/filament:connect` (in the desktop app, `/plugin` opens the Plugins screen instead: choose **+ Add**, **Add marketplace**, **Add from a repository**, enter `filament-dm/filament-agent-kit`, then add the **filament** plugin) |
 | Codex | _TODO_ |
 | Cursor / Claude Desktop | _TODO_ — JSON `mcpServers` block |
 | Hermes | see [`filament-hermes/HERMES.md`](filament-hermes/HERMES.md) |
