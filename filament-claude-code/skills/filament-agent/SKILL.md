@@ -43,13 +43,20 @@ This session is the agent. It waits for work in a background shell loop that cos
 3. **Settings.** Call `mcp__<server>__get_settings`. Each field is a promise
    to your user; follow the values in everything you do this session. If the
    agent file lists settings to declare and `get_settings` lacks them, declare
-   them now with `declare_settings`.
+   them now with `declare_settings`. If the server has no `get_settings`
+   tool, it has no settings yet: skip this step.
 
-4. **Say hello in Filament.** Post one short line to `backchannel` with
-   `mcp__<server>__post_message`, in your own name, saying you are back and
-   listening. Skip it when the newest message there is already a greeting
-   from you, so a quick restart does not greet twice. On the agent's first
-   session, make your avatar next (**First run** step 7).
+4. **Say hello in Filament.** Your user may have written to you while you
+   were setting up, so first call `poll_work` with `wait_seconds` 0. If it
+   holds a backchannel message, answer that message instead of posting a
+   separate hello: say you are back (or connected) and listening, and answer
+   what they wrote, in one reply through its `reply_with`. Handle any other
+   items as in **Items**, and keep the `cursor` for **The loop**. Otherwise
+   post one short line to `backchannel` with `mcp__<server>__post_message`,
+   in your own name, saying you are back and listening. Skip the hello when
+   the newest message there is already a greeting from you, so a quick
+   restart does not greet twice. On the agent's first session, make your
+   avatar next (**First run** step 7).
 
 5. **Tell the user** in the terminal, in one line, that you are listening as
    `<display_name>`, and which settings are in effect if any differ from
@@ -80,6 +87,11 @@ Find the server first, and use it for every `mcp__<server>__*` tool below:
 1. **Who you are.** Load `mcp__<server>__get_self` (step 2's ToolSearch note
    applies) and call it. Remember `user_id`, `owner_id` and `display_name`.
    Call `mcp__<server>__get_backchannel` and remember `cc_room_id`.
+   Your user may already be looking at that chat and waiting for you, so
+   from here until your hello, show what you are doing there: call
+   `set_status` with `channel` = `cc_room_id` and a line such as
+   `Setting up: writing my agent file…`, and update it at each step below
+   (see **Show what you are doing**). The hello clears it.
    - No `mcp__<server>__*` tools, or they need signing in: see
      **No Filament tools**.
    - `-32002`: the user has not finished naming the agent in the app. Tell
@@ -195,7 +207,9 @@ call it that.
   and a **Reconnect <server>** button in the chat does the same thing.
 
   In a terminal: type `/mcp`, choose `<server>`, then Authenticate (or
-  Re-authenticate), and approve in the browser.
+  Re-authenticate), and approve in the browser. On the first run, end with
+  one line saying that once they are signed in, you will greet them in
+  Filament and talk to them there from then on.
 - **Switching this folder to another agent** (the folder is signed in as an
   earlier one): type `/mcp`, choose `<server>`, clear its authentication,
   then Authenticate again; the browser asks which agent to sign in as, which
