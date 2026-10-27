@@ -27,6 +27,8 @@ class Fake:
     def __init__(self):
         self.queue, self.calls = [], []
         self.events, self.event_calls = [], []
+        # Read tools answer from here, by tool name; missing means empty.
+        self.reads, self.read_calls = {}, []
         self.lock = threading.Lock()
         self.stopped = False
         fake = self
@@ -47,6 +49,23 @@ class Fake:
                     else:
                         reply['result'] = {'id': 'sub_1', 'refreshBefore': '2026-10-29T00:00:00.000Z'}
                     raw = json.dumps(reply).encode()
+                    self.send_response(200)
+                    self.send_header('Content-Type', 'application/json')
+                    self.send_header('Content-Length', str(len(raw)))
+                    self.end_headers()
+                    self.wfile.write(raw)
+                    return
+                name = body['params'].get('name')
+                if name in ('get_recent_messages', 'get_thread'):
+                    with fake.lock:
+                        fake.read_calls.append({'name': name, 'args': body['params']['arguments']})
+                        step = fake.reads.get(name, {'messages': []} if name == 'get_recent_messages'
+                                              else {'root': None, 'replies': []})
+                    if step == 'error':
+                        result = {'isError': True, 'content': [{'type': 'text', 'text': 'denied'}]}
+                    else:
+                        result = {'content': [{'type': 'text', 'text': json.dumps(step)}]}
+                    raw = json.dumps({'jsonrpc': '2.0', 'id': 1, 'result': result}).encode()
                     self.send_response(200)
                     self.send_header('Content-Type', 'application/json')
                     self.send_header('Content-Length', str(len(raw)))
@@ -587,6 +606,56 @@ class ListenTest(unittest.TestCase):
         self.assertEqual(self.fake.event_calls[-1]['method'], 'events/unsubscribe')
         self.assertNotIn('bearer', self.fake.event_calls[-1]['params']['delivery'])
         self.assertFalse((self.state / 'wake.json').exists())
+
+    def row(self, event, at, **flags):
+        return dict({'event_id': event, 'sender': '@u:test', 'body': 'text ' + event, 'timestamp': at,
+                     'is_from_self': False, 'is_from_principal': True, 'reactions': [], 'mentioned_users': []},
+                    **flags)
+
+    def test_work_carries_the_earlier_conversation(self):
+        new = item('e3')
+        new['messages'][0]['timestamp'] = 3000
+        self.fake.reads['get_recent_messages'] = {'messages': [
+            self.row('e1', 1000), self.row('e2', 2000, sender='@bot:test', is_from_self=True,
+                                            is_from_principal=False),
+            self.row('e3', 3000)]}
+        self.fake.queue = [{'work': [new]}]
+        output = self.run_script('--check', '1')
+        context = self.body(output)['work'][0]['context']
+        self.assertIn('never answer or acknowledge', context['note'])
+        self.assertEqual(context['messages'], [
+            {'sender': '@u:test', 'body': 'text e1', 'timestamp': 1000, 'is_from_self': False, 'is_from_principal': True},
+            {'sender': '@bot:test', 'body': 'text e2', 'timestamp': 2000, 'is_from_self': True, 'is_from_principal': False}])
+        self.assertEqual(self.fake.read_calls, [{'name': 'get_recent_messages',
+                                                 'args': {'channel': '!room:test', 'limit': 11}}])
+        self.assertEqual(self.state_data()['pending']['work'][0]['context'], context)
+
+    def test_thread_context_keeps_its_root(self):
+        new = item('r13')
+        new['thread_id'] = 'root'
+        new['messages'][0]['timestamp'] = 13
+        self.fake.reads['get_thread'] = {'root': self.row('root', 0), 'replies': [
+            self.row('r%d' % n, n) for n in range(1, 14)]}
+        self.fake.queue = [{'work': [new]}]
+        context = self.body(self.run_script('--check', '1'))['work'][0]['context']
+        self.assertEqual([m['body'] for m in context['messages']],
+                         ['text root'] + ['text r%d' % n for n in range(4, 13)])
+        self.assertEqual(self.fake.read_calls, [{'name': 'get_thread', 'args': {'message_id': 'root'}}])
+
+    def test_unreadable_history_still_delivers_the_work(self):
+        self.fake.reads['get_recent_messages'] = 'error'
+        batch = self.work('e1')
+        self.assertNotIn('context', batch['work'][0])
+        self.assertEqual(len(self.fake.read_calls), 1)
+
+    def test_context_from_the_server_is_left_alone(self):
+        new = item('e1')
+        new['context'] = {'messages': []}
+        self.fake.queue = [{'work': [new, {'kind': 'reaction', 'channel_id': '!room:test'}]}]
+        batch = self.body(self.run_script('--check', '1'))
+        self.assertEqual(batch['work'][0]['context'], {'messages': []})
+        self.assertNotIn('context', batch['work'][1])
+        self.assertEqual(self.fake.read_calls, [])
 
 
 class RevisionTest(unittest.TestCase):

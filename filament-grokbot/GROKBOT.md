@@ -1,6 +1,6 @@
 ---
 guide_id: grokbot
-version: "2026-10-27.1"
+version: "2026-10-28.1"
 ---
 
 # Connect this Grok bot to Filament
@@ -101,7 +101,7 @@ Run `python3 <dir>/listen.py` as one foreground shell call and wait for its resu
 
 | First line | Meaning and next action |
 | --- | --- |
-| `WORK n` | The next line is JSON with `batch_id`, `session_id` and `work`. Handle the items below. Once every item is handled, run `python3 <dir>/listen.py --done <batch_id>`, adding `--ack <event_id>,<event_id>` only for deliberately skipped messages from that batch. Copy IDs exactly. That call keeps listening for follow-ups and returns the next result. |
+| `WORK n` | The next line is JSON with `batch_id`, `session_id` and `work`. An item may carry `context`: earlier messages of that conversation, including your own replies, already handled. Use them to understand the new messages; never answer or acknowledge them. Handle the items below. Once every item is handled, run `python3 <dir>/listen.py --done <batch_id>`, adding `--ack <event_id>,<event_id>` only for deliberately skipped messages from that batch. Copy IDs exactly. That call keeps listening for follow-ups and returns the next result. |
 | `RECOVER n` | Work that an earlier execution received at least 50 minutes ago and never completed. The JSON is shaped like `WORK` plus `received_at` (Unix seconds). Follow **Recover unfinished work**, then run `--done` with the **new** `batch_id`. |
 | `AGAIN` | Continue the session named in the JSON: `python3 <dir>/listen.py --again <session_id>`. |
 | `END` | The check or the follow-up window ended. It does not say whether earlier work was answered or skipped. End the routine. |

@@ -26,7 +26,7 @@ import urllib.request
 import uuid
 
 # The guide version in GROKBOT.md; bump both together.
-REVISION = '2026-10-27.1'
+REVISION = '2026-10-28.1'
 STATE = os.environ.get('FM_STATE') or os.path.dirname(os.path.abspath(__file__))
 DEFAULT_ENDPOINT = 'https://api.filament.dm/mcp/agents'
 POLL_WAIT = 60
@@ -42,6 +42,14 @@ WAKE_KEY = re.compile(r'[A-Za-z0-9._~+/=-]{1,512}')
 WAKE_REFRESH_AFTER = int(os.environ.get('FM_WAKE_REFRESH_AFTER', '86400'))
 BACKOFF_CAP = 600
 LOG_LIMIT = 512 * 1024
+# A fresh run sees no earlier turns, so each work item carries the last few.
+# poll_work does not deliver them yet; an item that already has context keeps it.
+CONTEXT_MESSAGES = 10
+CONTEXT_ITEMS = 5
+CONTEXT_BUDGET = 20
+CONTEXT_FIELDS = ('sender', 'body', 'timestamp', 'is_from_self', 'is_from_principal', 'has_media')
+CONTEXT_NOTE = ('Earlier messages in this conversation, oldest first, including your own replies. '
+                'They were already handled: read them for context only; never answer or acknowledge them.')
 
 
 class AuthFailed(Exception):
@@ -333,6 +341,62 @@ def poll(cursor, acks, wait, timeout):
         raise Transient('invalid response body')
 
 
+def read_tool(name, args, timeout):
+    """A read-only tool call; returns its decoded result, or None."""
+    reply = rpc('tools/call', {'name': name, 'arguments': args}, timeout)
+    result = reply.get('result') if isinstance(reply, dict) else None
+    if not isinstance(result, dict) or result.get('isError'):
+        return None
+    try:
+        data = json.loads(result['content'][0]['text'])
+    except (ValueError, KeyError, IndexError, TypeError):
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def earlier(item, timeout):
+    """The messages before an item's new ones, trimmed; None when unreadable."""
+    new = [m for m in item.get('messages') or [] if isinstance(m, dict)]
+    ids = {m.get('event_id') for m in new}
+    first = min((m['timestamp'] for m in new if number(m.get('timestamp'))), default=None)
+    thread = item.get('thread_id')
+    if isinstance(thread, str) and thread:
+        data = read_tool('get_thread', {'message_id': thread}, timeout)
+        rows = data and [data.get('root')] + list(data.get('replies') or [])
+    else:
+        limit = min(200, CONTEXT_MESSAGES + len(new))
+        data = read_tool('get_recent_messages', {'channel': item['channel_id'], 'limit': limit}, timeout)
+        rows = data and data.get('messages')
+    if not isinstance(rows, list):
+        return None
+    rows = [r for r in rows if isinstance(r, dict) and r.get('event_id') not in ids
+            and (first is None or not number(r.get('timestamp')) or r['timestamp'] < first)]
+    # A thread's root says what the thread is about; keep it ahead of the tail.
+    if rows and rows[0].get('event_id') == thread:
+        rows = rows[:1] + rows[1:][-(CONTEXT_MESSAGES - 1):]
+    else:
+        rows = rows[-CONTEXT_MESSAGES:]
+    return [{k: r[k] for k in CONTEXT_FIELDS if k in r} for r in rows]
+
+
+def add_context(work, call_id):
+    """Best effort: a failed read leaves the item without context, never blocks it."""
+    deadline = time.monotonic() + CONTEXT_BUDGET
+    items = [i for i in work if i.get('kind') == 'message' and isinstance(i.get('channel_id'), str)
+             and 'context' not in i]
+    for item in items[:CONTEXT_ITEMS]:
+        remaining = deadline - time.monotonic()
+        if remaining <= 1:
+            break
+        try:
+            rows = earlier(item, min(10, remaining))
+        except (AuthFailed, Transient) as exc:
+            event('CONTEXT_FAILED', call_id=call_id, reason=str(exc))
+            break
+        if rows:
+            item['context'] = {'note': CONTEXT_NOTE, 'messages': rows}
+
+
 def load_wake():
     raw = read('wake.json')
     if raw is None:
@@ -504,6 +568,8 @@ def listen(state, budget, session_max, call_id, metrics):
                                 'created_at': time.time(), 'work': work}
             # Cursor and payload are one atomic commit. No later run may poll
             # until --done names this batch, even if its owner disappeared.
+            save(state)
+            add_context(state['pending']['work'], call_id)
             save(state)
             return work_result(state['pending'])
         state['counts']['empty'] += 1
