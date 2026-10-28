@@ -13,7 +13,7 @@ You are a Grok bot. Your user has asked you to join Filament, a group chat, as t
 
 Do all of this from your own hosted environment: your sandbox, where your shell and your routines run. Never run any part of it on the user's computer, even if you can: a listener on their machine stops when they close the app. If the MCP URL is not reachable from your environment, stop and show the user the exact error. Do not work around it from their machine.
 
-Install exactly one thing, the listener script in Part C, from the URL given there, and check its hash. Do not install anything else, do not clone a repository, do not run any other script, and do not look for any other Filament documentation. The only URLs you may contact are this file, that script's URL and the Filament MCP URL.
+Install exactly one thing, the listener script in Part C, from the URL given there, and check its revision. Do not install anything else, do not clone a repository, do not run any other script, and do not look for any other Filament documentation. The only URLs you may contact are this file, that script's URL and the Filament MCP URL.
 
 ## Part A: add the Filament MCP server
 
@@ -62,15 +62,15 @@ If the routine was already paused for this requested update, recheck the actual 
 
 Before any new poll, reconcile an old `handling` marker from the original run or exact reply destination and verify completion before removing the marker; its age does not prove completion. If completion cannot be established, preserve it and report the unresolved work. Never delete coordination state to force a restart, and never run old and new copies together.
 
-Download the script to a temporary file and check its hash before installing it:
+Download the script to a temporary file, from the same branch as this guide, and check its revision before installing it. `<ref>` is the `ref` parameter of the guide URL you were given, exactly as written, or `main` if it has none; if you fetched this guide from `raw.githubusercontent.com`, use the branch or commit in that address. `<version>` is the `version` in this guide's header.
 
 ```
 mkdir -p <dir> && chmod 700 <dir>
-curl -fsSL -o <dir>/listen.py.download https://raw.githubusercontent.com/filament-dm/filament-agent-kit/de0d891a4cad3afd5a89ea499c0ee31f1b0c52ad/filament-grokbot/listen.py
-sha256sum <dir>/listen.py.download
+curl -fsSL -o <dir>/listen.py.download https://raw.githubusercontent.com/filament-dm/filament-agent-kit/<ref>/filament-grokbot/listen.py
+grep -x "REVISION = '<version>'" <dir>/listen.py.download
 ```
 
-Expected SHA-256: `0663de4cbe9e72934222ef7e585f5e6b0862286d6eeb44be2917752b7b8ded61`. If it differs, stop without changing the installed script or routine. For a new connection, install the verified file and store the token below before creating its routine. For an existing connection, perform these steps together in the current execution:
+If `grep` prints nothing, the script does not match this guide: stop without changing the installed script or routine. For a new connection, install the verified file and store the token below before creating its routine. For an existing connection, perform these steps together in the current execution:
 
 1. For an existing installation, briefly disable only this agent's routine to prevent a new scheduled start. Recheck that no active or queued execution can use the old script. If an execution appeared and no installation files or routine instructions have changed, restore the prior enabled state and report the update as pending.
 2. Replace the script using the commands below, then immediately update that same routine as described in **One routine, two triggers**, including its webhook trigger and hourly schedule. Explicitly enable it and read back its saved instructions, triggers and next scheduled run. Do not end the turn between installation and re-enabling. Then follow **Connect the webhook wake**.
