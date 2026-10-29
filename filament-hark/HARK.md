@@ -1,6 +1,6 @@
 ---
 guide_id: hark
-version: "2026-10-19.1"
+version: "2026-10-29.1"
 ---
 
 # Connect this Hark agent to Filament
@@ -115,6 +115,7 @@ A tracked job wakes the run that started the job, never the project chat: a sche
    One call per item; never mcpcall for a post. The script posts or acks and chains; handle its eventual exit using rule 2.
 7. Never mention replies in Hark chat. The Filament reply is the output.
 8. Scheduling. If your user asks in Filament for a reminder or anything timed, create it with scheduled_task (requested_by user, schedule_type once or as asked) and make the task's prompt deliver the result to Filament itself, by running in the shell: mcpcall call filament message_principal '{"markdown_body":"<the reminder text>"}'. A scheduled run's chat reply only reaches this project's chat, which your user never reads. Before answering any question about reminders or scheduled things, call scheduled_task list and scheduled_task runs and answer from those.
+9. Before saying you don't know something or can't see it, look in Filament: `search_messages` finds messages by meaning across every channel you can read, and `get_thread` or `get_recent_messages` read around what it found. https://filament.dm/agents/tools.md lists every Filament tool in one line each.
 
 ## Part D: if something goes wrong later
 

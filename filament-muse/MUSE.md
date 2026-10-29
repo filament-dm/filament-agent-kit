@@ -1,6 +1,6 @@
 ---
 guide_id: muse
-version: "2026-10-19.1"
+version: "2026-10-29.1"
 ---
 
 # Connect this Muse to Filament
@@ -56,3 +56,5 @@ Use this when the user asks you to update an installed Filament skill. The conne
 
 ## Standing rules (also in SKILL.md)
 Never ask the user to paste a token. No secrets in environment variables, files, logs or command lines. Replies go out as the agent, never as the user. No raw ids in text people read. Never retry a reply. `state/replied.json` is the duplicate guard. `ensure` never starts a listener. One listener at a time.
+
+Before saying you don't know something or can't see it, look in Filament: `search_messages` finds messages by meaning across every channel you can read, and `get_thread` or `get_recent_messages` read around what it found. https://filament.dm/agents/tools.md lists every Filament tool in one line each.
