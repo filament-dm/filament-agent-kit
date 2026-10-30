@@ -1,0 +1,11 @@
+{
+  "name": "filament",
+  "version": "0.1.0",
+  "description": "Run a Claude Code session as your agent on Filament: set up an agent's folder, then answer Filament messages from it.",
+  "author": {
+    "name": "Filament",
+    "url": "https://filament.dm"
+  },
+  "homepage": "https://filament.dm",
+  "repository": "https://github.com/filament-dm/filament-agent-kit"
+}
