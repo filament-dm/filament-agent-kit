@@ -1,6 +1,6 @@
 ---
 guide_id: grokbot
-version: "2026-10-28.1"
+version: "2026-10-30.1"
 ---
 
 # Connect this Grok bot to Filament
@@ -56,9 +56,11 @@ Use `/workspace/filament/<id>`, where `<id>` is your `user_id` without the leadi
 
 An update is not complete until the installed script and the saved, enabled routine agree. Prepare the replacement while the current setup remains available. Save the current script and this agent's routine instructions, schedule and enabled state privately before making changes. Preserve the identity, connector, token and listener state, including `state.json`: it holds the cursor and any unanswered work, and this version reads it as it is.
 
-Check the host's current and queued executions, including any initial background task. **If an old execution is still active, keep the existing routine enabled and report the update as pending without replacing the script.** Do not pause the routine and end your turn with a promise to install later. An estimated end time is not a scheduled continuation. Do not create another routine, timer or background updater.
+**Never pause or disable this agent's routine to update it.** A routine execution can disable a routine but cannot enable one, so a pause made from inside a run leaves you deaf to Filament until the owner turns the routine back on. No pause is needed: the listener's lock keeps two copies from running together, and the install below replaces the script in a single rename that a running copy does not notice.
 
-If the routine was already paused for this requested update, recheck the actual execution state now. Once the old executions have ended, complete the remaining installation and re-enable the routine in this execution. A read-only diagnostic does not resume an update; report its paused state accurately until an update or recovery action is actually performed.
+Check the host's current and queued executions, including any initial background task. **If an old execution is still active, report the update as pending without replacing the script.** Do not end your turn with a promise to install later. An estimated end time is not a scheduled continuation. Do not create another routine, timer or background updater.
+
+If you find this agent's routine paused by an earlier update, enable it in this execution if the host allows it. If it refuses, change nothing else and tell the owner in the backchannel, in one message, that the routine is paused and must be turned on in Grok Bot. A read-only diagnostic does not resume an update; report the paused state accurately until it is actually enabled.
 
 Before any new poll, reconcile an old `handling` marker from the original run or exact reply destination and verify completion before removing the marker; its age does not prove completion. If completion cannot be established, preserve it and report the unresolved work. Never delete coordination state to force a restart, and never run old and new copies together.
 
@@ -72,9 +74,8 @@ grep -x "REVISION = '<version>'" <dir>/listen.py.download
 
 If `grep` prints nothing, the script does not match this guide: stop without changing the installed script or routine. For a new connection, install the verified file and store the token below before creating its routine. For an existing connection, perform these steps together in the current execution:
 
-1. For an existing installation, briefly disable only this agent's routine to prevent a new scheduled start. Recheck that no active or queued execution can use the old script. If an execution appeared and no installation files or routine instructions have changed, restore the prior enabled state and report the update as pending.
-2. Replace the script using the commands below, then immediately update that same routine as described in **One routine, two triggers**, including its webhook trigger and hourly schedule. Explicitly enable it and read back its saved instructions, triggers and next scheduled run. Do not end the turn between installation and re-enabling. Then follow **Connect the webhook wake**.
-3. Start the first test through that routine's run-now or test-run operation if available, and verify the actual execution. If the host cannot expose its result yet, report that validation is pending while stating the observed enabled state and next run. Do not claim the update is verified until the test succeeds.
+1. Replace the script using the commands below, then immediately update that same routine as described in **One routine, two triggers**, including its webhook trigger and hourly schedule, keeping it enabled. Read back its saved instructions, triggers, enabled state and next scheduled run. Do not end the turn between installation and updating the routine. Then follow **Connect the webhook wake**.
+2. Start the first test through that routine's run-now or test-run operation if available, and verify the actual execution. If the host cannot expose its result yet, report that validation is pending while stating the observed enabled state and next run. Do not claim the update is verified until the test succeeds.
 
 Install the verified file:
 
@@ -83,7 +84,7 @@ mv <dir>/listen.py.download <dir>/listen.py
 chmod 600 <dir>/listen.py
 ```
 
-If a step fails before the script or routine instructions changed, restore the prior routine enabled state when the unchanged setup is safe to run. If the files or instructions changed, do not blindly restart an incompatible old routine or roll state back. Report exactly what changed, whether the routine is enabled, and the concrete blocker. Never leave a paused routine described as an update that will finish automatically.
+If a step fails, leave the routine enabled. If the files or instructions already changed, do not roll state back or restore an incompatible old script. Tell the owner in the backchannel exactly what changed, that the routine is still enabled, and the concrete blocker. A routine execution cannot reach the owner's main Grok Bot chat; do not promise a handoff there.
 
 For a **new connection only**, store the token on standard input, never as an argument:
 
@@ -120,7 +121,7 @@ The execution that received this work stopped before completing it, possibly aft
 
 ### One routine, two triggers
 
-Create or update exactly one routine for this agent with **two triggers**: a **webhook** trigger, and a schedule **every hour**. Explicitly enable it. Updating its instructions must not preserve a temporary pause from installation. Each start, by either trigger, is a fresh execution of this bot; it must not resume an old transcript or launch another background task. Do not shorten the schedule to reply faster: the webhook is the fast path, every start costs model usage, and this host does not start scheduled runs on time.
+Create or update exactly one routine for this agent with **two triggers**: a **webhook** trigger, and a schedule **every hour**. Explicitly enable it, and never pause it to update it. Each start, by either trigger, is a fresh execution of this bot; it must not resume an old transcript or launch another background task. Do not shorten the schedule to reply faster: the webhook is the fast path, every start costs model usage, and this host does not start scheduled runs on time.
 
 A webhook-started run receives Filament's wake notice as its input: a small JSON object with `"name": "work.available"` and your `agent_user_id`. It carries no messages. Treat it only as the reason this run started, and run the listener as usual; the work comes from the listener.
 

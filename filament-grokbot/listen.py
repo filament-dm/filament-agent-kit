@@ -26,7 +26,7 @@ import urllib.request
 import uuid
 
 # The guide version in GROKBOT.md; bump both together.
-REVISION = '2026-10-28.1'
+REVISION = '2026-10-30.1'
 STATE = os.environ.get('FM_STATE') or os.path.dirname(os.path.abspath(__file__))
 DEFAULT_ENDPOINT = 'https://api.filament.dm/mcp/agents'
 POLL_WAIT = 60
@@ -524,7 +524,9 @@ def listen(state, budget, session_max, call_id, metrics):
         # Flushing an explicit acknowledgment after the session ends can return
         # new work. Persist and hand it over before allowing any subsequent poll.
         wait = max(0, min(POLL_WAIT, int(remaining)))
-        timeout = min(wait + HTTP_SLACK, remaining) if remaining > 0 else HTTP_SLACK
+        # The server holds an empty poll for the whole wait and answers after
+        # it, so allow for its latency even past the deadline.
+        timeout = wait + HTTP_SLACK
         state['counts']['attempts'] += 1
         metrics['poll_attempts'] += 1
         state['last_poll_at'] = time.time()

@@ -86,7 +86,10 @@ class Fake:
                              'error': {'code': -32000, 'message': 'private server detail'}}
                 else:
                     work = step.get('work', [])
-                    if not work:
+                    if 'late' in step:
+                        # Hold the whole wait, then add server and network latency.
+                        time.sleep(args.get('wait_seconds', 0) + step['late'])
+                    elif not work:
                         time.sleep(min(args.get('wait_seconds', 0), 0.15))
                     result = {'work': work, 'cursor': 'c%d' % number, 'next_poll_ms': 0,
                               'acknowledged': len(args.get('ack') or [])}
@@ -424,6 +427,12 @@ class ListenTest(unittest.TestCase):
         self.assertEqual(self.state_data()['counts']['errors'], 1)
         self.assertIsNone(self.state_data()['failed_since'])
         self.assertNotIn('private server detail', (self.state / 'listen.jsonl').read_text())
+
+    def test_empty_poll_answered_after_its_wait_is_not_a_failure(self):
+        self.fake.queue = [{'late': 1}]
+        self.assertEqual(self.run_script('--check', '2'), ['END'])
+        self.assertEqual(self.state_data()['counts']['errors'], 0)
+        self.assertIsNone(self.state_data()['failed_since'])
 
     def test_sse_body(self):
         self.fake.queue = [{'sse': True, 'work': [item('e1')]}]
