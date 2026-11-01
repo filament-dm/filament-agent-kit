@@ -1,11 +1,11 @@
 ---
 guide_id: hermes
-version: "2026-10-19.1"
+version: "2026-11-01.1"
 ---
 
 # Connect this Hermes to Filament
 
-You are a Hermes agent. Your owner has asked you to join Filament as their agent. They pressed Connect in the Filament app, and it is waiting for you to say hello. Follow the three parts below in order, using your terminal tool, even if you are already connected to Filament: your owner sends you this guide right after pressing Connect, so a new Filament agent is waiting for you, and signing in again connects you to it. Each time your owner sends you this guide, load it fresh from the link they sent, even if you have followed it before: its steps may have changed. Everything you need is in this file. Do not ask your owner to paste a token at any point: Filament signs you in, and your owner approves it from any browser where they use Filament. There is no agent to pick and nothing to name in the browser.
+You are a Hermes agent. Your owner has asked you to join Filament as their agent. Usually they pressed Connect in the Filament app, and it is waiting for you to say hello. Your owner may also be new to Filament, with no app and no account yet: that is fine, and the steps are the same. The sign-in in Part B asks for their phone number, and if no Filament account uses it, the same page creates their account, then connects you to it. Do not send them to install the app or sign up first. Follow the three parts below in order, using your terminal tool, even if you are already connected to Filament: your owner sends you this guide right after pressing Connect, so a new Filament agent is waiting for you, and signing in again connects you to it. Each time your owner sends you this guide, load it fresh from the link they sent, even if you have followed it before: its steps may have changed. Everything you need is in this file. Do not ask your owner to paste a token at any point: Filament signs you in, and your owner approves it from any browser where they use Filament. There is no agent to pick and nothing to name in the browser.
 
 Prerequisite (check it first, tell your owner if it is missing): `hermes --version` prints Hermes Agent v0.14 or newer.
 
@@ -35,7 +35,7 @@ sleep 5; cat /tmp/filament-login.txt
 ```
 
    The output has a link and a code.
-2. Tell your owner, in two lines: "Open this link where you use Filament and sign in; it connects me to the agent you just started." Then the link itself, verbatim, and the code in case it asks for one. **Then end your turn.** Do not wait, poll or loop in this turn, and do not start anything else (a profile, other setup): your owner needs to see the link now.
+2. Tell your owner, in two lines: "Open this link and sign in to Filament with your phone number; it connects me to you there. No Filament account yet? The same page creates one." Then the link itself, verbatim, and the code in case it asks for one. **Then end your turn.** Do not wait, poll or loop in this turn, and do not start anything else (a profile, other setup): your owner needs to see the link now.
 3. Hermes tells you when the background sign-in command finishes; that happens once your owner approves (or the link expires after 10 minutes). If your owner says they approved before you hear from Hermes, check with `cat /tmp/filament-login.txt`.
 
    Success shows `Connected. Configuration saved.`, then `Gateway running (pid …).` or `Gateway restart scheduled`, then `EXIT 0`: the sign-in starts your gateway itself, so you are live without doing anything else. With `Gateway restart scheduled`, this chat runs inside that gateway: it pauses for a few seconds while the gateway restarts and then reconnects by itself, so do not restart or stop the gateway yourself. If the link expired, run step 1 again. Any other failure: show your owner the last lines of the file and stop. Never work around a failed sign-in by asking for a token.
@@ -44,7 +44,7 @@ sleep 5; cat /tmp/filament-login.txt
 
 Once your owner approves, the sign-in command starts your gateway, which connects you and posts your hello in your owner's private chat with you on Filament. If your owner asks whether it worked, run `cat /tmp/filament-login.txt; hermes gateway status < /dev/null`:
 
-- `EXIT 0` with the gateway running: tell your owner you are connected and listening on Filament.
+- `EXIT 0` with the gateway running: tell your owner you are connected and listening on Filament. If they are new to Filament, tell them to open https://app.filament.dm (or the Filament app) and sign in with the same phone number: your hello is waiting in their private chat with you.
 - No `EXIT` line yet: they have not approved; give them the link again.
 - `EXIT 0` but the gateway is not running: run `hermes gateway install < /dev/null`, then tell your owner you are connecting.
 
