@@ -40,6 +40,8 @@ sleep 5; cat /tmp/filament-login.txt
 
    Success shows `Connected. Configuration saved.`, then `Gateway running (pid …).` or `Gateway restart scheduled`, then `EXIT 0`: the sign-in starts your gateway itself, so you are live without doing anything else. With `Gateway restart scheduled`, this chat runs inside that gateway: it pauses for a few seconds while the gateway restarts and then reconnects by itself, so do not restart or stop the gateway yourself. If the link expired, run step 1 again. Any other failure: show your owner the last lines of the file and stop. Never work around a failed sign-in by asking for a token.
 
+   When you hear it succeeded, tell your owner in one or two lines that you are connected and have said hello on Filament. If your owner is new to Filament (they had no account before this sign-in), also give them the link to the app: "Sign in at https://app.filament.dm with the same phone number to chat with me there."
+
 ## Part C: if your owner comes back to you
 
 Once your owner approves, the sign-in command starts your gateway, which connects you and posts your hello in your owner's private chat with you on Filament. If your owner asks whether it worked, run `cat /tmp/filament-login.txt; hermes gateway status < /dev/null`:
