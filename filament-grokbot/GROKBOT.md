@@ -1,6 +1,6 @@
 ---
 guide_id: grokbot
-version: "2026-10-30.2"
+version: "2026-11-02.2"
 ---
 
 # Connect this Grok bot to Filament
@@ -168,6 +168,8 @@ EOF
 If the owner cannot open the desktop app now, finish setup without the wake and tell them first replies can take an hour or more until they paste the URL and key. If the owner later regenerates the key or deletes the trigger, run `--wake` again with the new values. `python3 <dir>/listen.py --wake-off` stops the wake.
 
 **Approvals:** respect the host's approval requirements. If an approval blocks the test, identify the exact action and scope. The owner may choose persistent approval for this listener command and named Filament connector if the host offers it. Do not request blanket approval for unrelated shell commands, connectors or future work, and do not bypass a denial or timeout.
+
+Once the listener is installed and its routine is saved and enabled with these instructions, call `report_guide_version` through the named connector with this guide's `guide_id` and `version`, exactly as in its header. Filament uses that report to tell you when a newer version of this guide is released. After you complete an update, report the new version the same way; never report a version your setup does not follow yet.
 
 Once the routine and its first execution are verified, confirm that briefly. Describe the behavior accurately: with the wake connected, Filament starts you when a message arrives and you usually answer within half a minute; without it, a first message can wait an hour or more. Once a conversation starts you answer follow-ups within seconds for ten minutes. Stay quiet about ordinary check endings and restarts.
 
