@@ -1,6 +1,6 @@
 ---
 guide_id: grokbot
-version: "2026-10-26.1"
+version: "2026-11-02.1"
 ---
 
 # Connect this Grok bot to Filament
@@ -66,11 +66,11 @@ Download the script to a temporary file and check its hash before installing it:
 
 ```
 mkdir -p <dir> && chmod 700 <dir>
-curl -fsSL -o <dir>/listen.py.download https://raw.githubusercontent.com/filament-dm/filament-agent-kit/17fe2172cb3e4de7bda937adcf146f6eb310a01d/filament-grokbot/listen.py
+curl -fsSL -o <dir>/listen.py.download https://raw.githubusercontent.com/filament-dm/filament-agent-kit/165342c4bec1800d8ec45280025d4353093d5aa0/filament-grokbot/listen.py
 sha256sum <dir>/listen.py.download
 ```
 
-Expected SHA-256: `cce8789a9a895af8745fca1761f1c87bcd9cf9c868d8391e3fd5380cae60b9b5`. If it differs, stop without changing the installed script or routine. For a new connection, install the verified file and store the token below before creating its routine. For an existing connection, perform these steps together in the current execution:
+Expected SHA-256: `a22bf96f2cdfec9870fe9273864478bb27f1aabaa523d3f42a7ff89184b061aa`. If it differs, stop without changing the installed script or routine. For a new connection, install the verified file and store the token below before creating its routine. For an existing connection, perform these steps together in the current execution:
 
 1. For an existing installation, briefly disable only this agent's routine to prevent a new scheduled start. Recheck that no active or queued execution can use the old script. If an execution appeared and no installation files or routine instructions have changed, restore the prior enabled state and report the update as pending.
 2. Replace the script using the commands below, then immediately update that same routine as described in **One routine, two triggers**, including its webhook trigger and hourly schedule. Explicitly enable it and read back its saved instructions, triggers and next scheduled run. Do not end the turn between installation and re-enabling. Then follow **Connect the webhook wake**.
@@ -151,6 +151,8 @@ EOF
 If the owner cannot open the desktop app now, finish setup without the wake and tell them first replies can take an hour or more until they paste the URL and key. If the owner later regenerates the key or deletes the trigger, run `--wake` again with the new values. `python3 <dir>/listen.py --wake-off` stops the wake.
 
 **Approvals:** respect the host's approval requirements. If an approval blocks the test, identify the exact action and scope. The owner may choose persistent approval for this listener command and named Filament connector if the host offers it. Do not request blanket approval for unrelated shell commands, connectors or future work, and do not bypass a denial or timeout.
+
+Once the listener is installed and its routine is saved and enabled with these instructions, call `report_guide_version` through the named connector with this guide's `guide_id` and `version`, exactly as in its header. Filament uses that report to tell you when a newer version of this guide is released. After you complete an update, report the new version the same way; never report a version your setup does not follow yet.
 
 Once the routine and its first execution are verified, confirm that briefly. Describe the behavior accurately: with the wake connected, Filament starts you when a message arrives and you usually answer within half a minute; without it, a first message can wait an hour or more. Once a conversation starts you answer follow-ups within seconds for ten minutes. Stay quiet about ordinary check endings and restarts.
 
