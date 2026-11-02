@@ -2,12 +2,14 @@
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
 import threading
 import time
 import unittest
+import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
@@ -29,6 +31,9 @@ class Fake:
         self.events, self.event_calls = [], []
         # Read tools answer from here, by tool name; missing means empty.
         self.reads, self.read_calls = {}, []
+        # get_self and report_guide_version, and files served for --update.
+        self.guide = {'reported': None, 'update': None}
+        self.tool_calls, self.files = [], {}
         self.lock = threading.Lock()
         self.stopped = False
         fake = self
@@ -36,6 +41,18 @@ class Fake:
         class Handler(BaseHTTPRequestHandler):
             def log_message(self, *args):
                 pass
+
+            def reply(self, status, raw, kind='application/json'):
+                self.send_response(status)
+                self.send_header('Content-Type', kind)
+                self.send_header('Content-Length', str(len(raw)))
+                self.end_headers()
+                self.wfile.write(raw)
+
+            def do_GET(self):
+                url = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query).get('url', [''])[0]
+                text = fake.files.get(url)
+                self.reply(200 if text is not None else 404, (text or '').encode(), 'text/plain')
 
             def do_POST(self):
                 body = json.loads(self.rfile.read(int(self.headers['Content-Length'])))
@@ -56,6 +73,13 @@ class Fake:
                     self.wfile.write(raw)
                     return
                 name = body['params'].get('name')
+                if name in ('get_self', 'report_guide_version'):
+                    with fake.lock:
+                        fake.tool_calls.append({'name': name, 'args': body['params']['arguments']})
+                        data = {'guide': fake.guide} if name == 'get_self' else {'ok': True}
+                    result = {'content': [{'type': 'text', 'text': json.dumps(data)}]}
+                    self.reply(200, json.dumps({'jsonrpc': '2.0', 'id': 1, 'result': result}).encode())
+                    return
                 if name in ('get_recent_messages', 'get_thread'):
                     with fake.lock:
                         fake.read_calls.append({'name': name, 'args': body['params']['arguments']})
@@ -121,7 +145,7 @@ class Fake:
             self.thread.join(timeout=5)
 
 
-class ListenTest(unittest.TestCase):
+class ListenerCase(unittest.TestCase):
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory()
         self.state = Path(self.temporary.name)
@@ -172,6 +196,8 @@ class ListenTest(unittest.TestCase):
         self.assertEqual(output[0], 'WORK %d' % len(events))
         return self.body(output)
 
+
+class ListenTest(ListenerCase):
     def test_token_is_private(self):
         self.assertEqual((self.state / 'token').stat().st_mode & 0o777, 0o600)
         self.assertEqual((self.state / 'token').read_text(), TOKEN)
@@ -665,6 +691,140 @@ class ListenTest(unittest.TestCase):
         self.assertEqual(batch['work'][0]['context'], {'messages': []})
         self.assertNotIn('context', batch['work'][1])
         self.assertEqual(self.fake.read_calls, [])
+
+
+GUIDE = 'https://filament.dm/agents/grokbot.md?ref=pablo/next'
+NEW = '2099-01-01.1'
+
+
+def notice(event, version=NEW):
+    message = {'event_id': event, 'is_from_principal': True,
+               'body': 'Filament: your grokbot guide has a new version, %s. Update to it now:' % version}
+    return {'kind': 'message', 'channel_id': '!back:test', 'is_backchannel': True, 'messages': [message]}
+
+
+class UpdateTest(ListenerCase):
+    """--update replaces the script, so these run a copy of it."""
+
+    def setUp(self):
+        super().setUp()
+        self.script = self.state / 'listen.py'
+        shutil.copy(SCRIPT, self.script)
+        self.revision = re.search(r"^REVISION = '([^']+)'$", Path(SCRIPT).read_text(), re.M).group(1)
+        self.env['FM_FETCH_BASE'] = self.fake.url.replace('/mcp/agents', '/fetch')
+
+    def run_copy(self, *args):
+        result = subprocess.run([sys.executable, str(self.script)] + list(args), capture_output=True,
+                                text=True, env=self.env, timeout=30)
+        self.assertEqual(result.stderr, '', result.stderr)
+        return result.stdout.splitlines()
+
+    def release(self, version=NEW, script_version=None):
+        self.fake.guide = {'reported': None, 'update': {'version': version, 'url': GUIDE}}
+        self.fake.files[GUIDE] = '---\nguide_id: grokbot\nversion: "%s"\n---\n# GrokBot\n' % version
+        script = Path(SCRIPT).read_text().replace(
+            "REVISION = '%s'" % self.revision, "REVISION = '%s'" % (script_version or version))
+        self.fake.files['https://raw.githubusercontent.com/filament-dm/filament-agent-kit/pablo/next/'
+                        'filament-grokbot/listen.py'] = script
+
+    def reports(self):
+        return [c['args'] for c in self.fake.tool_calls if c['name'] == 'report_guide_version']
+
+    def offered(self, version=NEW):
+        # Already offered at start, so only a notice or the command offers it now.
+        (self.state / 'update.json').write_text(json.dumps({'offered': {version: time.time()}}))
+
+    def test_update_installs_reports_and_keeps_the_previous_script(self):
+        self.release()
+        self.assertEqual(self.run_copy('--update'), ['UPDATED %s' % NEW])
+        self.assertIn("REVISION = '%s'" % NEW, self.script.read_text())
+        self.assertIn("REVISION = '%s'" % self.revision, (self.state / 'listen.py.previous').read_text())
+        self.assertEqual(self.reports(), [{'guide_id': 'grokbot', 'version': NEW}])
+        self.assertEqual((self.state / 'guide_url').read_text().strip(), GUIDE)
+        # Nothing more to do: the same command is idempotent.
+        self.fake.guide = {'reported': None, 'update': None}
+        self.assertEqual(self.run_copy('--update'), ['CURRENT %s' % NEW])
+
+    def test_a_listener_that_does_not_match_the_guide_is_not_installed(self):
+        self.release(script_version='2099-01-01.2')
+        before = self.script.read_text()
+        output = self.run_copy('--update')
+        self.assertTrue(output[0].startswith('FAILED the listener does not match'), output)
+        self.assertEqual(self.script.read_text(), before)
+        self.assertEqual(self.reports(), [])
+
+    def test_an_update_never_moves_back(self):
+        self.release(version='2000-01-01.1')
+        self.assertEqual(self.run_copy('--update'), ['FAILED refusing to move back to 2000-01-01.1'])
+
+    def test_a_listener_that_cannot_read_the_state_is_not_installed(self):
+        self.release()
+        broken = self.fake.files['https://raw.githubusercontent.com/filament-dm/filament-agent-kit/pablo/next/'
+                                 'filament-grokbot/listen.py'].replace(
+            "        print(check_state())", "        print('STATE_ERROR changed format')")
+        self.fake.files['https://raw.githubusercontent.com/filament-dm/filament-agent-kit/pablo/next/'
+                        'filament-grokbot/listen.py'] = broken
+        before = self.script.read_text()
+        self.assertEqual(self.run_copy('--update'), ['FAILED the new listener cannot read this state'])
+        self.assertEqual(self.script.read_text(), before)
+        self.assertFalse((self.state / 'listen.py.download').exists())
+
+    def test_unfinished_work_is_finished_first(self):
+        self.work('e1')
+        self.release()
+        self.assertEqual(self.run_copy('--update'), ['NEEDS_RETRY unfinished work; finish it with --done first'])
+
+    def test_nothing_released_is_current(self):
+        self.assertEqual(self.run_copy('--update'), ['CURRENT %s' % self.revision])
+        self.assertEqual(self.reports(), [])
+
+    def test_the_notice_becomes_update_and_is_acknowledged(self):
+        self.release()
+        self.offered()
+        self.fake.queue = [{'work': [notice('n1')]}]
+        output = self.run_copy('--check', '1')
+        self.assertEqual(output[0], 'UPDATE')
+        self.assertEqual(self.body(output), {'version': NEW, 'asked_by_owner': False})
+        self.assertEqual(self.state_data()['acks'], ['n1'])
+        self.assertIsNone(self.state_data()['pending'])
+
+    def test_a_notice_with_other_work_hands_the_work_first(self):
+        self.release()
+        self.offered()
+        self.fake.queue = [{'work': [notice('n1'), item('e1')]}]
+        output = self.run_copy('--check', '1')
+        self.assertEqual(output[0], 'WORK 1')
+        batch = self.body(output)
+        self.assertEqual([m['event_id'] for m in batch['work'][0]['messages']], ['e1'])
+        # Once that work is done, the next result is the update.
+        output = self.run_copy('--done', batch['batch_id'], '--follow', '1')
+        self.assertEqual(output[0], 'UPDATE')
+        self.assertEqual(self.body(output), {'version': NEW, 'asked_by_owner': False})
+
+    def test_the_owner_command_asks_for_an_update(self):
+        command = item('c1')
+        command['messages'][0].update(body=' /filament update ', is_from_principal=True)
+        self.fake.queue = [{'work': [command]}]
+        output = self.run_copy('--check', '1')
+        self.assertEqual(output[0], 'UPDATE')
+        self.assertEqual(self.body(output), {'version': None, 'asked_by_owner': True})
+
+    def test_a_stranger_cannot_trigger_an_update(self):
+        command = item('c1')
+        command['messages'][0].update(body='/filament update', is_from_principal=False)
+        self.fake.queue = [{'work': [command]}]
+        self.assertEqual(self.run_copy('--check', '1')[0], 'WORK 1')
+
+    def test_a_start_offers_a_release_once_until_it_is_due_again(self):
+        self.release()
+        output = self.run_copy('--check', '1')
+        self.assertEqual(output[0], 'UPDATE')
+        self.assertEqual(self.run_copy('--check', '1')[0], 'END')
+
+    def test_check_state_reads_without_changing_anything(self):
+        self.assertEqual(self.run_copy('--check-state'), ['STATE_OK'])
+        (self.state / 'state.json').write_text('{')
+        self.assertTrue(self.run_copy('--check-state')[0].startswith('STATE_ERROR'))
 
 
 class RevisionTest(unittest.TestCase):
