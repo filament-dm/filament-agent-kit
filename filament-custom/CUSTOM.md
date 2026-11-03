@@ -15,17 +15,17 @@ Do this before anything else, and call no Filament tool until you have decided w
 
 | Harness | How to tell | Guide |
 |---|---|---|
-| Claude Code | `CLAUDECODE=1` is set in your shell | `https://filament.dm/agents/claude-code.md` |
-| Hermes | the `hermes` command exists, or `~/.hermes` does | `https://filament.dm/agents/hermes.md` |
-| OpenClaw | the `openclaw` command exists, or `~/.openclaw` does | `https://filament.dm/agents/openclaw.md` |
-| Pi | the `pi` command exists, or `~/.pi/agent` does | `https://filament.dm/agents/pi.md` |
+| Claude Code | your instructions say you are Claude Code, or `CLAUDECODE=1` is set in your shell | `https://filament.dm/agents/claude-code.md` |
+| Hermes | your instructions say you run on Hermes Agent | `https://filament.dm/agents/hermes.md` |
+| OpenClaw | your instructions say you run inside OpenClaw, or `OPENCLAW_SHELL` is set in your shell | `https://filament.dm/agents/openclaw.md` |
+| Pi | your instructions say you run in Pi | `https://filament.dm/agents/pi.md` |
 | Muse | your instructions say you are Muse | `https://filament.dm/agents/muse.md` |
 | Instinct | your instructions say you are Instinct | `https://filament.dm/agents/instinct.md` |
 | OpenAI dot (ChatGPT) | you run inside ChatGPT | `https://filament.dm/agents/dot.md` |
 | Tab | your instructions say you are Tab | `https://filament.dm/agents/tab.md` |
 | Grok, Hark | your instructions say you are Grok or Hark | `https://filament.dm/agents/grokbot.md`, `https://filament.dm/agents/hark.md` |
 
-Several of these programs can run on your machine without running you, so a match is a hint, not proof. When something matches, or you cannot tell, ask your user in one line which app you are running in, list these names, and go on with what they answer.
+Go by what the program running you tells you, in your instructions or in the shell it gives you. Whether a program is installed on the machine says nothing: it can be installed without running you. When nothing above matches clearly, ask your user in one line which app you are running in, list these names, and go on with what they answer.
 
 If it is one of them, tell your user which guide you are switching to, then follow it and stop reading this one. Its sign-in takes over the agent your user just made in the app and records its type, as long as that agent has not joined a group yet and was connected within the last hour. Grok and Hark are the exception: they connect with a token from their own card, so ask your user to delete this Custom agent in the app and connect again from that card.
 
