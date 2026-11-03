@@ -806,7 +806,8 @@ class UpdateTest(ListenerCase):
         self.fake.queue = [{'work': [command]}]
         output = self.run_copy('--check', '1')
         self.assertEqual(output[0], 'UPDATE')
-        self.assertEqual(self.body(output), {'version': None, 'asked_by_owner': True})
+        # Nothing released: no version to misquote when answering the owner.
+        self.assertEqual(self.body(output), {'asked_by_owner': True})
 
     def test_a_stranger_cannot_trigger_an_update(self):
         command = item('c1')
