@@ -30,7 +30,7 @@ import urllib.request
 import uuid
 
 # The guide version in GROKBOT.md; bump both together.
-REVISION = '2026-11-02.3'
+REVISION = '2026-11-02.4'
 STATE = os.environ.get('FM_STATE') or os.path.dirname(os.path.abspath(__file__))
 DEFAULT_ENDPOINT = 'https://api.filament.dm/mcp/agents'
 POLL_WAIT = 60
