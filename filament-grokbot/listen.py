@@ -30,7 +30,7 @@ import urllib.request
 import uuid
 
 # The guide version in GROKBOT.md; bump both together.
-REVISION = '2026-11-02.4'
+REVISION = '2026-11-03.1'
 STATE = os.environ.get('FM_STATE') or os.path.dirname(os.path.abspath(__file__))
 DEFAULT_ENDPOINT = 'https://api.filament.dm/mcp/agents'
 POLL_WAIT = 60
@@ -485,8 +485,8 @@ def load_update():
 def offer_update(call_id, asked=False, retry=True):
     """Ask Filament once whether a newer guide is released; never blocks listening.
 
-    The next listener call returns UPDATE when one is. The owner's command asks
-    for an update even when Filament has none to offer.
+    The next listener call returns UPDATE when one is. The owner's command is
+    answered even when there is none, so the owner hears that the bot is current.
     """
     try:
         offer = released(read_tool('get_self', {}, 15))
@@ -592,15 +592,16 @@ def update_listener():
             return 'FAILED', str(exc)
         except Transient as exc:
             return 'NEEDS_RETRY', str(exc)
-        url = offer['url'] if offer else read('guide_url')
-        ref = guide_ref(url)
-        if ref is None:
+        # Filament's release is the only thing an update installs; nothing
+        # released for this agent means nothing to do.
+        if not offer:
             return 'CURRENT', REVISION
+        url, ref = offer['url'], guide_ref(offer['url'])
         try:
             guide_id, version = guide_header(fetch(url))
             if guide_id != GUIDE_ID or not version:
                 raise UpdateFailed('the released URL is not this guide')
-            if offer and version != offer['version']:
+            if version != offer['version']:
                 raise UpdateFailed('the guide is %s but Filament released %s' % (version, offer['version']))
             if version_key(version) < version_key(REVISION):
                 raise UpdateFailed('refusing to move back to %s' % version)
@@ -613,7 +614,6 @@ def update_listener():
             return 'FAILED', str(exc)
         except Transient as exc:
             return 'NEEDS_RETRY', 'download failed: %s' % exc
-        write('guide_url', url)
         try:
             report_version(version)
         except (AuthFailed, Transient) as exc:
@@ -621,7 +621,7 @@ def update_listener():
         info = load_update()
         info['requested'] = False
         write('update.json', json.dumps(info))
-        return ('UPDATED' if offer or version != REVISION else 'CURRENT'), version
+        return 'UPDATED', version
 
 
 def check_state():

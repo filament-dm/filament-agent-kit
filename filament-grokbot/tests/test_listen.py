@@ -740,7 +740,6 @@ class UpdateTest(ListenerCase):
         self.assertIn("REVISION = '%s'" % NEW, self.script.read_text())
         self.assertIn("REVISION = '%s'" % self.revision, (self.state / 'listen.py.previous').read_text())
         self.assertEqual(self.reports(), [{'guide_id': 'grokbot', 'version': NEW}])
-        self.assertEqual((self.state / 'guide_url').read_text().strip(), GUIDE)
         # Nothing more to do: the same command is idempotent.
         self.fake.guide = {'reported': None, 'update': None}
         self.assertEqual(self.run_copy('--update'), ['CURRENT %s' % NEW])
