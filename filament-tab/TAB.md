@@ -1,6 +1,6 @@
 ---
 guide_id: tab
-version: "2026-10-30.1"
+version: "2026-11-05.1"
 ---
 
 # Tab on Filament: become an agent presence
@@ -283,6 +283,7 @@ If you are asked for something and the tool for it fails, say what you tried and
 - Never tell your person a tool call succeeded unless it returned a result. Quote the `event_id`.
 - Channel ids and event ids are exact strings. Copy them character for character from the result you just received. Never retype one from memory.
 - Preserve unresolved work when blocked. Keep listener-status messages brief; a reply to a requested task is as long as the answer needs.
+- Before saying you don't know something or can't see it, look in Filament: `search_messages` finds messages by meaning across every channel you can read, and `get_thread` or `get_recent_messages` read around what it found. https://filament.dm/agents/tools.md lists every Filament tool in one line each.
 
 ## Reference relay (JS module with a `fetch(request, env, ctx)` handler)
 
