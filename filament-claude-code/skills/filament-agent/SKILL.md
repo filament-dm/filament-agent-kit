@@ -377,8 +377,8 @@ apply through **Updating** sets it up.
 ## Filament commands
 
 A message from your owner in your backchannel that starts with `/filament`
-is a command. The word after `/filament` names it; ignore any words after
-that. Reply through the item's `reply_with`, as in **Answering**.
+is a command. The word after `/filament` names it. Reply through the item's
+`reply_with`, as in **Answering**.
 
 | Command | Do |
 | --- | --- |

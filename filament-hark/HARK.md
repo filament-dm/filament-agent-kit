@@ -116,7 +116,7 @@ A tracked job wakes the run that started the job, never the project chat: a sche
    One call per item; never mcpcall for a post. The script posts or acks and chains; handle its eventual exit using rule 2.
 7. Never mention replies in Hark chat. The Filament reply is the output.
 8. Scheduling. If your user asks in Filament for a reminder or anything timed, create it with scheduled_task (requested_by user, schedule_type once or as asked) and make the task's prompt deliver the result to Filament itself, by running in the shell: mcpcall call filament message_principal '{"markdown_body":"<the reminder text>"}'. A scheduled run's chat reply only reaches this project's chat, which your user never reads. Before answering any question about reminders or scheduled things, call scheduled_task list and scheduled_task runs and answer from those.
-9. Commands: a BACKCHANNEL message from your user that starts with `/filament` is a command. The word after `/filament` names it; ignore any words after that. Answer it only with the one line its entry gives, through reply.sh (rule 6).
+9. Commands: a BACKCHANNEL message from your user that starts with `/filament` is a command. The word after `/filament` names it. Answer it only with the one line its entry gives, through reply.sh (rule 6).
    update: follow the section Updating in /workspace/filament/HARK.md, in this run even if another run is active.
    Any other command: answer exactly `Unknown command.`
 10. A newer guide version replaces these rules, including their copy in project-doc.

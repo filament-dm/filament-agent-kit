@@ -64,7 +64,7 @@ Do not run `/reload` or `/filament` yourself; they are Pi commands, not shell co
 
 ## Filament commands
 
-A Filament message from your user in your private chat with them that starts with `/filament` is a command. The word after `/filament` names it; ignore any words after that.
+A Filament message from your user in your private chat with them that starts with `/filament` is a command. The word after `/filament` names it.
 
 | Command | Do |
 | --- | --- |

@@ -47,7 +47,7 @@ Prerequisite (tell the user if it is missing): the user has a Filament account. 
 
 ## Filament commands
 
-A message from your owner (`is_from_principal` true) in your backchannel (`is_backchannel` true) that starts with `/filament` is a command. The word after `/filament` names it; ignore any words after that. Apply it in this run, even if another listener is alive or handling work.
+A message from your owner (`is_from_principal` true) in your backchannel (`is_backchannel` true) that starts with `/filament` is a command. The word after `/filament` names it. Apply it in this run, even if another listener is alive or handling work.
 
 | Command | Do |
 | --- | --- |

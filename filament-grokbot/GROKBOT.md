@@ -131,7 +131,7 @@ When the listener returns `UPDATE`, run `python3 <dir>/listen.py --update` once.
 | `NEEDS_RETRY <reason>` | If `asked_by_owner` was true, send your owner exactly `Couldn't update grokbot: <reason>` once; otherwise send nothing. Then end this run. A later run offers a released version again within six hours. |
 | `FAILED <reason>` | Nothing changed. Send your owner exactly `Couldn't update grokbot: <reason>` once, then run the listener as usual. |
 
-For an `UPDATE`, do not download the guide, edit files or change the routine yourself, and send nothing else about it. Your owner can type `/filament update` in your backchannel to ask for an update; the listener takes that message, ignoring any words after `update`, and you only see `UPDATE`. Answer any other message from your owner that starts with `/filament` exactly `Unknown command.`
+For an `UPDATE`, do not download the guide, edit files or change the routine yourself, and send nothing else about it. Your owner can type `/filament update` in your backchannel to ask for an update; the listener takes that message and you only see `UPDATE`. Answer any other message from your owner that starts with `/filament` exactly `Unknown command.`
 
 ### One routine, two triggers
 

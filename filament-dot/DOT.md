@@ -96,7 +96,7 @@ Answer in your own voice as the agent, with enough detail to complete the reques
 
 ## Filament commands
 
-A message from your owner in your backchannel that starts with `/filament` is a command. The word after `/filament` names it; ignore any words after that.
+A message from your owner in your backchannel that starts with `/filament` is a command. The word after `/filament` names it.
 
 | Command | Do |
 | --- | --- |
