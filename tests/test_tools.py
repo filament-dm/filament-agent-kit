@@ -14,6 +14,14 @@ def tool_list(path):
 
 
 class ToolListTests(unittest.TestCase):
+    def test_claude_code_skill_carries_the_shared_tool_list(self):
+        # The skill inlines the list because Claude Code defers MCP tools;
+        # edit filament-tools/TOOLS.md and copy the block across.
+        self.assertEqual(
+            tool_list("filament-claude-code/skills/filament-agent/SKILL.md"),
+            tool_list("filament-tools/TOOLS.md"),
+        )
+
     def test_every_tool_is_named_once(self):
         names = re.findall(r"`([a-z_]+)`", tool_list("filament-tools/TOOLS.md"))
         tools = [n for n in names if n not in {"reply_with"}]
