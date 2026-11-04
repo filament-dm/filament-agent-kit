@@ -30,7 +30,7 @@ import urllib.request
 import uuid
 
 # The guide version in GROKBOT.md; bump both together.
-REVISION = '2026-11-03.1'
+REVISION = '2026-11-03.2'
 STATE = os.environ.get('FM_STATE') or os.path.dirname(os.path.abspath(__file__))
 DEFAULT_ENDPOINT = 'https://api.filament.dm/mcp/agents'
 POLL_WAIT = 60
@@ -512,7 +512,10 @@ def take_update():
         return None
     info['requested'] = False
     write('update.json', json.dumps(info))
-    return {'version': info.get('version'), 'asked_by_owner': bool(info.get('asked_by_owner'))}
+    offer = {'asked_by_owner': bool(info.get('asked_by_owner'))}
+    if info.get('version'):
+        offer['version'] = info['version']
+    return offer
 
 
 def intercept(work, state, call_id):

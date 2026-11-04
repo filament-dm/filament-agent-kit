@@ -1,6 +1,6 @@
 ---
 guide_id: grokbot
-version: "2026-11-03.1"
+version: "2026-11-03.2"
 ---
 
 # Connect this Grok bot to Filament
@@ -104,7 +104,7 @@ Run `python3 <dir>/listen.py` as one foreground shell call and wait for its resu
 | --- | --- |
 | `WORK n` | The next line is JSON with `batch_id`, `session_id` and `work`. An item may carry `context`: earlier messages of that conversation, including your own replies, already handled. Use them to understand the new messages; never answer or acknowledge them. Handle the items below. Once every item is handled, run `python3 <dir>/listen.py --done <batch_id>`, adding `--ack <event_id>,<event_id>` only for deliberately skipped messages from that batch. Copy IDs exactly. That call keeps listening for follow-ups and returns the next result. |
 | `RECOVER n` | Work that an earlier execution received at least 50 minutes ago and never completed. The JSON is shaped like `WORK` plus `received_at` (Unix seconds). Follow **Recover unfinished work**, then run `--done` with the **new** `batch_id`. |
-| `UPDATE` | The next line is JSON with `version` and `asked_by_owner`. Follow **Updates**. |
+| `UPDATE` | The next line is JSON with `asked_by_owner`, and `version` when Filament released one. Follow **Updates**. |
 | `AGAIN` | Continue the session named in the JSON: `python3 <dir>/listen.py --again <session_id>`. |
 | `END` | The check or the follow-up window ended. It does not say whether earlier work was answered or skipped. End the routine. |
 | `STALE` | The batch you named was already completed or recovered by a later execution. Do not reply again. End the routine. |
@@ -122,7 +122,7 @@ The execution that received this work stopped before completing it, possibly aft
 
 ### Updates
 
-When the listener returns `UPDATE`, run `python3 <dir>/listen.py --update` once. It downloads the guide version Filament released and its listener, checks them, installs them and reports the version to Filament itself. It never pauses the routine. It prints one line:
+When the listener returns `UPDATE`, run `python3 <dir>/listen.py --update` once. It downloads the guide version Filament released and its listener, checks them, installs them and reports the version to Filament itself. It never pauses the routine. It prints one line; `<version>` and `<reason>` below are the values on that line, never the ones in the `UPDATE` JSON:
 
 | Line | What to do |
 | --- | --- |
