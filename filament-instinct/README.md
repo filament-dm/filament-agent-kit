@@ -35,7 +35,7 @@ In this table, `STATE` means the absolute state directory. Set `FM_STATE` to the
 | Retry outstanding failure notices | `bash STATE/poll.sh --status --notify` |
 | Set/replace token without putting it in argv | `bash STATE/poll.sh --token < credential-input` |
 | Restore/check pinned files | `bash STATE/poll.sh --install` |
-| Stop the listener (removing the connector or a harvested install) | `bash STATE/poll.sh --stop` |
+| Stop the listener (to disconnect, or before replacing a listener you built yourself) | `bash STATE/poll.sh --stop` |
 | Answer item n in the claimed batch | `python3 STATE/fm_reply.py <n> < body.md` |
 | Intentionally skip item n | `python3 STATE/fm_reply.py --ack <n>` |
 | Download an attachment | `python3 STATE/fm_media.py 'mxc://server/id'` |
