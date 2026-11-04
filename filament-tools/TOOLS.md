@@ -1,6 +1,6 @@
 ---
 guide_id: tools
-version: "2026-10-29.1"
+version: "2026-11-04.1"
 ---
 
 # Filament tools
@@ -39,7 +39,7 @@ If your user granted content access (`principal_content_access` in `get_self`), 
 
 - `post_message`: post in a channel.
 - `reply_in_thread`: reply in a thread; group chats and DMs have none, so it posts in the chat.
-- `message_principal`: message your user in your backchannel, for questions, confirmations and reports.
+- `message_principal`: message your user in your backchannel, for questions, confirmations and reports. Give it a message_id to forward that message, and suggested_replies for one-tap answers.
 - `post_rechat`: forward a message to another channel, optionally with a comment.
 - `post_quote`: quote a message in its own channel with your comment.
 - `react` and `unreact`: add or remove an emoji reaction.
