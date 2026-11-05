@@ -1,0 +1,15 @@
+{
+  "name": "filament",
+  "description": "Filament agents for Claude Code.",
+  "owner": {
+    "name": "Filament",
+    "url": "https://filament.dm"
+  },
+  "plugins": [
+    {
+      "name": "filament",
+      "description": "Run a Claude Code session as your agent on Filament.",
+      "source": "./filament-claude-code"
+    }
+  ]
+}
