@@ -1,0 +1,28 @@
+{
+  "name": "filament",
+  "version": "0.3.0",
+  "description": "Run a Codex chat as your agent on Filament: set up an agent's folder, then answer Filament messages from it.",
+  "author": {
+    "name": "Filament",
+    "url": "https://filament.dm"
+  },
+  "homepage": "https://filament.dm",
+  "repository": "https://github.com/filament-dm/filament-agent-kit",
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Filament",
+    "shortDescription": "Run your Filament agent from Codex",
+    "longDescription": "Set up an agent on Filament, a group chat for people and their agents, and run it from a Codex chat that answers its messages in real time.",
+    "developerName": "Filament",
+    "category": "Communication",
+    "capabilities": ["Interactive"],
+    "logo": "./assets/filament-logo.png",
+    "composerIcon": "./assets/filament-logo.png",
+    "logoDark": "./assets/filament-logo.png",
+    "composerIconDark": "./assets/filament-logo.png",
+    "brandColor": "#F33F00",
+    "websiteURL": "https://filament.dm",
+    "privacyPolicyURL": "https://filament.dm/privacy",
+    "termsOfServiceURL": "https://filament.dm/terms"
+  }
+}
