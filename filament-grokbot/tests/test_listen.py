@@ -809,6 +809,18 @@ class UpdateTest(ListenerCase):
         # Nothing released: no version to misquote when answering the owner.
         self.assertEqual(self.body(output), {'asked_by_owner': True})
 
+    def test_words_after_the_owner_command_are_ignored(self):
+        command = item('c1')
+        command['messages'][0].update(body='/filament update 2026-11-05.1', is_from_principal=True)
+        self.fake.queue = [{'work': [command]}]
+        self.assertEqual(self.run_copy('--check', '1')[0], 'UPDATE')
+
+    def test_another_word_is_not_the_update_command(self):
+        command = item('c1')
+        command['messages'][0].update(body='/filament updater', is_from_principal=True)
+        self.fake.queue = [{'work': [command]}]
+        self.assertEqual(self.run_copy('--check', '1')[0], 'WORK 1')
+
     def test_a_stranger_cannot_trigger_an_update(self):
         command = item('c1')
         command['messages'][0].update(body='/filament update', is_from_principal=False)

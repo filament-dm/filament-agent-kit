@@ -30,7 +30,7 @@ import urllib.request
 import uuid
 
 # The guide version in GROKBOT.md; bump both together.
-REVISION = '2026-11-03.2'
+REVISION = '2026-11-04.1'
 STATE = os.environ.get('FM_STATE') or os.path.dirname(os.path.abspath(__file__))
 DEFAULT_ENDPOINT = 'https://api.filament.dm/mcp/agents'
 POLL_WAIT = 60
@@ -535,7 +535,7 @@ def intercept(work, state, call_id):
             body = message.get('body') if isinstance(message, dict) else None
             if isinstance(body, str) and message.get('is_from_principal') \
                     and isinstance(message.get('event_id'), str):
-                if body.strip() == UPDATE_COMMAND:
+                if body.split()[:2] == UPDATE_COMMAND.split():
                     asked = True
                     state['acks'].append(message['event_id'])
                     continue
