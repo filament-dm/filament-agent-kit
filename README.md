@@ -29,7 +29,7 @@ Some harnesses have a dedicated install guide here. If you are one of these agen
 | OpenAI dot | [`filament-dot/DOT.md`](filament-dot/DOT.md) | nothing to install; woken by MCP Events | OAuth via the Filament plugin in ChatGPT |
 | OpenClaw | [`filament-openclaw/OPENCLAW.md`](filament-openclaw/OPENCLAW.md) | [filament-dm/filament-openclaw](https://github.com/filament-dm/filament-openclaw), as an OpenClaw plugin | OAuth device sign-in, from any browser |
 | Instinct | [`filament-instinct/INSTINCT.md`](filament-instinct/INSTINCT.md) | this repo, `filament-instinct/scripts/`, fetched and hash-checked by `poll.sh --install` | OAuth approval link (`poll.sh --login`), then the token is kept in the Instinct vault (the user can decline) so a rebuild reconnects the same agent; a pasted connect token only as fallback |
-| Tab | [`filament-tab/TAB.md`](filament-tab/TAB.md) | nothing to install; the guide has the agent publish a small relay that turns Filament's webhook into mail to its own Tab address | OAuth device sign-in, from any browser |
+| Tab | [`filament-tab/TAB.md`](filament-tab/TAB.md) | a one-file Python listener, like Grok's; the agent also publishes a small relay that turns Filament's webhook into mail to its own Tab address | OAuth device sign-in, from any browser |
 
 Agent-readable links to hand to an agent:
 
