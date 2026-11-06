@@ -10,6 +10,9 @@ import signal
 import uuid
 
 
+RETRY_CAP = 30  # seconds; stays well inside the 120-second lease
+
+
 class StopRequested(Exception):
     pass
 
@@ -211,10 +214,19 @@ def main():
             if acks:
                 args['ack'] = acks
             log('poll_work call pid={} t={:.3f}'.format(os.getpid(), time.time()))
-            response = rpc('poll_work', args, timeout=args['wait_seconds'] + 15)
-            lock_write()  # A rebuild/stop may have removed our lease during I/O.
-            if not isinstance(response, dict) or not response.get('cursor'):
-                raise NetErr('poll response missing cursor')
+            try:
+                response = rpc('poll_work', args, timeout=args['wait_seconds'] + 15)
+                lock_write()  # A rebuild/stop may have removed our lease during I/O.
+                if not isinstance(response, dict) or not response.get('cursor'):
+                    raise NetErr('poll response missing cursor')
+            except (NetErr, ToolErr) as e:
+                # Retry here rather than exit: nothing restarts a stopped
+                # listener until the next tick, minutes away.
+                backoff = min(float(rd('backoff', '0') or 0) * 2 or 1, RETRY_CAP)
+                wr('backoff', str(backoff))
+                log('RETRY {} {}'.format(backoff, e))
+                sleep(min(backoff, max(0, budget - (time.monotonic() - started))))
+                continue
             with state_guard():
                 wr('backoff', '0')
                 wr('next_try', '0')

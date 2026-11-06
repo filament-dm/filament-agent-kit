@@ -30,7 +30,7 @@ import urllib.request
 import uuid
 
 # The guide version in GROKBOT.md; bump both together.
-REVISION = '2026-11-03.2'
+REVISION = '2026-11-06.1'
 STATE = os.environ.get('FM_STATE') or os.path.dirname(os.path.abspath(__file__))
 DEFAULT_ENDPOINT = 'https://api.filament.dm/mcp/agents'
 POLL_WAIT = 60
@@ -55,11 +55,14 @@ CONTEXT_FIELDS = ('sender', 'body', 'timestamp', 'is_from_self', 'is_from_princi
 CONTEXT_NOTE = ('Earlier messages in this conversation, oldest first, including your own replies. '
                 'They were already handled: read them for context only; never answer or acknowledge them.')
 GUIDE_ID = 'grokbot'
-# The only URLs an update downloads: the released guide, then the listener from
-# the same branch. Filament releases a branch with ?ref=, as onboarding links do.
+# The only URLs an update downloads: the released guide, then the listener and
+# the routine protocol from the same branch. Filament releases a branch with ?ref=, as onboarding links do.
 GUIDE_URL = re.compile(r'https://filament\.dm/agents/grokbot\.md'
                        r'(?:\?ref=([A-Za-z0-9_-][A-Za-z0-9._-]*(?:/[A-Za-z0-9_-][A-Za-z0-9._-]*)*))?')
 SCRIPT_URL = 'https://raw.githubusercontent.com/filament-dm/filament-agent-kit/{ref}/filament-grokbot/listen.py'
+ROUTINE_URL = 'https://raw.githubusercontent.com/filament-dm/filament-agent-kit/{ref}/filament-grokbot/ROUTINE.md'
+# What each routine run reads; its first line names the guide version.
+ROUTINE = 'ROUTINE.md'
 FETCH_LIMIT = 2 * 1024 * 1024
 UPDATE_COMMAND = '/filament update'
 # Filament's notices about a release; whether to update comes from get_self.
@@ -612,7 +615,11 @@ def update_listener():
                 script = fetch(SCRIPT_URL.format(ref=ref))
                 if "\nREVISION = '%s'\n" % version not in script:
                     raise UpdateFailed('the listener does not match guide %s' % version)
+                routine = fetch(ROUTINE_URL.format(ref=ref))
+                if routine.split('\n', 1)[0] != '<!-- grokbot %s -->' % version:
+                    raise UpdateFailed('the routine protocol does not match guide %s' % version)
                 install(script)
+                write(ROUTINE, routine)
         except UpdateFailed as exc:
             return 'FAILED', str(exc)
         except Transient as exc:
@@ -691,6 +698,8 @@ def renew_wake():
 def set_wake():
     url = sys.stdin.readline().strip()
     key = sys.stdin.readline().strip()
+    # The routine panel also offers the key as a header value.
+    key = re.sub(r'^(?:Authorization:\s*)?Bearer\s+', '', key, flags=re.I)
     parts = urllib.parse.urlsplit(url)
     if parts.scheme != 'https' or parts.hostname not in WAKE_HOSTS or not parts.path.strip('/'):
         return 'WAKE_FAILED', 'the URL must be the routine webhook URL on ' + ', '.join(WAKE_HOSTS)

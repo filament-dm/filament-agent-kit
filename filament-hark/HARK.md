@@ -1,6 +1,6 @@
 ---
 guide_id: hark
-version: "2026-10-19.1"
+version: "2026-10-23.1"
 ---
 
 # Connect this Hark agent to Filament
@@ -13,7 +13,7 @@ Rules for the whole install:
 - Decide each step on raw results (exit codes, JSON), not on what you expect. If a result does not match what a step says to expect, stop and show it.
 - Work in this chat for Parts A and B. Part C creates a separate project where the connector lives; after that, nothing about Filament replies appears in this chat.
 
-Self link: `https://raw.githubusercontent.com/filament-dm/filament-agent-kit/main/filament-hark/HARK.md`. Re-fetch it if you need the latest version.
+Self link: `https://raw.githubusercontent.com/filament-dm/filament-agent-kit/main/filament-hark/HARK.md`. This file's URL is the exact HARK.md URL your user's message gave you, or the self link if it gave none; use it wherever this file is fetched again, so a pinned or test version stays the one followed.
 
 ## For the human (read this before pasting the sentence to Hark)
 
@@ -24,7 +24,7 @@ Self link: `https://raw.githubusercontent.com/filament-dm/filament-agent-kit/mai
 
 ## Part A: connect
 
-0. Before changing the MCP registration or profile, call `projects` with `action` `list` and look for a project titled `Filament`; also run `ls /workspace/filament/listen.sh 2>/dev/null`. If either exists, tell the user there is an existing connector and ask whether to replace it. On no: stop without changing anything. On yes: remember replacement was authorised and the existing project id, if any. Part C reuses that project; a leftover directory without a project still needs a new project.
+0. Before changing the MCP registration or profile, look for an existing Filament connector three ways: call `scheduled_task` with `action` `list` and look for a task named `Filament listener backstop` (its project id is the connector's project); call `projects` with `action` `list` and look for a project whose title contains `Filament` (Hark may have renamed it); and run `ls /workspace/filament/listen.sh 2>/dev/null`. If any of them finds one, tell the user there is an existing connector and ask whether to replace it. On no: stop without changing anything. On yes: remember replacement was authorised and the existing project id, if any (the backstop task's project id first, else the matching project's). Part C reuses that project; a leftover directory without a project still needs a new project.
 1. Open your secure vault form for the token. Call `request_secret` with `type` `api_key`, `label` `Filament connect token`, `description` `Paste the connect token from the Filament app's Agents tab; it starts with fmcp_ and I will use it only to reach api.filament.dm.`, and `scope` empty. Tell the user in one line: "Paste the Filament connect token from the app into this form. It starts with fmcp_." End the turn and wait for the form to complete. The result gives you a secret id; you only ever see a masked preview.
 2. Register the MCP server, which also binds the token to the host. Call `mcp_servers` with `action` `add`, `name` `filament`, `transport` `streamable_http`, `url` `https://api.filament.dm/mcp/agents`, `secret_id` the id from step 1, `host_suffixes` `["api.filament.dm"]`, `scheme` `bearer`. No `header`, no `value_prefix`. The name must be exactly `filament`; the scripts in Part C call it by that name. If a server called `filament` already exists, remove it first (`action` `remove`) and add it again with the new secret.
 3. The token now rides on every request to api.filament.dm from your sandbox, including plain `curl`, and never enters the sandbox itself.
@@ -57,13 +57,13 @@ The connector runs in a project of its own so that Filament replies never appear
    ```
    {"tool": "projects", "action": "call", "arguments": {"title": "Filament", "action": "create"}}
    ```
-   Expect `{"created": true, "id": "<project id>", "title": "Filament"}`. Remember the id.
-2. Assign the work. Use this message. If replacement was authorised in Part A step 0, append exactly: "The user authorised replacement of the existing connector; follow the replacement step in the brief." Otherwise append nothing:
+   Expect `{"created": true, "id": "<project id>", "title": ...}`. Hark may give the project its own title; remember the id and the title it returned.
+2. Assign the work. Use this message, with `<this file's URL>` replaced by this file's URL (see the self link above). If replacement was authorised in Part A step 0, append exactly: "The user authorised replacement of the existing connector; follow the replacement step in the brief." Otherwise append nothing:
    ```
-   {"tool": "projects", "action": "call", "arguments": {"id": "<project id>", "action": "assign", "message": "Fetch https://raw.githubusercontent.com/filament-dm/filament-agent-kit/main/filament-hark/HARK.md with curl and carry out the section titled The brief, every numbered step in order, then adopt its Filament front-door rules as standing rules for this project. The user asked for this project to run the Filament front door."}}
+   {"tool": "projects", "action": "call", "arguments": {"id": "<project id>", "action": "assign", "message": "Fetch <this file's URL> with curl and carry out the section titled The brief, every numbered step in order, then adopt its Filament front-door rules as standing rules for this project. The user asked for this project to run the Filament front door."}}
    ```
    Expect `{"dispatched": true, ...}`.
-3. Tell the user in two lines: "I've handed the Filament connection to a project called Filament. Within about two minutes <display_name> will say hello to you in the Filament app; reply to it there to see it answer." Then say nothing further about Filament in this chat unless the user asks. The hello on Filament is the signal that the install finished; there is no cross-project notification.
+3. Tell the user in two lines: "I've handed the Filament connection to a project called <the project's title>. Within about two minutes <display_name> will say hello to you in the Filament app; reply to it there to see it answer." Then say nothing further about Filament in this chat unless the user asks. The hello on Filament is the signal that the install finished; there is no cross-project notification.
 
 ## Auth recovery procedure
 
@@ -91,8 +91,14 @@ A tracked job wakes the run that started the job, never the project chat: a sche
 
    Filament front-door backstop. Step 1: run `bash /workspace/filament/backstop.sh check` in the shell. Step 2: if it printed NEED_START, run `bash /workspace/filament/restart_listener.sh` as a tracked background job (background=true); if it printed WEDGED or TAKEOVER, run `bash /workspace/filament/restart_listener.sh --replace` the same way; in either case then run `bash /workspace/filament/backstop.sh started`. Step 3: call billing_status; if the daily percent used is 85 or more, run `bash /workspace/filament/backstop.sh warn <percent> '<resets_at>'`. Step 4: send no chat message. If a job you started later wakes you, follow this project's Filament front-door rules.
 
-   Immediately write the returned task id to `/workspace/filament/backstop.task`. When supplying resets_at to the shell, quote it as literal data, escaping any embedded single quote; never evaluate its contents. The script passes it to the JSON helper as an argument.
-6. Say hello: `mcpcall call filament message_principal '{"markdown_body":"Hello, I am connected to Filament and listening. Message me here any time."}'`. Expect an event_id. That hello is the completion signal; send nothing to the main chat.
+   Hark plans set a floor on how often a scheduled task may run. If the create is rejected for running too often, the error names the floor (for example "at most once every 30 minutes"): create it once more with that number of minutes, starting at the next whole multiple of it past the hour (for 30 minutes, the next :00 or :30). The backstop is part of the setup your user asked for, at whatever interval their plan allows, so do not ask them to confirm it and do not wait for an answer. Any other error, or a second rejection: report it once with message_principal and stop before step 6.
+
+   Immediately write the returned task id, and nothing else, to `/workspace/filament/backstop.task`. When supplying resets_at to the shell, quote it as literal data, escaping any embedded single quote; never evaluate its contents. The script passes it to the JSON helper as an argument.
+6. Say hello only once `/workspace/filament/backstop.task` holds the id of the task step 5 created. Run exactly one of these two commands:
+   - The backstop runs every 10 minutes: `mcpcall call filament message_principal '{"markdown_body":"Hello, I am connected to Filament and listening. Message me here any time."}'`
+   - It runs every N minutes, N more than 10: `mcpcall call filament message_principal '{"markdown_body":"Hello, I am connected to Filament and listening. Message me here any time. Your Hark plan only lets me check my connection every N minutes, so if I stop listening it can take up to N minutes before I am back."}'`, with both Ns replaced by the number.
+
+   Expect an event_id. That hello is the completion signal; send nothing to the main chat.
 
 ## Filament front-door rules
 
