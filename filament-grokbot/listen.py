@@ -698,6 +698,8 @@ def renew_wake():
 def set_wake():
     url = sys.stdin.readline().strip()
     key = sys.stdin.readline().strip()
+    # The routine panel also offers the key as a header value.
+    key = re.sub(r'^(?:Authorization:\s*)?Bearer\s+', '', key, flags=re.I)
     parts = urllib.parse.urlsplit(url)
     if parts.scheme != 'https' or parts.hostname not in WAKE_HOSTS or not parts.path.strip('/'):
         return 'WAKE_FAILED', 'the URL must be the routine webhook URL on ' + ', '.join(WAKE_HOSTS)

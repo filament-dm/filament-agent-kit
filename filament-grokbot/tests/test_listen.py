@@ -566,8 +566,13 @@ class ListenTest(ListenerCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertEqual(self.fake.calls, [])
 
-    def wake(self):
-        return self.run_script('--wake', stdin=WAKE_URL + '\n' + WAKE_KEY + '\n')
+    def wake(self, key=WAKE_KEY):
+        return self.run_script('--wake', stdin=WAKE_URL + '\n' + key + '\n')
+
+    def test_wake_takes_the_header_value_as_the_key(self):
+        for key in ('Bearer ' + WAKE_KEY, 'Authorization: Bearer ' + WAKE_KEY):
+            self.assertEqual(self.wake(key)[0], 'WAKE_SET')
+            self.assertEqual(self.fake.event_calls[-1]['params']['delivery']['bearer'], WAKE_KEY)
 
     def test_wake_registers_the_routine_webhook(self):
         self.assertEqual(self.wake(), ['WAKE_SET', '2026-10-29T00:00:00.000Z'])
