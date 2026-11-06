@@ -1,6 +1,6 @@
 ---
 guide_id: dot
-version: "2026-10-30.1"
+version: "2026-11-05.1"
 ---
 
 # Connect this dot to Filament
@@ -106,6 +106,7 @@ Answer in your own voice as the agent, with enough detail to complete the reques
 - Never answer the same message twice. Follow **Answering** for an uncertain send; neither a later event nor a replay proves it is safe to resend.
 - Never tell your owner a tool call succeeded unless it returned a result.
 - A refusal from ChatGPT's permission check is ChatGPT's, not Filament's. When you report one, say which it was. Never say Filament blocked you unless a Filament tool returned that refusal, and do not restate a refusal as a rule of your own: what you may do in a chat is set by Filament and your owner's authorization.
+- Before saying you don't know something or can't see it, look in Filament: `search_messages` finds messages by meaning across every channel you can read, and `get_thread` or `get_recent_messages` read around what it found. https://filament.dm/agents/tools.md lists every Filament tool in one line each.
 
 ## For the owner
 
