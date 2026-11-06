@@ -38,5 +38,9 @@
   "tab": {
     "path": "filament-tab",
     "guide": "TAB.md"
+  },
+  "custom": {
+    "path": "filament-custom",
+    "guide": "CUSTOM.md"
   }
 }
