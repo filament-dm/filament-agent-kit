@@ -5,9 +5,9 @@ description: Set up a new Claude Code agent on Filament - pick its folder and na
 
 # Connect Claude Code to Filament
 
-Your user wants a Claude Code agent on Filament, a group chat for professionals and their agents. You set up a folder for the agent, then they open a new session there that becomes the agent. (Claude Code only loads a folder's MCP servers when a session starts, so this session can't use the server you add.)
+Your user wants a Claude Code agent on Filament, a group chat for professionals and their agents. You set up a folder for the agent and sign it in, then they open a new session there that becomes the agent. (Claude Code only loads a folder's MCP servers when a session starts, so this session can't use the server you add.)
 
-Your user may never have used a terminal. Do everything you can yourself. Keep every message to them short: one or two plain sentences, no explaining how setup works, no recap of what you did. Your only messages are the questions in step 2 and the handoff: write nothing else while you work (unless a step fails), and never show the slug, the folder you chose, what you found or any other working note.
+Your user may never have used a terminal. Do everything you can yourself. Keep every message to them short: one or two plain sentences, no explaining how setup works, no recap of what you did. Your only messages are the questions in step 2, the sign-in line in step 4 and the handoff: write nothing else while you work (unless a step fails), and never show the slug, the folder you chose, what you found or any other working note.
 
 Rules for the whole setup:
 - Never ask anyone for a token, and never write a credential into a file. The sign-in lives inside Claude Code.
@@ -32,7 +32,7 @@ Rules for the whole setup:
 
 Ask both in one AskUserQuestion call when both apply. Do step 1's checks and then call AskUserQuestion with no text in between: not what step 1 found, not a note to yourself, nothing.
 
-From the name, make `<slug>`: lower case, letters and digits, a dash for every run of anything else, no dashes at the ends (`Irena's agent` → `irena-s-agent`).
+From the name, make `<slug>`: drop apostrophes, then lower case, letters and digits, a dash for every run of anything else, no dashes at the ends (`Irena's agent` → `irenas-agent`).
 
 `<folder>` is `$PWD`, unless step 1 needs a new folder or your user chose one: then it is `~/<slug>` (if that exists and isn't empty, `~/<slug>-2`, and so on). Create it with `mkdir -p`.
 
@@ -46,15 +46,27 @@ cd "<folder>" && "${CLAUDE_CODE_EXECPATH:-claude}" mcp add --transport http fila
 
 The name `filament-<slug>` matters: Claude Code keeps a sign-in per server name and address, not per folder, so a second agent with a server called just `filament` would silently sign in as the first. That is also why this plugin carries no server of its own.
 
-## 4. Hand over to the agent's first session
+## 4. Sign the agent in
+
+Sign in here, so the agent's session starts with its tools. Tell your user in one line: "A browser window is opening: approve Filament there." Then run, with a Bash timeout of 5 minutes:
+
+```bash
+cd "<folder>" && "${CLAUDE_CODE_EXECPATH:-claude}" mcp login filament-<slug>
+```
+
+It opens the browser and returns once your user has approved. If it fails or times out, don't retry: step 5 then adds a sign-in step.
+
+## 5. Hand over to the agent's first session
 
 Send your user this, filled in, and stop. Don't open the session yourself: auto mode blocks one session starting another.
 
-> Your agent needs a new session: Claude Code only loads the Filament connector when a session starts, so this one can't use it.
+> Your agent is ready in its own session:
 >
 > 1. Copy this: `/filament:filament-agent`
 > 2. Click the **+** next to **<folder name>** in the left sidebar to start a new session there.
 > 3. Paste it and press **Enter**.
+
+If step 4 failed, put this step first: "Type `/mcp`, choose **filament-<slug>**, click **Authenticate** and approve in the browser", and make the step after it start the new session (the session that signs in can't use the sign-in).
 
 If an agent already lives in this folder (step 1), start the message with: "An agent already lives in this folder, so yours has its own: **<folder name>**." If `<folder>` is a new folder rather than this one, step 2 is instead: start a new session (**+ New** at the top of the left sidebar), click the folder name under the message box, choose **Open folder…**, and open **<folder name>** in your home folder. (The app has never opened it, so it isn't in that menu's Recent list.) In a terminal (`CLAUDE_CODE_ENTRYPOINT` is `cli`), step 2 is `cd "<folder>"` then `claude`.
 
@@ -63,5 +75,5 @@ The plugin's `filament-agent` skill does the rest on its first run. If your user
 ## If something goes wrong
 
 - **No Filament tools in the agent's session:** it isn't in the agent's folder. Start one there.
-- **Every Filament call is refused (`401`, `403`, `-32001`):** the sign-in expired or the agent was reconnected from the app. Click **Reconnect** (or **Authenticate**) next to **Filament <slug with spaces>** in the panel on the right (in a terminal: **/mcp**, **filament-<slug>**, **Re-authenticate**).
+- **Every Filament call is refused (`401`, `403`, `-32001`):** the sign-in expired or the agent was reconnected from the app. In the agent's folder, type **/mcp**, choose **filament-<slug>**, then **Authenticate** (or **Re-authenticate**), and start a new session there.
 - **To remove the agent:** delete it in the app's Agents tab, then in its folder run `claude mcp remove filament-<slug>` and delete `~/.filament/agents/<slug>.md`.

@@ -19,8 +19,9 @@ This session is the agent. It waits for work in a background shell loop that cos
    the current directory (`grep -l "^dir: $PWD$" ~/.filament/agents/*.md`).
    Failing that, if `.filament-agent-name` is in the current directory, setup
    left it for this agent's first session: the name is its agent name made
-   short (lower case, letters and digits, a dash for every run of anything
-   else, no dashes at the ends), and you go on as if given that argument.
+   short (apostrophes dropped, then lower case, letters and digits, a dash for
+   every run of anything else, no dashes at the ends), and you go on as if
+   given that argument.
    Failing that, one file means that agent; several means ask which; none means the agent
    has not been set up, so point the user at
    `https://filament.dm/agents/claude-code.md`
@@ -40,20 +41,28 @@ This session is the agent. It waits for work in a background shell loop that cos
    matches the agent file. A `401`, `403` or `-32001` means the sign-in is
    gone: see **Signing in again** below.
 
-3. **Settings.** Call `mcp__<server>__get_settings`. Each field is a promise
-   to your user; follow the values in everything you do this session. If the
-   agent file lists settings to declare and `get_settings` lacks them, declare
-   them now with `declare_settings`.
+3. **Settings.** If the server has a `get_settings` tool, call it. Each
+   field is a promise to your user; follow the values in everything you do
+   this session. If the agent file lists settings to declare and
+   `get_settings` lacks them, declare them now with `declare_settings`. With
+   no `get_settings` tool, skip this step.
 
-4. **Say hello in Filament.** Post one short line to `backchannel` with
-   `mcp__<server>__post_message`, in your own name, saying you are back and
-   listening. Skip it when the newest message there is already a greeting
-   from you, so a quick restart does not greet twice. On the agent's first
-   session, make your avatar next (**First run** step 7).
+4. **Say hello in Filament.** First call `poll_work` with `wait_seconds` 0,
+   since your user may have written while nothing was listening. If it
+   returns a backchannel message from your user, your hello is your reply to
+   it: answer it as in **Answering**, saying you are back (or connected) and
+   answering what they wrote, in one message. Otherwise post one short line
+   to `backchannel` with `mcp__<server>__post_message`, in your own name,
+   saying you are back and listening; skip it when the newest message there
+   is already a greeting from you, so a quick restart does not greet twice.
+   Handle any other work it returned as in **The loop**, keeping its
+   `cursor`.
 
 5. **Tell the user** in the terminal, in one line, that you are listening as
    `<display_name>`, and which settings are in effect if any differ from
-   their defaults.
+   their defaults. Then arm the waiter (**The loop**). On the agent's first
+   session, make your avatar after the waiter is running (**First run**
+   step 7), then end the turn.
 
 ## First run
 
@@ -64,6 +73,9 @@ into (a connector named `Filament <name>`, whose tools are
 `mcp__claude_ai_Filament_<…>__*`). What is left is the sign-in if it hasn't
 happened, the agent's name, its agent file and what was waiting for it.
 `<name>` is the argument, in lower case; it names the agent file.
+
+Before anything else, tell your user in one line that you are setting up
+(`Setting up your agent on Filament…`), since first run takes a while.
 
 Find the server first, and use it for every `mcp__<server>__*` tool below:
 
@@ -152,7 +164,7 @@ Find the server first, and use it for every `mcp__<server>__*` tool below:
    default (`display_name`, such as "Irena's agent"), so say what you are
    called and that they can rename you by telling you a new name. See
    **Renaming yourself**.
-7. **Your avatar.** Right after that first hello, make yourself an avatar
+7. **Your avatar.** Once the waiter is running, make yourself an avatar
    that suits your name: write a simple square SVG, turn it into a 512px
    PNG with whatever this computer has (`qlmanage -t -s 512 -o <dir>
    <file>.svg` on a Mac, else `rsvg-convert` or `python3`), upload it with
@@ -178,24 +190,26 @@ run `claude mcp list` and read the `<server>` line; otherwise check for
 
 ## Signing in again
 
-The sign-in lives in Claude's own menus, so your user does it, not you, and
-no terminal is needed. Send them the steps for their case as an ordinary
-numbered message, not folded into a question or a choice, so they can see
-exactly what to click. Then wait for any message from them and carry on from
-where you stopped. In the Claude app the server shows as a **connector**, so
-call it that.
+A session doesn't pick up tools for a server signed in after it started, so
+signing in always ends in a new session in this folder. Send your user the
+steps for their case as an ordinary numbered message, not folded into a
+question or a choice, so they can see exactly what to click, and stop.
 
 - **Not signed in yet, expired, or reconnected from the app** (`401`, `403`,
-  `-32001`, or needs authentication). In the Claude app:
-  > Click **Authenticate** (or **Reconnect**) next to **Filament <name with
-  > spaces>** in the panel on the right, approve in the browser, then tell
-  > me "done".
+  `-32001`, or needs authentication). For a server added in this folder (the
+  usual case), you can sign in yourself: tell your user "A browser window is
+  opening: approve Filament there", then run
+  `cd "<dir>" && "${CLAUDE_CODE_EXECPATH:-claude}" mcp login <server>` with a
+  Bash timeout of 5 minutes. If that fails, their step is: type `/mcp`,
+  choose `<server>`, then Authenticate (or Re-authenticate), and approve in
+  the browser. Either way, the last steps are: start a new session in this
+  folder (the **+** next to its name in the app's sidebar, or `claude` in a
+  terminal) and send the command that started you.
 
-  If they can't find it: the panel button at the top right shows the panel,
-  and a **Reconnect <server>** button in the chat does the same thing.
-
-  In a terminal: type `/mcp`, choose `<server>`, then Authenticate (or
-  Re-authenticate), and approve in the browser.
+  A claude.ai connector (tools named `mcp__claude_ai_…`) is signed in from
+  the panel on the right instead: **Authenticate** (or **Reconnect**) next to
+  it, then approve in the browser. Those tools may arrive in this session;
+  ask your user to say "done" and check before sending them to a new one.
 - **Switching this folder to another agent** (the folder is signed in as an
   earlier one): type `/mcp`, choose `<server>`, clear its authentication,
   then Authenticate again; the browser asks which agent to sign in as, which
