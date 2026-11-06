@@ -16,7 +16,7 @@ Rules for the whole setup:
 
 ## Before you start
 
-- **Connect first:** your user should already have tapped Connect on the Claude card in the Filament app's Agents tab, which reserves the agent the sign-in will claim. If you can't tell, ask once.
+- **New to Filament is fine:** if your user tapped Connect on the Claude card in the Filament app's Agents tab, the sign-in claims the agent that reserved. If they didn't, or don't use Filament yet, carry on without asking: the sign-in asks for their phone number, creates their Filament account if that number has none, and makes the agent. Don't send them to install the app or sign up first.
 - **Server:** the skill's argument if it is a URL, else the address on a `Server:` line in your user's message, else `https://api.filament.dm/mcp/agents`. Call it `<server URL>`.
 
 ## 1. Look at this folder

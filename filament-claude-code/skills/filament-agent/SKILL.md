@@ -171,8 +171,8 @@ run `claude mcp list` and read the `<server>` line; otherwise check for
 - `<server>` is not set up here: this session started outside the agent's
   folder, or the folder was never set up. If an agent file names a `dir`,
   tell your user to open Claude Code in that folder. Otherwise tell them to
-  tap Connect on the Claude card in the Filament app and follow what it
-  shows. Stop.
+  run `/filament:connect` (no Filament account needed: its sign-in creates
+  one). Stop.
 - `<server>` is set up but not signed in, or not yet approved: see
   **Signing in again**.
 
