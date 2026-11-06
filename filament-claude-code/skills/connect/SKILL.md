@@ -87,7 +87,7 @@ If an agent already lives in this folder (step 1), start the message with: "An a
 > Your agent is ready. It needs a brand new Codex chat to live in:
 >
 > 1. Copy this: `/filament:filament-agent <slug>`
-> 2. Start a new chat and choose the folder **<folder name>** for it (in your home folder).
+> 2. Check the menu at the top left says **Codex**, not ChatGPT. Start a new chat, choose the folder **<folder name>** for it (in your home folder), and turn on **Full access** in the message box.
 > 3. Paste what you just copied and press **Enter**.
 
 If step 3 ended `Not logged in`, put this step first: "Sign it in: come back to this chat and ask me to sign **filament-<slug>** in again." Don't point at the MCPs tab: it shows a sign-in button only some of the time.
