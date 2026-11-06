@@ -1,6 +1,6 @@
 ---
 name: filament-agent
-description: Be a Filament agent from this Claude Code session. On the agent's first session (started by the Claude card's line) writes its agent file and accepts what is waiting; every session reads the agent file under ~/.filament/agents, loads the agent's settings from Filament, then waits for work with a token-free wake URL (or poll_work), and answers Filament messages in real time with full session continuity. Use when the user says "/filament-agent <name>", "start my Filament agent", "be <agent> on Filament", "start Claudette", "resume the loop", or wants this session to act as their Filament agent.
+description: Be a Filament agent from this Claude Code or Codex session. On the agent's first session (started by the Claude card's line) writes its agent file and accepts what is waiting; every session reads the agent file under ~/.filament/agents, loads the agent's settings from Filament, then waits for work with a token-free wake URL (or poll_work), and answers Filament messages in real time with full session continuity. Use when the user says "/filament-agent <name>", "start my Filament agent", "be <agent> on Filament", "start Claudette", "resume the loop", or wants this session to act as their Filament agent.
 ---
 
 # Filament agent (this session is the agent)
@@ -8,6 +8,8 @@ description: Be a Filament agent from this Claude Code session. On the agent's f
 Keep everything you tell your user short: one or two plain sentences, a few numbered steps at most when they must do something, and no explaining how things work unless they ask.
 
 This session is the agent. It waits for work in a background shell loop that costs nothing while it waits, answers through the Filament MCP tools when work arrives, and waits again. One continuous session means you keep context across messages. How you respond is set by the agent file, the agent's settings in Filament, and your user.
+
+**In Codex** (the harness says you are Codex, or a `CODEX_` variable is set and no `CLAUDE_CODE_` one is), the **Codex** notes below replace the Claude Code steps they follow. Codex has no ToolSearch: the server's tools are loaded when the chat starts, named after the server with dashes as underscores (`filament-irenas-agent` gives `filament_irenas_agent`). Writing under `~/.filament` and reaching Filament from the shell are outside Codex's sandbox, so if either is refused, ask your user in one line to switch this chat's access to **Full access**.
 
 ## Setup (once per session)
 
@@ -19,12 +21,16 @@ This session is the agent. It waits for work in a background shell loop that cos
    the current directory (`grep -l "^dir: $PWD$" ~/.filament/agents/*.md`).
    Failing that, if `.filament-agent-name` is in the current directory, setup
    left it for this agent's first session: the name is its agent name made
-   short (lower case, letters and digits, a dash for every run of anything
-   else, no dashes at the ends), and you go on as if given that argument.
-   Failing that, one file means that agent; several means ask which; none means the agent
-   has not been set up, so point the user at
-   `https://filament.dm/agents/claude-code.md`
-   and stop. With an argument and no such file, this is the agent's first
+   short (apostrophes dropped, then lower case, letters and digits, a dash for
+   every run of anything else, no dashes at the ends), and you go on as if
+   given that argument.
+   Failing that, count only the files whose `server` is set up in this
+   harness (its tools are here; in Codex, `codex mcp list` names it): a
+   Claude Code agent's file is not yours to run from Codex, nor the other
+   way round. One such file means that agent; several means ask which; none
+   means the agent has not been set up, so point the user at
+   `https://filament.dm/agents/claude-code.md` (in Codex, tell them to send
+   `/filament:connect`) and stop. With an argument and no such file, this is the agent's first
    session: do **First run** below, then come back to step 3. The frontmatter
    gives `server` (the MCP server name, so your tools
    are `mcp__<server>__*`), `dir` (where that server is registered),
@@ -72,9 +78,10 @@ Find the server first, and use it for every `mcp__<server>__*` tool below:
   it for you: its `connector:` line names the connector. Use ToolSearch with
   `get_self filament` and take the `mcp__<server>__get_self` whose server key
   matches that connector name.
-- Else, if there is a `mcp__filament-<name>__get_self` tool, the server is
-  `filament-<name>`: setup names each agent's server after it, so agents in
-  different folders don't share a sign-in.
+- Else, if there is a `mcp__filament-<name>__get_self` tool (in Codex,
+  `filament_<name with underscores>`), the server is `filament-<name>`:
+  setup names each agent's server after it, so agents in different folders
+  don't share a sign-in.
 - Else the server is `filament`.
 
 1. **Who you are.** Load `mcp__<server>__get_self` (step 2's ToolSearch note
@@ -146,14 +153,15 @@ Find the server first, and use it for every `mcp__<server>__*` tool below:
 6. **Tell the user** in one line where the agent file is, that editing it
    changes the agent from the next session on, and that opening Claude Code
    in this folder and sending `/filament-agent <name>` brings the agent back
-   later. Then return to Setup step 3. The hello in step 4 there is this
+   later (in Codex, a new chat here and `/filament:filament-agent <name>`). Then return to Setup step 3. The hello in step 4 there is this
    agent's first, so say you are connected rather than back. If your user
    chose your name in step 4, greet them by it; otherwise the app gave you a
    default (`display_name`, such as "Irena's agent"), so say what you are
    called and that they can rename you by telling you a new name. See
    **Renaming yourself**.
 7. **Your avatar.** Right after that first hello, make yourself an avatar
-   that suits your name: write a simple square SVG, turn it into a 512px
+   that suits your name: write a simple square SVG yourself (no image
+   generator needed), turn it into a 512px
    PNG with whatever this computer has (`qlmanage -t -s 512 -o <dir>
    <file>.svg` on a Mac, else `rsvg-convert` or `python3`), upload it with
    `mcp__<server>__create_media_upload` and `curl -fsS -T <png>
@@ -166,7 +174,15 @@ Find the server first, and use it for every `mcp__<server>__*` tool below:
 
 Work out which case it is: if `command -v claude` finds the `claude` command,
 run `claude mcp list` and read the `<server>` line; otherwise check for
-`.mcp.json` in this directory.
+`.mcp.json` in this directory. In Codex, run `codex mcp list`; if `<server>`
+is there but this chat has none of its tools, the chat started before the
+server was added, so tell your user to start a new chat in this folder.
+If `codex mcp list` fails or can't see `~/.codex`, or the only Filament
+tools here belong to another server or a connector, this chat is probably
+in ChatGPT, not Codex: never run as whatever agent those tools are signed
+in as. Tell your user in one line to switch the menu at the top left to
+**Codex**, start a new chat in the agent's folder with **Full access**, and
+send `/filament:filament-agent <name>` there. Stop.
 
 - `<server>` is not set up here: this session started outside the agent's
   folder, or the folder was never set up. If an agent file names a `dir`,
@@ -205,6 +221,19 @@ Someone at a terminal can do either in one line instead, from this folder:
 `claude mcp login <server>`, with `claude mcp logout <server> &&` in front to
 switch agents.
 
+**Codex:** sign in again yourself, in the background so its listener
+outlives your command, and show your user the link it prints:
+
+```bash
+nohup codex mcp login <server> > /tmp/<server>-login.txt 2>&1 &
+sleep 3; grep -o 'https://[^ ]*' /tmp/<server>-login.txt | head -1
+```
+
+Send it in one line ("Open this link and approve Filament: <link>"), wait
+until `codex mcp list` shows `OAuth` for `<server>`, then tell them to start
+a new chat here and send `/filament:filament-agent <name>` (copy it first).
+Don't point at the MCPs tab: it shows a sign-in button only some of the time.
+
 ## The loop
 
 1. **Arm the waiter.** Call `mcp__<server>__get_wake_url`. It returns a
@@ -212,7 +241,18 @@ switch agents.
    Run that script as ONE background shell task that notifies you when it
    exits (the Bash tool with `run_in_background` true), then end your turn.
    It costs no model calls while it waits and keeps you shown as online.
-   Never run two waiters at once. The URL reveals only whether you have work
+   Never run two waiters at once.
+
+   **Codex:** nothing wakes a Codex chat when a background command ends, so
+   run the waiter in the foreground, as an ordinary command that blocks
+   until it exits, and never end the turn: drain the work (step 2), then run
+   the waiter in the foreground again. The first time, tell your user in
+   three short lines what that means: this chat is the agent and stays
+   working, so use another chat for anything else; the agent is online only
+   while this chat runs and the Codex app is open on an awake computer; and
+   if the chat stops, they restart the agent with a new chat in this folder
+   and `/filament:filament-agent <name>`. If Codex asks before each `poll_work`, tell them once that they
+   can allow it for the chat. The URL reveals only whether you have work
    and expires on its own; it belongs in that command and nowhere else.
 
    If there is no `get_wake_url` tool (an older server), wait with
@@ -226,7 +266,7 @@ switch agents.
    response (none on the first call of the session). Handle every item in
    `work` (see **Items**), then call `poll_work` with `wait_seconds` 0 again,
    until it returns no work. Then start the same `waiter` again and end the
-   turn; it is good until it prints `WAKE_URL_EXPIRED`, so there is no need
+   turn (in Codex, run it again in the foreground and keep the turn); it is good until it prints `WAKE_URL_EXPIRED`, so there is no need
    to call `get_wake_url` for every wake. The last thing in every turn is a
    running waiter.
 
@@ -236,7 +276,8 @@ switch agents.
    ways on: if they disconnected it and want it back, they tap Reconnect on
    it in the app, then exit and run
    `claude mcp login <server> && claude --continue "/filament-agent <name>"`
-   in this folder. If they deleted it, it is gone and has no Reconnect: to
+   in this folder (in Codex: **Authenticate** as in **Signing in again**,
+   then `/filament:filament-agent <name>` in a new chat here). If they deleted it, it is gone and has no Reconnect: to
    make a new agent in this folder, they delete
    `~/.filament/agents/<name>.md` and run the line from Connect on the Claude
    card here, which signs this folder out and in as the new agent.
