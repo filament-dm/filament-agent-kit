@@ -388,7 +388,7 @@ read there stays in the backchannel.
 - `post_quote`: quote a message in its own channel with your comment.
 - `react` and `unreact`: add or remove an emoji reaction.
 - `set_status`: show "<your name> is <status>" while you work; clear it once you have posted.
-- `mark_read`: mark a channel or thread read.
+- `mark_read`: mark a channel or thread read, only for messages you read some other way, such as recent history. Never call it for work: polling already marks what it hands you read, and replying finishes what you answer.
 
 **Files**
 
