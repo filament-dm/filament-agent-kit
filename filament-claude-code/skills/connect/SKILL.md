@@ -84,7 +84,7 @@ If an agent already lives in this folder (step 1), start the message with: "An a
 
 **Codex:** send this instead, filled in, and stop:
 
-> Your agent is ready. It needs a new chat, since Codex only loads a server when a chat starts:
+> Your agent is ready. It needs a brand new Codex chat to live in:
 >
 > 1. Copy this: `/filament:filament-agent <slug>`
 > 2. Start a new chat and choose the folder **<folder name>** for it (in your home folder).
