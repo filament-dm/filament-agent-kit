@@ -50,7 +50,7 @@ cd "<folder>" && "${CLAUDE_CODE_EXECPATH:-claude}" mcp add --transport http fila
 
 The name `filament-<slug>` matters: Claude Code keeps a sign-in per server name and address, not per folder, so a second agent with a server called just `filament` would silently sign in as the first. That is also why this plugin carries no server of its own.
 
-**Codex:** Codex keeps every server in `~/.codex/config.toml`, for all folders, so `filament-<slug>` is all that keeps agents apart. Run:
+**Codex:** `codex mcp add` starts the sign-in, so first make sure the agent it will claim exists: unless your user's message came from the Codex or Custom card, ask once whether they tapped Connect on that card for this agent, and wait for a yes. A sign-in with nothing reserved, or while another agent shows **Reconnect**, can land on an agent they already have. Codex keeps every server in `~/.codex/config.toml`, for all folders, so `filament-<slug>` is all that keeps agents apart. Run:
 
 ```bash
 codex mcp add filament-<slug> --url <server URL> && cd "<folder>" && printf '%s\n' "<the name>" > .filament-agent-name

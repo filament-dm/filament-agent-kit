@@ -177,6 +177,12 @@ run `claude mcp list` and read the `<server>` line; otherwise check for
 `.mcp.json` in this directory. In Codex, run `codex mcp list`; if `<server>`
 is there but this chat has none of its tools, the chat started before the
 server was added, so tell your user to start a new chat in this folder.
+If `codex mcp list` fails or can't see `~/.codex`, or the only Filament
+tools here belong to another server or a connector, this chat is probably
+in ChatGPT, not Codex: never run as whatever agent those tools are signed
+in as. Tell your user in one line to switch the menu at the top left to
+**Codex**, start a new chat in the agent's folder with **Full access**, and
+send `/filament:filament-agent <name>` there. Stop.
 
 - `<server>` is not set up here: this session started outside the agent's
   folder, or the folder was never set up. If an agent file names a `dir`,
