@@ -719,13 +719,15 @@ class UpdateTest(ListenerCase):
         self.assertEqual(result.stderr, '', result.stderr)
         return result.stdout.splitlines()
 
-    def release(self, version=NEW, script_version=None):
+    def release(self, version=NEW, script_version=None, routine_version=None):
         self.fake.guide = {'reported': None, 'update': {'version': version, 'url': GUIDE}}
         self.fake.files[GUIDE] = '---\nguide_id: grokbot\nversion: "%s"\n---\n# GrokBot\n' % version
         script = Path(SCRIPT).read_text().replace(
             "REVISION = '%s'" % self.revision, "REVISION = '%s'" % (script_version or version))
-        self.fake.files['https://raw.githubusercontent.com/filament-dm/filament-agent-kit/pablo/next/'
-                        'filament-grokbot/listen.py'] = script
+        base = 'https://raw.githubusercontent.com/filament-dm/filament-agent-kit/pablo/next/filament-grokbot/'
+        self.fake.files[base + 'listen.py'] = script
+        self.fake.files[base + 'ROUTINE.md'] = '<!-- grokbot %s -->\n# Routine\n' % (
+            routine_version or version)
 
     def reports(self):
         return [c['args'] for c in self.fake.tool_calls if c['name'] == 'report_guide_version']
@@ -739,6 +741,7 @@ class UpdateTest(ListenerCase):
         self.assertEqual(self.run_copy('--update'), ['UPDATED %s' % NEW])
         self.assertIn("REVISION = '%s'" % NEW, self.script.read_text())
         self.assertIn("REVISION = '%s'" % self.revision, (self.state / 'listen.py.previous').read_text())
+        self.assertEqual((self.state / 'ROUTINE.md').read_text(), '<!-- grokbot %s -->\n# Routine\n' % NEW)
         self.assertEqual(self.reports(), [{'guide_id': 'grokbot', 'version': NEW}])
         # Nothing more to do: the same command is idempotent.
         self.fake.guide = {'reported': None, 'update': None}
@@ -750,6 +753,16 @@ class UpdateTest(ListenerCase):
         output = self.run_copy('--update')
         self.assertTrue(output[0].startswith('FAILED the listener does not match'), output)
         self.assertEqual(self.script.read_text(), before)
+        self.assertEqual(self.reports(), [])
+
+    def test_a_routine_protocol_that_does_not_match_the_guide_installs_nothing(self):
+        self.release(routine_version='2099-01-01.2')
+        (self.state / 'ROUTINE.md').write_text('old protocol')
+        before = self.script.read_text()
+        output = self.run_copy('--update')
+        self.assertTrue(output[0].startswith('FAILED the routine protocol does not match'), output)
+        self.assertEqual(self.script.read_text(), before)
+        self.assertEqual((self.state / 'ROUTINE.md').read_text(), 'old protocol')
         self.assertEqual(self.reports(), [])
 
     def test_an_update_never_moves_back(self):
@@ -833,6 +846,8 @@ class RevisionTest(unittest.TestCase):
         version = re.search(r'^version: "([^"]+)"$', guide, re.M).group(1)
         revision = re.search(r"^REVISION = '([^']+)'$", Path(SCRIPT).read_text(), re.M).group(1)
         self.assertEqual(revision, version)
+        routine = (Path(SCRIPT).parent / 'ROUTINE.md').read_text()
+        self.assertEqual(routine.split('\n', 1)[0], '<!-- grokbot %s -->' % version)
 
 
 if __name__ == '__main__':
