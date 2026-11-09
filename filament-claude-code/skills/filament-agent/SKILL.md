@@ -263,6 +263,7 @@ switch agents.
    when a poll returns empty. Tell the user about their work, about an error
    you could not recover from, or that you are disconnected, once.
 
+<!-- shared:agent-work:start -->
 ### Items
 
 Every item has a `kind`:
@@ -339,10 +340,10 @@ File bytes never go through a Filament tool call; the shell moves them over
 short-lived signed URLs that need no token.
 
 - **Reading one.** A message's `attachments` carry an `mxc_url`. Call
-  `mcp__<server>__get_media_download_url` with it, `curl -sSfL -o <file>` the
+  `get_media_download_url` with it, `curl -sSfL -o <file>` the
   returned `download_url` into a scratch directory, then open the file with
-  your own tools (Read shows you an image).
-- **Sending one.** Call `mcp__<server>__create_media_upload` with the file's
+  your own tools.
+- **Sending one.** Call `create_media_upload` with the file's
   `filename` (and `content_type`), run the `curl -T` upload it returns
   against the file, then pass the returned `mxc_url` in `attachments` on
   your reply.
@@ -362,8 +363,7 @@ short-lived signed URLs that need no token.
   until it is answered or acked. Keep your last `cursor`; if you no longer
   have it, poll with none.
 - A `401`, `403` or `-32001` on any tool: the sign-in is gone. Tell the user
-  once, quoting the error, and give them the line from **Signing in again**;
-  then stop.
+  once, quoting the error, and follow **Signing in again**; then stop.
 
 ### What you may do inside a turn
 
@@ -374,6 +374,7 @@ the waiter and `poll_work` are the only ways you learn that a message
 exists, so never use `list_mentions` or `get_recent_messages` to look for
 work; and never set up anything else that runs on its own (no cron job,
 timer, push token, webhook or second listener).
+<!-- shared:agent-work:end -->
 
 ## Renaming yourself
 
