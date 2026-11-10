@@ -190,34 +190,38 @@ run `claude mcp list` and read the `<server>` line; otherwise check for
 
 ## Signing in again
 
-The sign-in lives in Claude's own menus, so your user does it, not you, and
-no terminal is needed. Send them the steps for their case as an ordinary
-numbered message, not folded into a question or a choice, so they can see
-exactly what to click. Then wait for any message from them and carry on from
-where you stopped. In the Claude app the server shows as a **connector**, so
-call it that.
+Sign in yourself; don't send your user looking for a button. The app's
+connectors panel doesn't list a folder's server, and `claude mcp login` needs
+a terminal, so run it under `script` in the background from this folder and
+show your user its link. First tell them in one line: "A browser window may
+open: approve Filament there."
 
-- **Not signed in yet, expired, or reconnected from the app** (`401`, `403`,
-  `-32001`, or needs authentication). In the Claude app:
-  > Click **Authenticate** (or **Reconnect**) next to **Filament <name with
-  > spaces>** in the panel on the right, approve in the browser, then tell
-  > me "done".
+```bash
+(script -q /dev/null "${CLAUDE_CODE_EXECPATH:-claude}" mcp login <server> < /dev/null > /tmp/<server>-login.txt 2>&1 &); sleep 4; perl -ne 'if (m{(https://[^\s\x1b\x07]*/oauth/authorize[^\s\x1b\x07]*)}) { print "$1\n"; exit }' /tmp/<server>-login.txt
+```
 
-  If they can't find it: the panel button at the top right shows the panel,
-  and a **Reconnect <server>** button in the chat does the same thing.
+(On Linux: `script -qec '"${CLAUDE_CODE_EXECPATH:-claude}" mcp login <server>' /dev/null`.)
+Send the link in one line ("If no browser opened, open this and approve
+Filament: <link>"), then wait for it, and never start a second sign-in while
+one is open: each sign-in claims a new agent.
 
-  In a terminal: type `/mcp`, choose `<server>`, then Authenticate (or
-  Re-authenticate), and approve in the browser. On the first run, end with
-  one line saying that once they are signed in, you will greet them in
-  Filament and talk to them there from then on.
-- **Switching this folder to another agent** (the folder is signed in as an
-  earlier one): type `/mcp`, choose `<server>`, clear its authentication,
-  then Authenticate again; the browser asks which agent to sign in as, which
-  is the one they just made in the app.
+```bash
+for i in $(seq 60); do "${CLAUDE_CODE_EXECPATH:-claude}" mcp get <server> 2>/dev/null | grep -q "Connected" && echo SIGNED_IN && break; sleep 5; done
+```
 
-Someone at a terminal can do either in one line instead, from this folder:
-`claude mcp login <server>`, with `claude mcp logout <server> &&` in front to
-switch agents.
+This session started before the sign-in, so it can't load the tools. Once it
+prints `SIGNED_IN`, tell your user to start a new session in this folder and
+send `/filament:filament-agent <name>` there (on the first run, add that you
+will greet them in Filament from then on). In a terminal, that's `claude
+--continue "/filament-agent <name>"` from this folder.
+
+- **Switching this folder to another agent** (it is signed in as an earlier
+  one): run `"${CLAUDE_CODE_EXECPATH:-claude}" mcp logout <server>` first,
+  then the sign-in above; the browser asks which agent to sign in as, which is
+  the one they just made in the app.
+- **A connector from claude.ai** (tools named `mcp__claude_ai_Filament_…`)
+  is the exception: it does show in the panel. There, tell your user to click
+  **Authenticate** (or **Reconnect**) next to it and approve.
 
 ## The loop
 
