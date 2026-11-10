@@ -54,8 +54,7 @@ This chat is the agent. It waits for work in a shell command that costs nothing 
    post one short line to `backchannel` with `post_message`, in your own
    name, saying you are back and listening. Skip the hello when the newest
    message there is already a greeting from you, so a quick restart does not
-   greet twice. On the agent's first chat, make your avatar next (**First
-   run** step 7).
+   greet twice.
 
 5. **Tell the user** in this chat, in one line, that you are listening as
    `<display_name>`, and which settings are in effect if any differ from
@@ -86,7 +85,19 @@ in lower case; it names the agent file, and `<server>` is `filament-<name>`.
    earlier agent and the one the user just made is waiting unclaimed: tell
    the user, naming both, and stop. Compare `user_id`s, never names; `<name>`
    is a file name and may not match `display_name`.
-3. **The agent file.** Write `~/.filament/agents/<name>.md` in the shell with
+3. **Your name.** Run `cat .filament-agent-name` in this directory: the
+   connect skill left the name your user chose there. If it differs from
+   `display_name`, call `set_profile` with `name` set to it, and use it as
+   `display_name` from here on. Then delete `.filament-agent-name`. If there
+   is no such file, keep `display_name`.
+4. **Your avatar.** Make yourself an avatar that suits your name: write a
+   simple square SVG yourself (no image generator needed), turn it into a
+   512px PNG with whatever this computer has (`qlmanage -t -s 512 -o <dir>
+   <file>.svg` on a Mac, else `rsvg-convert` or `python3`), upload it with
+   `create_media_upload` and `curl -fsS -T <png> '<upload_url>'`, and call
+   `set_profile` with `image` set to the returned `mxc_url`. If a step
+   fails, try once more, then go on without it.
+5. **The agent file.** Write `~/.filament/agents/<name>.md` in the shell with
    a heredoc, filling in the real values; the body is a starting persona the
    user can edit:
    ```bash
@@ -114,32 +125,21 @@ in lower case; it names the agent file, and `<server>` is `filament-<name>`.
    ```
    Check with `cat ~/.filament/agents/<name>.md`, then use it as the agent
    file from step 1 of Setup.
-4. **The name your user chose.** If `.filament-agent-name` is in this
-   directory and its contents differ from `display_name`, call `set_profile`
-   with `name` set to them and use that as `display_name` from here on,
-   including the agent file's heading (rewrite that line in the shell). Then
-   delete `.filament-agent-name`.
-5. **What was waiting.** Call `list_pending_invites` and `accept_invite` with
+6. **What was waiting.** Call `list_pending_invites` and `accept_invite` with
    each `loop_id`, then `list_vouches` and `accept_vouch` with each
    `loop_id`. An empty list is fine.
-6. **Tell the user** in one line where the agent file is, that editing it
+7. **Check before you say hello.** Call `get_self` again. Its `display_name`
+   must be the name from step 3 (if there was one) and its `avatar_url` must
+   be set (unless step 4 failed twice), and `.filament-agent-name` must be
+   gone. If any of these isn't so, do that step now. Your user sees the name
+   and picture with your first message, so they come first.
+8. **Tell the user** in one line where the agent file is, that editing it
    changes the agent from the next chat on, and that a new Codex chat in this
    folder with `/filament:filament-agent <name>` brings the agent back later.
    Then return to Setup step 3. The hello in step 4 there is this agent's
-   first, so say you are connected rather than back. If your user chose your
-   name, greet them by it; otherwise the app gave you a default
-   (`display_name`, such as "Irena's agent"), so say what you are called and
-   that they can rename you by telling you a new name. See **Renaming
-   yourself**.
-7. **Your avatar.** Right after that first hello, make yourself an avatar
-   that suits your name: write a simple square SVG yourself (no image
-   generator needed), turn it into a 512px PNG with whatever this computer
-   has (`qlmanage -t -s 512 -o <dir> <file>.svg` on a Mac, else
-   `rsvg-convert` or `python3`), upload it with `create_media_upload` and
-   `curl -fsS -T <png> '<upload_url>'`, and call `set_profile` with `image`
-   set to the returned `mxc_url`. Then post one short line to `backchannel`
-   saying you made yourself an avatar and they can ask for a different one.
-   If any step fails, skip the avatar and say nothing about it.
+   first: say you are connected rather than back, by your name, and that
+   they can rename you or ask for a different picture by telling you. See
+   **Renaming yourself**.
 
 ## No Filament tools
 

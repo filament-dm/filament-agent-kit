@@ -51,6 +51,8 @@ Tell your user in one line: "A browser window may open: approve Filament there."
 codex mcp add filament-<slug> --url <server URL> && cd "<folder>" && printf '%s\n' "<the name>" > .filament-agent-name
 ```
 
+`<the name>` is the name exactly as your user gave it ("Irena's agent"), not `<slug>`: the agent's first chat sets its Filament name from that file.
+
 Writing `~/.codex/config.toml` is outside Codex's sandbox. If the command is refused, tell your user in one line to switch this chat's access to **Full access** (or approve the request), then run it again.
 
 Then check, and never sign in twice: each sign-in claims a new agent. Run `codex mcp list` and read the **Auth** column for `filament-<slug>`:
