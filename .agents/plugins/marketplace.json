@@ -1,0 +1,20 @@
+{
+  "name": "filament",
+  "interface": {
+    "displayName": "Filament"
+  },
+  "plugins": [
+    {
+      "name": "filament",
+      "source": {
+        "source": "local",
+        "path": "./filament-codex"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_USE"
+      },
+      "category": "Communication"
+    }
+  ]
+}
