@@ -173,8 +173,13 @@ Send it in one line ("Open this link and approve Filament: <link>"). On the
 first run, add one line saying that once they are signed in, you will greet
 them in Filament and talk to them there from then on. Wait until
 `codex mcp list` shows `OAuth` for `<server>`, then tell them to start a new
-chat here and send `/filament:filament-agent <name>` (copy it first): this
-chat can't load the new sign-in. Don't point at the MCPs tab: it shows a
+chat here (Codex, Full access) and send this, in its own code block so it
+has a copy button, since this chat can't load the new sign-in:
+
+```
+/filament:filament-agent <name>
+```
+ Don't point at the MCPs tab: it shows a
 sign-in button only some of the time.
 
 ## The loop
