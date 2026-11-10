@@ -1,0 +1,10 @@
+{
+  "kind": "worker",
+  "entry": "relay.mjs",
+  "bindings": [
+    { "type": "kv", "name": "SEEN" }
+  ],
+  "worker": {
+    "compatibility_date": "2026-08-01"
+  }
+}
