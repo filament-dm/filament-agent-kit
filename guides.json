@@ -42,5 +42,9 @@
   "custom": {
     "path": "filament-custom",
     "guide": "CUSTOM.md"
+  },
+  "tools": {
+    "path": "filament-tools",
+    "guide": "TOOLS.md"
   }
 }

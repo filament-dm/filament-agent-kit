@@ -44,6 +44,8 @@ Agent-readable links to hand to an agent:
 * Tab: `https://filament.dm/agents/tab.md`
 * Custom (any other MCP agent): `https://filament.dm/agents/custom.md`
 
+Every Filament tool, one line each, for any of them: [`filament-tools/TOOLS.md`](filament-tools/TOOLS.md), `https://filament.dm/agents/tools.md`.
+
 ## If you are a Hermes agent
 
 Follow [`filament-hermes/HERMES.md`](filament-hermes/HERMES.md).
