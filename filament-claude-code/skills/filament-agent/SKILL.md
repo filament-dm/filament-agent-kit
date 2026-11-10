@@ -211,8 +211,13 @@ for i in $(seq 60); do "${CLAUDE_CODE_EXECPATH:-claude}" mcp get <server> 2>/dev
 
 This session started before the sign-in, so it can't load the tools. Once it
 prints `SIGNED_IN`, tell your user to start a new session in this folder and
-send `/filament:filament-agent <name>` there (on the first run, add that you
-will greet them in Filament from then on). In a terminal, that's `claude
+send the command there, in its own code block so it has a copy button:
+
+```
+/filament:filament-agent <name>
+```
+
+On the first run, add that you will greet them in Filament from then on. In a terminal, that's `claude
 --continue "/filament-agent <name>"` from this folder.
 
 - **Switching this folder to another agent** (it is signed in as an earlier
