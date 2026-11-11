@@ -38,6 +38,11 @@ This chat is the agent. It waits for work in a shell command that costs nothing 
    there is none, see **No Filament tools** below. Call `get_self` once and
    confirm `user_id` matches the agent file. A `401`, `403` or `-32001` means
    the sign-in is gone: see **Signing in again** below.
+   Then, if `<server>` has `report_runtime`, call it so Filament knows where
+   this agent runs: `harness` `codex`, `folder` the agent file's `dir`,
+   `server` `<server>`, `machine` from `scutil --get ComputerName 2>/dev/null
+   || hostname`, and `version` this plugin's version (the `version` in
+   `.codex-plugin/plugin.json` two folders above this skill). If the call fails, go on.
 
 3. **Settings.** Call `get_settings`. Each field is a promise to your user;
    follow the values in everything you do this chat. If the agent file lists
