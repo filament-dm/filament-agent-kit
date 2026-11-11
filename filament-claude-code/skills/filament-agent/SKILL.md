@@ -39,6 +39,11 @@ This session is the agent. It waits for work in a background shell loop that cos
    see **No Filament tools** below. Call `get_self` once and confirm `user_id`
    matches the agent file. A `401`, `403` or `-32001` means the sign-in is
    gone: see **Signing in again** below.
+   Then, if the server has `report_runtime`, call it so Filament knows where
+   this agent runs: `harness` `claude-code`, `folder` the agent file's `dir`,
+   `server` `<server>`, `machine` from `scutil --get ComputerName 2>/dev/null
+   || hostname`, and `version` this plugin's version (the `version` in
+   `.claude-plugin/plugin.json` two folders above this skill). If the call fails, go on.
 
 3. **Settings.** Call `mcp__<server>__get_settings`. Each field is a promise
    to your user; follow the values in everything you do this session. If the
