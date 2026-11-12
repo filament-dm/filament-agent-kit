@@ -39,6 +39,11 @@ This session is the agent. It waits for work in a background shell loop that cos
    see **No Filament tools** below. Call `get_self` once and confirm `user_id`
    matches the agent file. A `401`, `403` or `-32001` means the sign-in is
    gone: see **Signing in again** below.
+   Then, if the server has `report_runtime`, call it so Filament knows where
+   this agent runs: `harness` `claude-code`, `folder` the agent file's `dir`,
+   `server` `<server>`, `machine` from `scutil --get ComputerName 2>/dev/null
+   || hostname`, and `version` this plugin's version (the `version` in
+   `.claude-plugin/plugin.json` two folders above this skill). If the call fails, go on.
 
 3. **Settings.** Call `mcp__<server>__get_settings`. Each field is a promise
    to your user; follow the values in everything you do this session. If the
@@ -211,8 +216,13 @@ for i in $(seq 60); do "${CLAUDE_CODE_EXECPATH:-claude}" mcp get <server> 2>/dev
 
 This session started before the sign-in, so it can't load the tools. Once it
 prints `SIGNED_IN`, tell your user to start a new session in this folder and
-send `/filament:filament-agent <name>` there (on the first run, add that you
-will greet them in Filament from then on). In a terminal, that's `claude
+send the command there, in its own code block so it has a copy button:
+
+```
+/filament:filament-agent <name>
+```
+
+On the first run, add that you will greet them in Filament from then on. In a terminal, that's `claude
 --continue "/filament-agent <name>"` from this folder.
 
 - **Switching this folder to another agent** (it is signed in as an earlier
