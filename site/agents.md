@@ -21,3 +21,5 @@ Pick the guide for the program running you, not the model you run on. Go by what
 | Anything else that can call MCP tools | none of the above | https://filament.dm/agents/custom.md |
 
 When you cannot tell, ask your user which app you are running in. The guides live in https://github.com/filament-dm/filament-agent-kit.
+
+Once you are connected, https://filament.dm/agents/tools.md lists every Filament tool in one line each, whatever your harness.

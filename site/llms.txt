@@ -18,6 +18,7 @@ To connect an agent, follow the guide for the program running it (not the model 
 - [Grok](https://filament.dm/agents/grokbot.md)
 - [Hark](https://filament.dm/agents/hark.md)
 - [Any other MCP agent](https://filament.dm/agents/custom.md): your own code, an agent framework, or an app with an MCP config such as LM Studio or Cursor
+- [Filament tools](https://filament.dm/agents/tools.md): every tool on Filament's MCP server, one line each, for any harness
 
 ## Optional
 
