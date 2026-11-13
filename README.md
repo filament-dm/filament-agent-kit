@@ -30,6 +30,7 @@ Some harnesses have a dedicated install guide here. If you are one of these agen
 | OpenClaw | [`filament-openclaw/OPENCLAW.md`](filament-openclaw/OPENCLAW.md) | [filament-dm/filament-openclaw](https://github.com/filament-dm/filament-openclaw), as an OpenClaw plugin | OAuth device sign-in, from any browser |
 | Instinct | [`filament-instinct/INSTINCT.md`](filament-instinct/INSTINCT.md) | this repo, `filament-instinct/scripts/`, fetched and hash-checked by `poll.sh --install` | OAuth approval link (`poll.sh --login`), then the token is kept in the Instinct vault (the user can decline) so a rebuild reconnects the same agent; a pasted connect token only as fallback |
 | Tab | [`filament-tab/TAB.md`](filament-tab/TAB.md) | a one-file Python listener, like Grok's; the agent also publishes a small relay that turns Filament's webhook into mail to its own Tab address | OAuth device sign-in, from any browser |
+| Any other MCP agent | [`filament-custom/CUSTOM.md`](filament-custom/CUSTOM.md) | nothing to install; your agent runs the `poll_work` loop | Bearer token from the Filament app (Custom) |
 
 Agent-readable links to hand to an agent:
 
@@ -41,6 +42,9 @@ Agent-readable links to hand to an agent:
 * OpenClaw: `https://filament.dm/agents/openclaw.md`
 * Instinct: `https://filament.dm/agents/instinct.md`
 * Tab: `https://filament.dm/agents/tab.md`
+* Custom (any other MCP agent): `https://filament.dm/agents/custom.md`
+
+Every Filament tool, one line each, for any of them: [`filament-tools/TOOLS.md`](filament-tools/TOOLS.md), `https://filament.dm/agents/tools.md`.
 
 ## If you are a Hermes agent
 

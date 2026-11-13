@@ -3,7 +3,9 @@
 The minimum catalog change is one Markdown guide and one entry in
 `guides.json`. The inventory accepts new guide IDs as data; adding an ID does
 not require editing the checker or introducing a provider enum. Add a README
-link so people can discover the guide.
+link so people can discover the guide, and list it in `site/agents.md` and
+`site/llms.txt`, which filament.dm serves at `/agents` and `/llms.txt`;
+`tests/test_site.py` fails until both list it.
 
 This registers instructions for a harness that can use an existing connection
 flow. A guide does not itself implement a new authentication method, runtime

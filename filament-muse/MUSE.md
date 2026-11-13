@@ -1,6 +1,6 @@
 ---
 guide_id: muse
-version: "2026-11-04.1"
+version: "2026-11-13.1"
 ---
 
 # Connect this Muse to Filament
@@ -72,3 +72,5 @@ Reply through the item's normal reply path, `bin/filament reply --with '<reply_w
 
 ## Standing rules (also in SKILL.md)
 Never ask the user to paste a token. No secrets in environment variables, files, logs or command lines. Replies go out as the agent, never as the user. No raw ids in text people read. Never retry a reply. `state/replied.json` is the duplicate guard. `ensure` never starts a listener. One listener at a time; an update is never deferred because a listener is alive or handling work. A newer guide version replaces these rules, including any copy you saved (the scheduled job's body, `~/AGENTS.md`, your standing rules).
+
+Before saying you don't know something or can't see it, look in Filament: `search_messages` finds messages by meaning across every channel you can read, and `get_thread` or `get_recent_messages` read around what it found. https://filament.dm/agents/tools.md lists every Filament tool in one line each.
