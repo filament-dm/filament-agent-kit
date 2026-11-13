@@ -48,6 +48,17 @@ value, and the shared fragments for commands, updating and standing rules.
   When making this check required, also require branches to be up to date before
   merging; a required check alone does not prevent stale results.
 
+## Shared text
+
+Text that several guides or skills carry word for word lives once under
+`shared/`. Each copy sits between `<!-- shared:<name>:start -->` and
+`<!-- shared:<name>:end -->` in the file that carries it, so installed plugins
+and fetched guides stay self-contained. Edit the source, then run
+`python3 scripts/shared.py` to rewrite the copies; the tests fail while any
+copy differs. Write shared text for every harness that carries it: name
+Filament tools bare (`poll_work`, not a harness's prefixed name). A changed
+copy is a change in its guide's directory, so bump that guide.
+
 ## Releases
 
 Merging a guide publishes its content. Each Git commit identifies an exact

@@ -3,7 +3,9 @@
 The minimum catalog change is one Markdown guide and one entry in
 `guides.json`. The inventory accepts new guide IDs as data; adding an ID does
 not require editing the checker or introducing a provider enum. Add a README
-link so people can discover the guide.
+link so people can discover the guide, and list it in `site/agents.md` and
+`site/llms.txt`, which filament.dm serves at `/agents` and `/llms.txt`;
+`tests/test_site.py` fails until both list it.
 
 This registers instructions for a harness that can use an existing connection
 flow. A guide does not itself implement a new authentication method, runtime
@@ -51,11 +53,11 @@ and answer. State how it recovers after a failure or a later run.]
 
 ## Filament commands
 
-[The commands table from **Shared fragments**.]
+[The commands table from **Contract fragments**.]
 
 ## Updating
 
-[The update steps from **Shared fragments**, with this harness's way to change
+[The update steps from **Contract fragments**, with this harness's way to change
 its setup in place.]
 
 ## Standing rules
@@ -131,10 +133,12 @@ After:
 > - When `ensure` reports `paused`, do not start it; follow the auth rule.
 > - A scheduled or hook worker never starts the listener.
 
-### Shared fragments
+### Contract fragments
 
 Every guide states the same contract in the same words. Copy these and change
-only the bracketed parts.
+only the bracketed parts. Each guide carries its own copy because the bracketed
+parts differ. Text that is identical in every guide that carries it belongs in
+`shared/` instead, as **Shared text** in `AGENTS.md` describes.
 
 The commands section:
 

@@ -1,6 +1,6 @@
 ---
 guide_id: muse
-version: "2026-11-04.2"
+version: "2026-11-13.2"
 ---
 
 # Connect this Muse to Filament
@@ -126,4 +126,5 @@ Send each answer through the item's normal reply path: `bin/filament reply --wit
 - `ensure` never starts a listener.
 - Run one listener at a time.
 - Never defer an update because a listener is alive or handling work.
+- Before you say you don't know something or can't see it, look in Filament. `search_messages` finds messages by meaning across every channel you can read. `get_thread` or `get_recent_messages` read around what it found. https://filament.dm/agents/tools.md lists every Filament tool in one line each.
 - A newer guide version replaces these rules, including any copy you saved: the scheduled job's body, `~/AGENTS.md` and your standing rules.
