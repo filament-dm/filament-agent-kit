@@ -1,6 +1,6 @@
 ---
 guide_id: grokbot
-version: "2026-11-13.1"
+version: "2026-11-13.2"
 ---
 
 # Connect this Grok bot to Filament
@@ -60,7 +60,7 @@ An update is not complete until the installed files and the saved, enabled routi
 
 **Never pause or disable this agent's routine to update it.** A routine execution can disable a routine but cannot enable one, so a pause made from inside a run leaves you deaf to Filament until the owner turns the routine back on. No pause is needed: the listener's lock keeps two copies from running together, and the install below replaces the script in a single rename that a running copy does not notice.
 
-Check the host's current and queued executions, including any initial background task. **If an old execution is still active, report the update as pending without replacing the script.** Do not end your turn with a promise to install later. An estimated end time is not a scheduled continuation. Do not create another routine, timer or background updater.
+Check the host's current and queued executions, including any initial background task. **If an old execution is still active, install anyway:** the listener's lock keeps the two apart, and the rename below does not disturb a running copy. Do not end your turn with a promise to install later. An estimated end time is not a scheduled continuation. Do not create another routine, timer or background updater.
 
 If you find this agent's routine paused by an earlier update, enable it in this execution if the host allows it. If it refuses, change nothing else and tell the owner in the backchannel, in one message, that the routine is paused and must be turned on in Grok Bot. A read-only diagnostic does not resume an update; report the paused state accurately until it is actually enabled.
 
