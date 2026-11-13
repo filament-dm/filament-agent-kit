@@ -1,6 +1,6 @@
 ---
 guide_id: claude-code
-version: "2026-11-10.2"
+version: "2026-11-13.1"
 ---
 
 # Connect Claude Code to Filament
@@ -28,6 +28,7 @@ Self link: `https://filament.dm/agents/claude-code.md`.
 - If a file in `~/.filament/agents/` has a `dir:` line equal to `$PWD`, an agent already lives here, so the new one needs a new folder.
 - If `$PWD` is a git repository or has more than a handful of files, it looks like someone's project, so ask about the folder in step 2.
 - Otherwise this folder is fine.
+- Also run `echo "$CLAUDE_CODE_ENTRYPOINT"`: `cli` means your user is in a terminal, not the app, which changes the handover.
 
 ## 2. Ask your questions
 
@@ -63,10 +64,10 @@ The name `filament-<slug>` matters: Claude Code keeps a sign-in per server name 
 Then sign the server in from here, so the agent's first session starts with its tools. The app's connectors panel doesn't list a folder's server, so don't send your user looking for it. `claude mcp login` needs a terminal, so run it under `script` in the background, and show your user its link. First tell them in one line: "A browser window may open: approve Filament there."
 
 ```bash
-cd "<folder>" && (script -q /dev/null "${CLAUDE_CODE_EXECPATH:-claude}" mcp login filament-<slug> < /dev/null > /tmp/filament-<slug>-login.txt 2>&1 &); sleep 4; perl -ne 'if (m{(https://[^\s\x1b\x07]*/oauth/authorize[^\s\x1b\x07]*)}) { print "$1\n"; exit }' /tmp/filament-<slug>-login.txt
+cd "<folder>" && (script -q /dev/null "${CLAUDE_CODE_EXECPATH:-claude}" mcp login filament-<slug> < /dev/null > /tmp/filament-<slug>-login.txt 2>&1 &); sleep 4; perl -ne 'if (m{(https?://[^\s\x1b\x07]*/oauth/authorize[^\s\x1b\x07]*)}) { print "$1\n"; exit }' /tmp/filament-<slug>-login.txt
 ```
 
-(On Linux, `script` takes the command differently: `script -qec '"${CLAUDE_CODE_EXECPATH:-claude}" mcp login filament-<slug>' /dev/null`.) Send your user the link in one line ("If no browser opened, open this and approve Filament: <link>"), then wait for the sign-in, and never start a second one: each sign-in claims a new agent.
+(On Linux, `script` takes the command differently: `script -qec '"${CLAUDE_CODE_EXECPATH:-claude}" mcp login filament-<slug>' /dev/null`.) Send your user the link in one line ("If no browser opened, open this and approve Filament: <link>"), then wait for the sign-in, and never start a second one: each sign-in claims a new agent. Give the wait a 6-minute timeout: it can take 5 minutes, and the Bash tool stops a command after 2 minutes unless told otherwise.
 
 ```bash
 cd "<folder>" && for i in $(seq 60); do "${CLAUDE_CODE_EXECPATH:-claude}" mcp get filament-<slug> 2>/dev/null | grep -q "Connected" && echo SIGNED_IN && break; sleep 5; done
@@ -89,7 +90,25 @@ Your agent needs a new session: Claude Code only loads the Filament connector wh
 ```
 ````
 
-If the sign-in in step 4 didn't finish, put this step first: "Sign it in: tell me here when you're ready and I'll send a new link." (Run step 4's sign-in again when they do.) If an agent already lives in this folder (step 1), start the message with: "An agent already lives in this folder, so yours has its own: **<folder name>**." If `<folder>` is a new folder rather than this one, step 1 is instead: start a new session (**+ New** at the top of the left sidebar), click the folder name under the message box, choose **Open folder…**, and open **<folder name>** in your home folder. (The app has never opened it, so it isn't in that menu's Recent list.) In a terminal (`CLAUDE_CODE_ENTRYPOINT` is `cli`), step 1 is `cd "<folder>"` then `claude`.
+If `CLAUDE_CODE_ENTRYPOINT` is `cli` (step 1), your user is in a terminal: send this instead, with `<folder>` as a full path:
+
+````markdown
+Your agent needs a new session: Claude Code only loads the Filament connector when a session starts, so this one can't use it.
+
+1. In a terminal, run this to start a new session there:
+
+```
+cd "<folder>" && claude
+```
+
+2. Copy this, paste it there and press **Enter**:
+
+```
+/filament-agent
+```
+````
+
+If the sign-in in step 4 didn't finish, put this step first: "Sign it in: tell me here when you're ready and I'll send a new link." (Run step 4's sign-in again when they do.) If an agent already lives in this folder (step 1), start the message with: "An agent already lives in this folder, so yours has its own: **<folder name>**." In the app, if `<folder>` is a new folder rather than this one, step 1 is instead: start a new session (**+ New** at the top of the left sidebar), click the folder name under the message box, choose **Open folder…**, and open **<folder name>** in your home folder. (The app has never opened it, so it isn't in that menu's Recent list.)
 
 The skill's first run does the rest. If your user comes back here with a problem, help with the step they are on.
 
