@@ -9,6 +9,11 @@ Keep everything you tell your user short: one or two plain sentences, a few numb
 
 This session is the agent. It waits for work in a background shell loop that costs nothing while it waits, answers through the Filament MCP tools when work arrives, and waits again. One continuous session means you keep context across messages. How you respond is set by the agent file, the agent's settings in Filament, and your user.
 
+The command that starts this agent, `<agent command>` below, is
+`/filament:filament-agent` when this skill came with the Filament plugin (a
+`.claude-plugin/plugin.json` sits two folders above it), else
+`/filament-agent`.
+
 ## Setup (once per session)
 
 1. **Agent file.** The argument is the agent name. Print
@@ -162,7 +167,7 @@ Find the server first, and use it for every `mcp__<server>__*` tool below:
    `accept_vouch` with each `loop_id`. An empty list is fine.
 6. **Tell the user** in one line where the agent file is, that editing it
    changes the agent from the next session on, and that opening Claude Code
-   in this folder and sending `/filament-agent <name>` brings the agent back
+   in this folder and sending `<agent command> <name>` brings the agent back
    later. Then return to Setup step 3. The hello in step 4 there is this
    agent's first, so say you are connected rather than back. If your user
    chose your name in step 4, greet them by it; otherwise the app gave you a
@@ -202,13 +207,15 @@ show your user its link. First tell them in one line: "A browser window may
 open: approve Filament there."
 
 ```bash
-(script -q /dev/null "${CLAUDE_CODE_EXECPATH:-claude}" mcp login <server> < /dev/null > /tmp/<server>-login.txt 2>&1 &); sleep 4; perl -ne 'if (m{(https://[^\s\x1b\x07]*/oauth/authorize[^\s\x1b\x07]*)}) { print "$1\n"; exit }' /tmp/<server>-login.txt
+(script -q /dev/null "${CLAUDE_CODE_EXECPATH:-claude}" mcp login <server> < /dev/null > /tmp/<server>-login.txt 2>&1 &); sleep 4; perl -ne 'if (m{(https?://[^\s\x1b\x07]*/oauth/authorize[^\s\x1b\x07]*)}) { print "$1\n"; exit }' /tmp/<server>-login.txt
 ```
 
 (On Linux: `script -qec '"${CLAUDE_CODE_EXECPATH:-claude}" mcp login <server>' /dev/null`.)
 Send the link in one line ("If no browser opened, open this and approve
 Filament: <link>"), then wait for it, and never start a second sign-in while
-one is open: each sign-in claims a new agent.
+one is open: each sign-in claims a new agent. Give the wait a 6-minute
+timeout: it can take 5 minutes, and the Bash tool stops a command after 2
+minutes unless told otherwise.
 
 ```bash
 for i in $(seq 60); do "${CLAUDE_CODE_EXECPATH:-claude}" mcp get <server> 2>/dev/null | grep -q "Connected" && echo SIGNED_IN && break; sleep 5; done
@@ -219,11 +226,11 @@ prints `SIGNED_IN`, tell your user to start a new session in this folder and
 send the command there, in its own code block so it has a copy button:
 
 ```
-/filament:filament-agent <name>
+<agent command> <name>
 ```
 
 On the first run, add that you will greet them in Filament from then on. In a terminal, that's `claude
---continue "/filament-agent <name>"` from this folder.
+--continue "<agent command> <name>"` from this folder.
 
 - **Switching this folder to another agent** (it is signed in as an earlier
   one): run `"${CLAUDE_CODE_EXECPATH:-claude}" mcp logout <server>` first,
@@ -263,7 +270,7 @@ On the first run, add that you will greet them in Filament from then on. In a te
    agent was disconnected or deleted in Filament, then stop. Give them both
    ways on: if they disconnected it and want it back, they tap Reconnect on
    it in the app, then exit and run
-   `claude mcp login <server> && claude --continue "/filament-agent <name>"`
+   `claude mcp login <server> && claude --continue "<agent command> <name>"`
    in this folder. If they deleted it, it is gone and has no Reconnect: to
    make a new agent in this folder, they delete
    `~/.filament/agents/<name>.md` and run the line from Connect on the Claude

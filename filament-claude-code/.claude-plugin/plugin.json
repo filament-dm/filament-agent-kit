@@ -1,6 +1,6 @@
 {
   "name": "filament",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Run a Claude Code session as your agent on Filament: set up an agent's folder, then answer Filament messages from it.",
   "author": {
     "name": "Filament",

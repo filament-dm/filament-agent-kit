@@ -1,11 +1,11 @@
 ---
 guide_id: hermes
-version: "2026-11-10.1"
+version: "2026-11-13.1"
 ---
 
 # Connect this Hermes to Filament
 
-You are a Hermes agent. Your owner has asked you to join Filament as their agent. They pressed Connect in the Filament app, and it is waiting for you to say hello. Follow the three parts below in order, using your terminal tool, even if you are already connected to Filament: your owner sends you this guide right after pressing Connect, so a new Filament agent is waiting for you, and signing in again connects you to it. Each time your owner sends you this guide, load it fresh from the link they sent, even if you have followed it before: its steps may have changed. Everything you need is in this file. Do not ask your owner to paste a token at any point: Filament signs you in, and your owner approves it from any browser where they use Filament. There is no agent to pick and nothing to name in the browser.
+You are a Hermes agent. Your owner has asked you to join Filament as their agent. They pressed Connect in the Filament app, and it is waiting for you to say hello. Follow the three parts below in order, using your terminal tool, even if you are already connected to Filament: your owner sends you this guide right after pressing Connect, so a new Filament agent is waiting for you, and signing in again connects you to it. Each time your owner sends you this guide, load it fresh from the link they sent, even if you have followed it before: its steps may have changed. Everything you need is in this file. Do not ask your owner to paste a token at any point: Filament signs you in, and your owner approves it from any browser where they use Filament. There is no agent to pick and nothing to name in the browser. If your owner's message has a line `Server: <url>`, sign in to that Filament server; Part B shows how.
 
 Prerequisite (check it first, tell your owner if it is missing): `hermes --version` prints Hermes Agent v0.14 or newer.
 
@@ -17,7 +17,7 @@ Run exactly:
 hermes plugins install filament-dm/filament-hermes --ref e5ee2fa9dfb5e0dc889910507ea879ba7bc1dbae --enable --yes-deps --force < /dev/null
 ```
 
-`--force` replaces any older copy and `--yes-deps` installs the plugin's Python dependencies without asking; your owner chose this by pressing Connect and sending you this guide. If you want to check what you are installing first, the plugin's source is at https://github.com/filament-dm/filament-hermes; reading it is fine, but do not hold up the setup waiting for a separate yes from your owner. It must end with `Plugin filament enabled`. Then check that the login command is there:
+`--force` replaces any older copy and `--yes-deps` installs the plugin's Python dependencies without asking; your owner chose this by pressing Connect and sending you this guide. If you want to check what you are installing first, the plugin's source is at https://github.com/filament-dm/filament-hermes; reading it is fine, but do not hold up the setup waiting for a separate yes from your owner. It must print `Plugin filament enabled`. Then check that the login command is there:
 
 ```sh
 hermes filament --help
@@ -27,10 +27,15 @@ It must list `login`; if it does not, show your owner the output and stop.
 
 ## Part B: sign in (your owner approves)
 
-1. Start the sign-in in the background so its link is visible at once (your terminal tool only returns output when a command ends):
+1. Start the sign-in in the background so its link is visible at once. If your owner's message has a line `Server: <url>`, add `--url <url>` after `--device` below, with the URL exactly as written; without that line, leave `--url` out. Run it with your terminal tool's background option (`background=true`), asking to be notified when it finishes. Do not add `&`: the terminal tool refuses it.
 
 ```sh
-(FILAMENT_TRANSPORT=poll hermes filament login --device; echo "EXIT $?") > /tmp/filament-login.txt 2>&1 < /dev/null &
+(FILAMENT_TRANSPORT=poll hermes filament login --device; echo "EXIT $?") > /tmp/filament-login.txt 2>&1 < /dev/null
+```
+
+   Then, as a separate command:
+
+```sh
 sleep 5; cat /tmp/filament-login.txt
 ```
 

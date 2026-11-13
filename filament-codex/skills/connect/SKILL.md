@@ -1,6 +1,6 @@
 ---
 name: connect
-description: Set up a new Codex agent on Filament - pick its folder and name, register its Filament server, and hand over to the agent's own chat. Use when the user says "/filament:connect", "connect to Filament", "set up my Filament agent", or pastes the Codex card's message from the Filament app.
+description: Set up a new Codex agent on Filament - pick its folder and name, register its Filament server, and hand over to the agent's own chat. Use when the user says "$filament:connect" or "/filament:connect", "connect to Filament", "set up my Filament agent", or pastes the Codex card's message from the Filament app.
 ---
 
 # Connect Codex to Filament
@@ -68,14 +68,15 @@ Writing `~/.codex/config.toml` is outside Codex's sandbox. If the command is ref
 Then check, and never sign in twice: each sign-in claims a new agent. Run `codex mcp list` and read the **Auth** column for `filament-<slug>`:
 
 - `OAuth`: it is signed in. Go to step 4.
-- `Not logged in`: start the sign-in in the background, so you can show its link while it waits, and wait for it:
+- `Not logged in`: start the sign-in in the background, so you can show its link while it waits, and wait for it. Codex stops whatever a command started when the command ends, so the sign-in runs in a session of its own (`perl`'s `setsid`, which works on macOS and Linux alike) to keep it listening for the approval:
 
   ```bash
-  nohup codex mcp login filament-<slug> > /tmp/filament-<slug>-login.txt 2>&1 &
-  sleep 3; grep -o 'https://[^ ]*' /tmp/filament-<slug>-login.txt | head -1
+  perl -MPOSIX -e 'setsid(); exec @ARGV' codex mcp login filament-<slug> > /tmp/filament-<slug>-login.txt 2>&1 < /dev/null &
+  sleep 3; grep -oE 'https?://[^ ]+' /tmp/filament-<slug>-login.txt | head -1
   ```
 
   Send your user that link in one line ("Open this link and approve Filament: <link>"), then run `for i in $(seq 60); do codex mcp list | grep -q "^filament-<slug> .*OAuth" && break; sleep 5; done` and check the Auth column again. If it is still `Not logged in`, the handover adds a sign-in step.
+- `Unknown`: Codex could not reach `<server URL>`, so there is nothing to sign in to. Tell your user that in one line, with the address, and stop: no sign-in, no handover.
 
 ## 4. Hand over to the agent's chat
 
@@ -88,7 +89,7 @@ Your agent is ready. It needs a brand new Codex chat to live in:
 2. Copy this, paste it there and press **Enter**:
 
 ```
-/filament:filament-agent <slug>
+$filament:filament-agent <slug>
 ```
 ````
 
