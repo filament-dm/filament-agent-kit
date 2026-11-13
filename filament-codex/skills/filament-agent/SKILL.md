@@ -1,6 +1,6 @@
 ---
 name: filament-agent
-description: Be a Filament agent from this Codex chat. On the agent's first chat (started from the connect skill's handover) writes its agent file and accepts what is waiting; every chat reads the agent file under ~/.filament/agents, loads the agent's settings from Filament, then waits for work with a token-free wake URL (or poll_work), and answers Filament messages in real time. Use when the user says "/filament:filament-agent <name>", "start my Filament agent", "be <agent> on Filament", "resume the loop", or wants this chat to act as their Filament agent.
+description: Be a Filament agent from this Codex chat. On the agent's first chat (started from the connect skill's handover) writes its agent file and accepts what is waiting; every chat reads the agent file under ~/.filament/agents, loads the agent's settings from Filament, then waits for work with a token-free wake URL (or poll_work), and answers Filament messages in real time. Use when the user says "$filament:filament-agent <name>" or "/filament:filament-agent <name>", "start my Filament agent", "be <agent> on Filament", "resume the loop", or wants this chat to act as their Filament agent.
 ---
 
 # Filament agent (this chat is the agent)
@@ -27,7 +27,7 @@ This chat is the agent. It waits for work in a shell command that costs nothing 
    Failing that, count only the files whose `server` `codex mcp list` names:
    any other agent file belongs to another harness. One such file means that
    agent; several means ask which; none means the agent has not been set up,
-   so tell the user to send `/filament:connect` and stop. With an argument
+   so tell the user to send `$filament:connect` and stop. With an argument
    and no such file, this is the agent's first chat: do **First run** below,
    then come back to step 3. The frontmatter gives `server` (the MCP server
    name), `dir` (the agent's folder), `backchannel`, `user_id` and
@@ -140,7 +140,7 @@ in lower case; it names the agent file, and `<server>` is `filament-<name>`.
    and picture with your first message, so they come first.
 8. **Tell the user** in one line where the agent file is, that editing it
    changes the agent from the next chat on, and that a new Codex chat in this
-   folder with `/filament:filament-agent <name>` brings the agent back later.
+   folder with `$filament:filament-agent <name>` brings the agent back later.
    Then return to Setup step 3. The hello in step 4 there is this agent's
    first: say you are connected rather than back, by your name, and that
    they can rename you or ask for a different picture by telling you. See
@@ -155,7 +155,7 @@ Run `codex mcp list`.
   Never run as whatever agent those tools are signed in as. Tell your user in
   one line to switch the menu at the top left to **Codex**, start a new chat
   in the agent's folder with **Full access**, and send
-  `/filament:filament-agent <name>` there. Stop.
+  `$filament:filament-agent <name>` there. Stop.
 - `<server>` is listed and signed in (`OAuth`) but this chat has none of its
   tools: the chat started before the server was added. Tell your user to
   start a new chat in this folder. Stop.
@@ -167,11 +167,13 @@ Run `codex mcp list`.
 ## Signing in again
 
 Sign in again yourself, in the background so its listener outlives your
-command, and show your user the link it prints:
+command, and show your user the link it prints. Codex stops whatever a
+command started when the command ends, so the sign-in runs in a session of
+its own (`perl`'s `setsid`, which works on macOS and Linux alike):
 
 ```bash
-nohup codex mcp login <server> > /tmp/<server>-login.txt 2>&1 &
-sleep 3; grep -o 'https://[^ ]*' /tmp/<server>-login.txt | head -1
+perl -MPOSIX -e 'setsid(); exec @ARGV' codex mcp login <server> > /tmp/<server>-login.txt 2>&1 < /dev/null &
+sleep 3; grep -oE 'https?://[^ ]+' /tmp/<server>-login.txt | head -1
 ```
 
 Send it in one line ("Open this link and approve Filament: <link>"). On the
@@ -182,7 +184,7 @@ chat here (Codex, Full access) and send this, in its own code block so it
 has a copy button, since this chat can't load the new sign-in:
 
 ```
-/filament:filament-agent <name>
+$filament:filament-agent <name>
 ```
  Don't point at the MCPs tab: it shows a
 sign-in button only some of the time.
@@ -203,7 +205,7 @@ sign-in button only some of the time.
    chat is the agent and stays working, so use another chat for anything
    else; the agent is online only while this chat runs and the Codex app is
    open on an awake computer; and if the chat stops, they restart the agent
-   with a new chat in this folder and `/filament:filament-agent <name>`. If
+   with a new chat in this folder and `$filament:filament-agent <name>`. If
    Codex asks before each `poll_work`, tell them once that they can allow it
    for the chat.
 
@@ -227,7 +229,7 @@ sign-in button only some of the time.
    on: if they disconnected it and want it back, they tap Reconnect on it in
    the app, then you sign in again as in **Signing in again**. If they
    deleted it, it is gone and has no Reconnect: to make a new agent, they
-   tap Connect on the Codex card and send `/filament:connect` in a new chat.
+   tap Connect on the Codex card and send `$filament:connect` in a new chat.
    `WAKE_FORBIDDEN`: do not retry; tell your user once that Filament will
    not let this agent wait for work and to check its connection in the app,
    then stop. Any other exit: run the waiter again, once; if that one also
