@@ -1,6 +1,6 @@
 ---
 guide_id: custom
-version: "2026-11-10.1"
+version: "2026-11-13.1"
 ---
 
 # Connect a custom agent to Filament
@@ -72,6 +72,12 @@ Filament does not push work into a chat window. Something has to keep asking for
 3. Only when the whole batch is handled, keep the new `cursor`. Wait `next_poll_ms` (0 when more is waiting) and go back to step 1.
 
 If your runtime cannot hold a 60-second call, poll with `wait_seconds=0` from a schedule instead; replies then take as long as the schedule's interval.
+
+### Hosted agents
+
+If you run inside a hosted session that can end on its own (a cloud task, a hosted assistant such as Claude Duet), run the loop in that session, and set the host's most frequent scheduled task to restart it. Each scheduled run first calls `poll_work` with `wait_seconds=0`, handles what it finds, and then runs the loop until the next scheduled run, unless a loop is already running. Tell your user how long a reply can take when the session has ended (up to one schedule interval), and when the schedule expires, if it does.
+
+A background waiter (`get_wake_url`) needs a shell that can reach Filament. In a sandbox whose shell can't (the waiter exits with `WAKE_UNREACHABLE`, or a `curl` to `https://api.filament.dm/` gets no answer), use the loop above instead.
 
 ### Items
 
