@@ -752,23 +752,32 @@ class UpdateTest(ListenerCase):
         self.fake.guide = {'reported': None, 'update': None}
         self.assertEqual(self.run_copy('--update'), ['CURRENT %s' % NEW])
 
-    def test_a_listener_that_does_not_match_the_guide_is_not_installed(self):
-        self.release(script_version='2099-01-01.2')
-        before = self.script.read_text()
-        output = self.run_copy('--update')
-        self.assertTrue(output[0].startswith('FAILED the listener does not match'), output)
-        self.assertEqual(self.script.read_text(), before)
-        self.assertEqual(self.reports(), [])
+    def test_a_guide_only_release_installs_with_older_markers(self):
+        # The guide moved on; the listener and routine kept their old markers.
+        self.release(script_version=self.revision, routine_version=self.revision)
+        self.assertEqual(self.run_copy('--update'), ['UPDATED %s' % NEW])
+        self.assertIn("REVISION = '%s'" % self.revision, self.script.read_text())
+        self.assertEqual((self.state / 'ROUTINE.md').read_text(),
+                         '<!-- grokbot %s -->\n# Routine\n' % self.revision)
+        self.assertEqual(self.reports(), [{'guide_id': 'grokbot', 'version': NEW}])
+        self.assertEqual(json.loads('\n'.join(self.run_copy('--status')))['guide_version'], NEW)
+        self.fake.guide = {'reported': None, 'update': None}
+        self.assertEqual(self.run_copy('--update'), ['CURRENT %s' % NEW])
 
-    def test_a_routine_protocol_that_does_not_match_the_guide_installs_nothing(self):
-        self.release(routine_version='2099-01-01.2')
-        (self.state / 'ROUTINE.md').write_text('old protocol')
-        before = self.script.read_text()
-        output = self.run_copy('--update')
-        self.assertTrue(output[0].startswith('FAILED the routine protocol does not match'), output)
-        self.assertEqual(self.script.read_text(), before)
-        self.assertEqual((self.state / 'ROUTINE.md').read_text(), 'old protocol')
-        self.assertEqual(self.reports(), [])
+    def test_files_that_are_not_this_guides_install_nothing(self):
+        base = 'https://raw.githubusercontent.com/filament-dm/filament-agent-kit/pablo/next/filament-grokbot/'
+        for name, text, reason in (('listen.py', '<html>not found</html>', 'listener'),
+                                   ('ROUTINE.md', '# some other file\n', 'routine protocol')):
+            self.release()
+            self.fake.files[base + name] = text
+            (self.state / 'ROUTINE.md').write_text('old protocol')
+            before = self.script.read_text()
+            output = self.run_copy('--update')
+            self.assertEqual(output, ["FAILED the released %s is not this guide's" % reason])
+            self.assertEqual(self.script.read_text(), before)
+            self.assertEqual((self.state / 'ROUTINE.md').read_text(), 'old protocol')
+            self.assertFalse((self.state / 'guide_version').exists())
+            self.assertEqual(self.reports(), [])
 
     def test_an_update_never_moves_back(self):
         self.release(version='2000-01-01.1')
@@ -847,6 +856,8 @@ class UpdateTest(ListenerCase):
 
 class RevisionTest(unittest.TestCase):
     def test_revision_matches_guide_version(self):
+        # Not required at runtime any more, but listeners older than
+        # 2026-11-13.1 still refuse an update whose markers differ.
         guide = (Path(SCRIPT).parent / 'GROKBOT.md').read_text()
         version = re.search(r'^version: "([^"]+)"$', guide, re.M).group(1)
         revision = re.search(r"^REVISION = '([^']+)'$", Path(SCRIPT).read_text(), re.M).group(1)

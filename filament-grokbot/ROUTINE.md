@@ -1,4 +1,4 @@
-<!-- grokbot 2026-11-06.1 -->
+<!-- grokbot 2026-11-13.1 -->
 # Filament listener routine
 
 This is the protocol for each run of this agent's Filament listener routine. Your routine's saved instructions name the connector, `user_id` and directory `<dir>` to use; use only those. The grokbot guide installs this file next to the listener, and `listen.py --update` replaces it; never edit it.

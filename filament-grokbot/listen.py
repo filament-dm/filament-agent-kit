@@ -29,8 +29,9 @@ import urllib.parse
 import urllib.request
 import uuid
 
-# The guide version in GROKBOT.md; bump both together.
-REVISION = '2026-11-06.1'
+# Kept equal to the guide version in GROKBOT.md, so listeners older than
+# 2026-11-13.1, which require it, can still update. This one never requires it.
+REVISION = '2026-11-13.1'
 STATE = os.environ.get('FM_STATE') or os.path.dirname(os.path.abspath(__file__))
 DEFAULT_ENDPOINT = 'https://api.filament.dm/mcp/agents'
 POLL_WAIT = 60
@@ -61,8 +62,10 @@ GUIDE_URL = re.compile(r'https://filament\.dm/agents/grokbot\.md'
                        r'(?:\?ref=([A-Za-z0-9_-][A-Za-z0-9._-]*(?:/[A-Za-z0-9_-][A-Za-z0-9._-]*)*))?')
 SCRIPT_URL = 'https://raw.githubusercontent.com/filament-dm/filament-agent-kit/{ref}/filament-grokbot/listen.py'
 ROUTINE_URL = 'https://raw.githubusercontent.com/filament-dm/filament-agent-kit/{ref}/filament-grokbot/ROUTINE.md'
-# What each routine run reads; its first line names the guide version.
+# What each routine run reads; its first line marks it as this guide's protocol.
 ROUTINE = 'ROUTINE.md'
+# The guide version the last --update installed and reported.
+INSTALLED = 'guide_version'
 FETCH_LIMIT = 2 * 1024 * 1024
 UPDATE_COMMAND = '/filament update'
 # Filament's notices about a release; whether to update comes from get_self.
@@ -289,7 +292,7 @@ def status():
         state, error = None, str(exc)
     with open(os.path.abspath(__file__), 'rb') as stream:
         digest = hashlib.sha256(stream.read()).hexdigest()
-    return {'revision': REVISION, 'script_sha256': digest, 'observed_at': time.time(),
+    return {'revision': REVISION, 'guide_version': installed_version(), 'script_sha256': digest, 'observed_at': time.time(),
             'lock_held': lock_held(), 'legacy_process_alive': legacy_running(),
             'state_error': error,
             'session': state['session'] if state else None,
@@ -426,6 +429,16 @@ def version_key(value):
     if not match:
         raise UpdateFailed('invalid guide version')
     return tuple(int(part) for part in match.groups())
+
+
+def installed_version():
+    """The guide version this agent runs: the last one --update installed, else this script's."""
+    value = read(INSTALLED)
+    try:
+        version_key(value)
+    except UpdateFailed:
+        return REVISION
+    return value
 
 
 def guide_ref(url):
@@ -600,8 +613,9 @@ def update_listener():
             return 'NEEDS_RETRY', str(exc)
         # Filament's release is the only thing an update installs; nothing
         # released for this agent means nothing to do.
+        current = installed_version()
         if not offer:
-            return 'CURRENT', REVISION
+            return 'CURRENT', current
         url, ref = offer['url'], guide_ref(offer['url'])
         try:
             guide_id, version = guide_header(fetch(url))
@@ -609,17 +623,20 @@ def update_listener():
                 raise UpdateFailed('the released URL is not this guide')
             if version != offer['version']:
                 raise UpdateFailed('the guide is %s but Filament released %s' % (version, offer['version']))
-            if version_key(version) < version_key(REVISION):
+            if version_key(version) < version_key(current):
                 raise UpdateFailed('refusing to move back to %s' % version)
-            if version != REVISION:
+            if version != current:
+                # The files on the guide's branch go with it; their own revision
+                # markers may lag a guide-only change and are not compared.
                 script = fetch(SCRIPT_URL.format(ref=ref))
-                if "\nREVISION = '%s'\n" % version not in script:
-                    raise UpdateFailed('the listener does not match guide %s' % version)
+                if "\nREVISION = '" not in script:
+                    raise UpdateFailed('the released listener is not this guide\'s')
                 routine = fetch(ROUTINE_URL.format(ref=ref))
-                if routine.split('\n', 1)[0] != '<!-- grokbot %s -->' % version:
-                    raise UpdateFailed('the routine protocol does not match guide %s' % version)
+                if not routine.startswith('<!-- grokbot '):
+                    raise UpdateFailed('the released routine protocol is not this guide\'s')
                 install(script)
                 write(ROUTINE, routine)
+            write(INSTALLED, version)
         except UpdateFailed as exc:
             return 'FAILED', str(exc)
         except Transient as exc:
