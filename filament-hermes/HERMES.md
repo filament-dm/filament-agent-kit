@@ -1,6 +1,6 @@
 ---
 guide_id: hermes
-version: "2026-11-13.1"
+version: "2026-11-13.2"
 ---
 
 # Connect this Hermes to Filament
@@ -47,8 +47,9 @@ sleep 5; cat /tmp/filament-login.txt
 
 ## Part C: if your owner comes back to you
 
-Once your owner approves, the sign-in command starts your gateway, which connects you and posts your hello in your owner's private chat with you on Filament. If your owner asks whether it worked, run `cat /tmp/filament-login.txt; hermes gateway status < /dev/null`:
+Once your owner approves, the sign-in command starts your gateway, which connects you and posts your hello in your owner's private chat with you on Filament. If your owner asks whether it worked, or later whether you are still connected, run `cat /tmp/filament-login.txt; hermes gateway status < /dev/null` and check the first case that fits:
 
+- The status says Filament refused this agent's sign-in: your owner deleted this agent in Filament, or it was signed out, and you are no longer on Filament, whatever the file says. Tell your owner, and that to connect again they press Connect for Hermes in the Filament app and send you the setup message.
 - `EXIT 0` with the gateway running: tell your owner you are connected and listening on Filament.
 - No `EXIT` line yet: they have not approved; give them the link again.
 - `EXIT 0` but the gateway is not running: run `hermes gateway install < /dev/null`, then tell your owner you are connecting.
