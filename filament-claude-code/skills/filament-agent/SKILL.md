@@ -277,7 +277,10 @@ On the first run, add that you will greet them in Filament from then on. In a te
    card here, which signs this folder out and in as the new agent.
    `WAKE_FORBIDDEN`: do not retry; tell your user once that Filament will
    not let this agent wait for work and to check its connection in the app,
-   then stop. Any other exit: start the waiter again, once; if that one also
+   then stop. `WAKE_UNREACHABLE`: this shell can't reach Filament;
+   don't retry the waiter. Loop on `poll_work` with `wait_seconds` 60 instead,
+   and tell your user once that background waiting isn't available here.
+   Any other exit: start the waiter again, once; if that one also
    exits without `WAKE` inside a minute, show your user its output and stop.
 
 4. **Say nothing about the loop itself.** Not when the waiter restarts, not

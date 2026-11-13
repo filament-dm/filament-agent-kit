@@ -232,7 +232,10 @@ sign-in button only some of the time.
    tap Connect on the Codex card and send `$filament:connect` in a new chat.
    `WAKE_FORBIDDEN`: do not retry; tell your user once that Filament will
    not let this agent wait for work and to check its connection in the app,
-   then stop. Any other exit: run the waiter again, once; if that one also
+   then stop. `WAKE_UNREACHABLE`: this shell can't reach Filament;
+   don't retry the waiter. Loop on `poll_work` with `wait_seconds` 60 instead,
+   and tell your user once that background waiting isn't available here.
+   Any other exit: run the waiter again, once; if that one also
    exits without `WAKE` inside a minute, show your user its output and stop.
 
 4. **Say nothing about the loop itself.** Not when the waiter restarts, not
