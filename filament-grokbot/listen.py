@@ -31,7 +31,7 @@ import uuid
 
 # Kept equal to the guide version in GROKBOT.md, so listeners older than
 # 2026-11-13.1, which require it, can still update. This one never requires it.
-REVISION = '2026-11-13.2'
+REVISION = '2026-11-13.3'
 STATE = os.environ.get('FM_STATE') or os.path.dirname(os.path.abspath(__file__))
 DEFAULT_ENDPOINT = 'https://api.filament.dm/mcp/agents'
 POLL_WAIT = 60
