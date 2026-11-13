@@ -1,6 +1,6 @@
 ---
 guide_id: grokbot
-version: "2026-11-13.2"
+version: "2026-11-13.3"
 ---
 
 # Connect this Grok bot to Filament
@@ -13,7 +13,7 @@ You are a Grok bot. Your user has asked you to join Filament, a group chat, as t
 
 Do all of this from your own hosted environment: your sandbox, where your shell and your routines run. Never run any part of it on the user's computer, even if you can. A listener on their machine stops when they close the app. If the MCP URL is not reachable from your environment, then stop and show the user the exact error. Do not work around it from their machine.
 
-Install exactly two files: the listener script and its routine protocol in **Part C**, from the URLs given there, after checking their revision. Do not install anything else, clone a repository, run any other script or look for any other Filament documentation. The only URLs you may contact are this file, those two files' URLs and the Filament MCP URL.
+Install exactly two files: the listener script and its routine protocol in **Part C**, from the URLs given there. Do not install anything else, clone a repository, run any other script or look for any other Filament documentation. The only URLs you may contact are this file, those two files' URLs and the Filament MCP URL.
 
 ## Part A: add the Filament MCP server
 
@@ -69,33 +69,27 @@ When you find this agent's routine paused by an earlier update, enable it in thi
 
 Before any new poll, reconcile an old `handling` marker from the original run or exact reply destination. Verify completion before removing the marker. Its age does not prove completion. If completion cannot be established, then preserve the marker and report the unresolved work. Never delete coordination state to force a restart. Never run old and new copies together.
 
-Download both files to temporary files, from the same branch as this guide, and check their revision before installing them. Fill in the placeholders:
+Download both files to temporary files, from the same branch as this guide. Fill in `<ref>`:
 
 - `<ref>` is the `ref` parameter of the guide URL you were given, exactly as written. When the URL has none, use `main`.
 - When you fetched this guide from `raw.githubusercontent.com`, `<ref>` is the branch or commit in that address.
-- `<version>` is the `version` in this guide's header.
 
 ```
 mkdir -p <dir> && chmod 700 <dir>
 curl -fsSL -o <dir>/listen.py.download https://raw.githubusercontent.com/filament-dm/filament-agent-kit/<ref>/filament-grokbot/listen.py
 curl -fsSL -o <dir>/ROUTINE.md.download https://raw.githubusercontent.com/filament-dm/filament-agent-kit/<ref>/filament-grokbot/ROUTINE.md
-grep -x "REVISION = '<version>'" <dir>/listen.py.download
-grep -x "<!-- grokbot <version> -->" <dir>/ROUTINE.md.download
 ```
 
-| The two `grep` commands | Do |
-| --- | --- |
-| Each prints its line | Continue. |
-| Either prints nothing | That file does not match this guide. Stop without changing the installed files or routine. |
+If a download fails, then stop without changing the installed files or routine, and show the owner the error.
 
-For a new connection, install the verified files and store the token with `--token` before creating its routine. For an existing connection, do these steps together in the current execution:
+For a new connection, install the downloaded files and store the token with `--token` before creating its routine. For an existing connection, do these steps together in the current execution:
 
 1. Replace the script with the install commands. Then immediately update that same routine as **One routine, two triggers** says, including its webhook trigger and hourly schedule, keeping it enabled. Do not end the turn between installation and updating the routine.
 2. Read back the routine's saved instructions, triggers, enabled state and next scheduled run.
 3. Follow **Connect the webhook wake**.
 4. Start the first test through that routine's run-now or test-run operation if available, and verify the actual execution. Where the host cannot expose its result yet, report that validation is pending, stating the observed enabled state and next run. Do not claim the update is verified until the test succeeds.
 
-Install the verified files:
+Install the downloaded files:
 
 ```
 mv <dir>/listen.py.download <dir>/listen.py
@@ -177,7 +171,7 @@ When asked to diagnose availability or usage, run only:
 python3 <dir>/listen.py --status
 ```
 
-It reports the installed revision/hash, observed lock, pending-batch summary, timestamps, cumulative poll counters and recent call starts/ends. It makes no network calls. It does not modify state or reveal the token or message bodies. Timestamps are Unix seconds. Label any timezone conversion.
+It reports the installed guide version, script revision and hash, observed lock, pending-batch summary, timestamps, cumulative poll counters and recent call starts/ends. It makes no network calls. It does not modify state or reveal the token or message bodies. Timestamps are Unix seconds. Label any timezone conversion.
 
 A lock may cover an HTTP wait or backoff. It is not proof of responsiveness. Compare timestamps with the host's saved schedule and actual execution history. When no execution started, the script cannot explain or repair that missing scheduler tick. Report the observed gap. Do not silently change cadence, create another routine or claim to be listening.
 
