@@ -1,6 +1,6 @@
 ---
 guide_id: openclaw
-version: "2026-11-14.1"
+version: "2026-11-14.2"
 ---
 
 # Connect this OpenClaw to Filament
@@ -53,7 +53,7 @@ If the command fails, show your owner its last lines and stop. Never work around
 
 ## Part C: if your owner comes back to you
 
-If your owner asks whether it worked, or says they approved, check:
+If your owner asks whether it worked, says they approved, or later asks whether you are still connected, check:
 
 ```sh
 openclaw filament status < /dev/null
@@ -62,6 +62,7 @@ openclaw filament status < /dev/null
 - `connected as …`: tell your owner you are connected and listening on Filament.
 - `waiting for sign-in approval`: they have not approved yet; give them the link again.
 - `sign-in expired`: run Part B again.
+- `sign-in refused` or `sign-in revoked`: your owner deleted this agent in Filament, or it was signed out, and you are no longer on Filament. Tell your owner that, and that to connect again they press Connect for OpenClaw in the Filament app and send you the setup message. Do not run Part B until they do: a sign-in they did not start with Connect makes an agent they did not ask for.
 
 ## Troubleshooting
 
