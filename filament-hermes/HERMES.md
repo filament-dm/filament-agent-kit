@@ -1,6 +1,6 @@
 ---
 guide_id: hermes
-version: "2026-11-13.3"
+version: "2026-11-14.1"
 ---
 
 # Connect this Hermes to Filament
@@ -14,7 +14,7 @@ Prerequisite (check it first, tell your owner if it is missing): `hermes --versi
 Run exactly:
 
 ```sh
-hermes plugins install filament-dm/filament-hermes --ref 5aa9245f80191e7aeb87b7a8a48f0156f9786614 --enable --yes-deps --force < /dev/null
+hermes plugins install filament-dm/filament-hermes --ref b22c417ab7998d38675e9b37907480d0b6416ce4 --enable --yes-deps --force < /dev/null
 ```
 
 `--force` replaces any older copy and `--yes-deps` installs the plugin's Python dependencies without asking; your owner chose this by pressing Connect and sending you this guide. If you want to check what you are installing first, the plugin's source is at https://github.com/filament-dm/filament-hermes; reading it is fine, but do not hold up the setup waiting for a separate yes from your owner. It must print `Plugin filament enabled`. Then check that the login command is there:
@@ -43,7 +43,7 @@ sleep 5; cat /tmp/filament-login.txt
 2. Tell your owner, in two lines: "Open this link where you use Filament and sign in; it connects me to the agent you just started." Then the link itself, verbatim, and the code in case it asks for one. **Then end your turn.** Do not wait, poll or loop in this turn, and do not start anything else (a profile, other setup): your owner needs to see the link now.
 3. Hermes tells you when the background sign-in command finishes; that happens once your owner approves (or the link expires after 10 minutes). If your owner says they approved before you hear from Hermes, check with `cat /tmp/filament-login.txt`.
 
-   Success shows `Connected. Configuration saved.`, then `Gateway running (pid …).` or `Gateway restart scheduled`, then `EXIT 0`: the sign-in starts your gateway itself, so you are live without doing anything else. With `Gateway restart scheduled`, this chat runs inside that gateway: it pauses for a few seconds while the gateway restarts and then reconnects by itself, so do not restart or stop the gateway yourself. If the link expired, run step 1 again. Any other failure: show your owner the last lines of the file and stop. Never work around a failed sign-in by asking for a token.
+   Success shows `Connected. Configuration saved.`, then `Gateway running (pid …).` or `Gateway restart scheduled`, then `EXIT 0`: the sign-in starts your gateway itself, so you are live without doing anything else. With `Gateway restart scheduled`, this chat runs inside that gateway: once your turn ends, it pauses for a few seconds while the gateway restarts and then reconnects by itself, so do not restart or stop the gateway yourself. If the link expired, run step 1 again. Any other failure: show your owner the last lines of the file and stop. Never work around a failed sign-in by asking for a token.
 
 ## Part C: if your owner comes back to you
 
