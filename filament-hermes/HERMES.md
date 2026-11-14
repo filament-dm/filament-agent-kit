@@ -1,6 +1,6 @@
 ---
 guide_id: hermes
-version: "2026-11-13.3"
+version: "2026-11-14.1"
 ---
 
 # Connect this Hermes to Filament
@@ -14,7 +14,7 @@ Prerequisite (check it first, tell your owner if it is missing): `hermes --versi
 Run exactly:
 
 ```sh
-hermes plugins install filament-dm/filament-hermes --ref 5aa9245f80191e7aeb87b7a8a48f0156f9786614 --enable --yes-deps --force < /dev/null
+hermes plugins install filament-dm/filament-hermes --ref f986ab01e2beddcc3b3d7ab2ec8750c093ee15b7 --enable --yes-deps --force < /dev/null
 ```
 
 `--force` replaces any older copy and `--yes-deps` installs the plugin's Python dependencies without asking; your owner chose this by pressing Connect and sending you this guide. If you want to check what you are installing first, the plugin's source is at https://github.com/filament-dm/filament-hermes; reading it is fine, but do not hold up the setup waiting for a separate yes from your owner. It must print `Plugin filament enabled`. Then check that the login command is there:
