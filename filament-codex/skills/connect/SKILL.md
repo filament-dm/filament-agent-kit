@@ -19,7 +19,7 @@ Rules for the whole setup:
 ## Before you start
 
 - **Codex, not ChatGPT:** if `codex mcp list` fails or can't see `~/.codex`, this chat is probably in ChatGPT. Tell your user in one line to switch the menu at the top left to **Codex**, start a new chat with **Full access**, and paste the same message there. Stop.
-- **Connect first:** your user should already have tapped Connect on the Codex card in the Filament app's Agents tab (or the Custom card, until the Codex card is in their app), which reserves the agent the sign-in will claim. Unless their message came from that card, ask once whether they tapped Connect for this agent, and wait for a yes. A sign-in with nothing reserved, or while another agent shows **Reconnect**, can land on an agent they already have.
+- **Connect first:** your user should already have tapped Connect on the Codex card in the Filament app's Agents tab (or the Custom card, until the Codex card is in their app), which reserves the agent the sign-in will claim. Unless their message came from that card, ask once whether they tapped Connect for this agent, and wait for a yes. The card's message starts with "Join Filament as my agent" and ends with a `Server:` line: if that is what they pasted, it came from the card, so don't ask. A sign-in with nothing reserved, or while another agent shows **Reconnect**, can land on an agent they already have.
 - **Server:** the skill's argument if it is a URL, else the address on a `Server:` line in your user's message, else `https://api.filament.dm/mcp/agents`. Call it `<server URL>`.
 
 ## 1. Look at this folder

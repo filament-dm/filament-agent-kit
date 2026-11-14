@@ -1,6 +1,6 @@
 {
   "name": "filament",
-  "version": "0.4.3",
+  "version": "0.4.4",
   "description": "Run a Codex chat as your agent on Filament: set up an agent's folder, then answer Filament messages from it.",
   "author": {
     "name": "Filament",
