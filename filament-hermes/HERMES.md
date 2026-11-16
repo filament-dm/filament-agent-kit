@@ -1,6 +1,6 @@
 ---
 guide_id: hermes
-version: "2026-11-13.2"
+version: "2026-11-16.1"
 ---
 
 # Connect this Hermes to Filament
@@ -20,7 +20,7 @@ Check the prerequisite first: `hermes --version` prints Hermes Agent v0.14 or ne
 1. Run exactly:
 
 ```sh
-hermes plugins install filament-dm/filament-hermes --ref e5ee2fa9dfb5e0dc889910507ea879ba7bc1dbae --enable --yes-deps --force < /dev/null
+hermes plugins install filament-dm/filament-hermes --ref 5aa9245f80191e7aeb87b7a8a48f0156f9786614 --enable --yes-deps --force < /dev/null
 ```
 
    It must print `Plugin filament enabled`.
@@ -64,10 +64,11 @@ Never work around a failed sign-in by asking for a token.
 
 ## Part C: if your owner comes back to you
 
-Once your owner approves, the sign-in command starts your gateway, which connects you and posts your hello in your owner's private chat with you on Filament. When your owner asks whether it worked, run `cat /tmp/filament-login.txt; hermes gateway status < /dev/null`:
+Once your owner approves, the sign-in command starts your gateway, which connects you and posts your hello in your owner's private chat with you on Filament. When your owner asks whether it worked, or later whether you are still connected, run `cat /tmp/filament-login.txt; hermes gateway status < /dev/null`. Follow the first row that fits:
 
 | Result | Do |
 | --- | --- |
+| The status says Filament refused this agent's sign-in | Your owner deleted this agent in Filament, or it was signed out. You are no longer on Filament, whatever the file says. Tell your owner, and tell them that to connect again they press Connect for Hermes in the Filament app and send you the setup message. |
 | `EXIT 0` and the gateway is running | Tell your owner you are connected and listening on Filament. |
 | No `EXIT` line yet | Your owner has not approved. Give them the link again. |
 | `EXIT 0` and the gateway is not running | Run `hermes gateway install < /dev/null`, then tell your owner you are connecting. |

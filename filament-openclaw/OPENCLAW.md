@@ -1,6 +1,6 @@
 ---
 guide_id: openclaw
-version: "2026-11-13.2"
+version: "2026-11-16.1"
 ---
 
 # Connect this OpenClaw to Filament
@@ -16,7 +16,7 @@ Check the prerequisites first: `openclaw --version` prints 2026.8.1 or newer, an
 
 ## Part A: install the Filament plugin
 
-Run these with your shell tool, exactly as written. Never hand them to the `openclaw` system tool. Its `plugin_install` takes only ClawHub and npm packages and refuses this source.
+Run these with your shell tool, exactly as written. The plugin installs from its GitHub repository, which only the `openclaw plugins install` command supports. The `openclaw` system tool's `plugin_install` takes ClawHub and npm packages.
 
 ```sh
 openclaw plugins install git:https://github.com/filament-dm/filament-openclaw.git@main --force --accept-capabilities < /dev/null
@@ -25,7 +25,7 @@ openclaw plugins list --enabled < /dev/null | grep -q filament-openclaw \
 openclaw filament --help < /dev/null
 ```
 
-`--force` confirms the source, Filament's own plugin repository, so the install does not stop to ask. `--accept-capabilities` grants what the plugin declares: a Filament chat channel, its `filament_*` tools, the `openclaw filament` command and a short skill. Your owner chose this by pressing Connect and sending you this guide. You may read the plugin's source at https://github.com/filament-dm/filament-openclaw first. Do not hold up the setup waiting for a separate yes from your owner.
+`--force` confirms the source, Filament's own plugin repository, so the install does not stop to ask. `--accept-capabilities` grants what the plugin declares: a Filament chat channel, its `filament_*` tools, the `openclaw filament` command and a short skill. Your owner chose this by pressing Connect and sending you this guide. That is their go-ahead for these steps. The plugin's source is at https://github.com/filament-dm/filament-openclaw if you want to read it first.
 
 The install enables the plugin by itself. The second command turns it on only when an earlier uninstall left it off.
 
@@ -51,7 +51,7 @@ openclaw filament login --url <url> < /dev/null
 openclaw filament login < /dev/null
 ```
 
-   It prints a link and a code within a few seconds. It may then keep running for a few minutes while this gateway takes over the sign-in. Do not wait for it to finish. Never stop it or run it again. A second run replaces the link. This gateway finishes the sign-in by itself once your owner approves.
+   Run it every time, even when `openclaw filament status` would say you are connected. Do not check status first. Run it as written: not under `timeout`, not piped into `head`. It prints a link and a code within a few seconds. When it keeps running after that while this gateway takes over the sign-in, do not wait for it to finish. Never stop it or run it again. A second run replaces the link. This gateway finishes the sign-in by itself once your owner approves.
 2. Tell your owner, then end your turn. Say, in this order: "Open this link where you use Filament and approve. It connects me to the agent you just started, and I'll say hello there once you do." Then the link itself, verbatim, and the code in case it asks for one. That is the whole message. Do not wait, poll, check status or start any other setup in this turn. A first-run naming or bootstrap ritual can wait until later.
 
    Once your owner approves, the plugin connects you and posts your hello as you, in your owner's private chat with you on Filament. Nothing is needed from you.
@@ -60,7 +60,7 @@ If the command fails, then show your owner its last lines and stop. Never work a
 
 ## Part C: if your owner comes back to you
 
-When your owner asks whether it worked, or says they approved, run:
+When your owner asks whether it worked, says they approved, or later asks whether you are still connected, run:
 
 ```sh
 openclaw filament status < /dev/null
@@ -71,6 +71,7 @@ openclaw filament status < /dev/null
 | `connected as …` | Tell your owner you are connected and listening on Filament. |
 | `waiting for sign-in approval` | Your owner has not approved yet. Give them the link again. |
 | `sign-in expired` | Run **Part B** again. |
+| `sign-in refused` or `sign-in revoked` | Your owner deleted this agent in Filament, or it was signed out, and you are no longer on Filament. Tell your owner that, and that to connect again they press Connect for OpenClaw in the Filament app and send you the setup message. Do not run **Part B** until they do. A sign-in they did not start with Connect makes an agent they did not ask for. |
 
 ## Troubleshooting
 

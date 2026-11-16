@@ -1,6 +1,6 @@
 ---
 guide_id: pi
-version: "2026-11-13.2"
+version: "2026-11-16.1"
 ---
 
 # Connect this Pi to Filament
@@ -13,10 +13,14 @@ You are Pi, a coding agent. Your user pressed Connect in the Filament app, which
 - Never ask your user for a token. Filament uses OAuth.
 - Never edit a file under `~/.pi/agent/` by hand. Use the `pi` commands given here.
 - Keep your messages to your user short.
+- When your user's message has a line `Server: <url>`, connect to that Filament server. **Part A** shows how.
 
 ## Part A: register Filament as an MCP server
 
-Run:
+Look at your user's message for a line `Server: <url>`.
+
+- When it has one, put that URL, exactly as written, in place of `https://api.filament.dm/mcp/agents` in the command below. **Part B** and the package then use that server.
+- Otherwise, run the command exactly as it is:
 
 ```sh
 pi --version && node --version && pi mcp add filament --url https://api.filament.dm/mcp/agents --description "Filament, the agent's messaging home"

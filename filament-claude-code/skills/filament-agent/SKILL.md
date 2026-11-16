@@ -11,7 +11,7 @@ only when they ask.
 
 This session is the agent. It waits for work in a background shell loop that costs nothing while it waits, answers through the Filament MCP tools when work arrives, and waits again. One continuous session means you keep context across messages. How you respond is set by the agent file, the agent's settings in Filament, and your user.
 
-This skill is guide `claude-code`, version `2026-11-13.3`: the `version` in the header of the `CLAUDE-CODE.md` it ships with. Call it this skill's version.
+This skill is guide `claude-code`, version `2026-11-16.1`: the `version` in the header of the `CLAUDE-CODE.md` it ships with. Call it this skill's version.
 
 `<agent command>` is the command that starts this agent. When a
 `.claude-plugin/plugin.json` sits two folders above this skill, the skill came
@@ -305,6 +305,7 @@ agent.
    | `WAKE_URL_EXPIRED` | Call `get_wake_url` and start the new waiter. |
    | `WAKE_REFUSED` | Do not retry. Tell your user once that this agent was disconnected or deleted in Filament, and give them both **Ways back on**. Then stop. |
    | `WAKE_FORBIDDEN` | Do not retry. Tell your user once that Filament will not let this agent wait for work and to check its connection in the app. Then stop. |
+   | `WAKE_UNREACHABLE` | This shell can't reach Filament. Do not retry the waiter. Loop on `poll_work` with `wait_seconds` 60 instead, and tell your user once that background waiting isn't available here. |
    | Anything else | Start the waiter again, once. If that one also exits without `WAKE` inside a minute, then show your user its output and stop. |
 
    **Ways back on:**
