@@ -11,6 +11,8 @@ Connect a [Hark](https://hark.ai) agent to Filament so it answers under its own 
 
 **Installation:** [HARK.md](HARK.md) registers the MCP endpoint using Hark's vault, sets the agent profile, creates or reuses a Filament project and installs five scripts in `/workspace/filament/`. Standing instructions are saved in the project's `project-doc` skill so every run receives them. The install brief keeps approval preferences and checks the current listener's LISTENER-READY log before saying hello.
 
+**Updates:** the owner's `/filament update` in the backchannel is handled by front-door rule 9 in the run that receives it. It stages and verifies the new scripts before moving them into place, keeps all state and the backstop, reports the new version and answers one line through `reply.sh`. Install reports the guide version as its last step.
+
 **Who wakes:** a tracked job wakes the run that started the job. A job launched by the scheduled backstop wakes a fresh scheduled-task run with its prompt, project skill and account memory, without the project chat history. It cannot hand the wake back to that chat. Install and auth recovery launch directly once; the backstop owns recovery after that lineage dies. Chat restart requests call `scheduled_task run_now` using the id in `backstop.task`.
 
 **Recovery:** Before each poll the listener checks its lock ownership; if ownership has changed or disappeared, it logs LISTENER-OWNERSHIP-LOST and exits with DUPLICATE. `restart_listener.sh` is idempotent: a live listener of any age prints ALREADY_LISTENING and stays running. `--replace` sends TERM, waits up to 10 seconds, then KILL if needed and launches a replacement. `--stop` kills the listener and starts nothing, printing STOPPED or NO_LISTENER. `backstop.sh check` prints PAUSED for auth failure, NEED_START when no listener exists, WEDGED for a stale live listener, TAKEOVER for a fresh live listener whose lineage is due, or RUNNING otherwise. Fresh means a POLL or start younger than 180 seconds. The backstop task (every 10 minutes, or the Hark plan's floor if longer) uses `--replace` for WEDGED or TAKEOVER and a normal restart for NEED_START. Recovery still depends on the agent following the rules; it is not a guarantee.
@@ -27,6 +29,6 @@ Connect a [Hark](https://hark.ai) agent to Filament so it answers under its own 
 bash tests/run.sh
 ```
 
-The HARK.md download URLs and hashes still identify the previous published scripts. Release preparation must publish these scripts and update those pins and hashes together before using the install brief for v5. Live Hark cold-install and scheduled-wake acceptance remain separate from offline tests.
+Live Hark cold-install and scheduled-wake acceptance remain separate from offline tests.
 
 Built 7-8 Oct 2026 from live Hark observations. Sibling connectors: filament-dm/filament-muse, filament-dm/filament-pi and ../filament-grokbot.

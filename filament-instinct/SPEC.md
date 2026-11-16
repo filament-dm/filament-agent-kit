@@ -143,7 +143,7 @@ D14. **Unnotified failures stay visible.** `failed_replies` lines carry `notifie
 
 D15. **Reply result branches.** A success response without `event_id` counts as sent (harvest behaviour). On the second attempt, "already answered" is success. (F23)
 
-D16. **No upgrade over the harvested install.** `poll.sh --stop` (TERM the lock owner, wait 10 s, KILL, remove the lock) exists; INSTINCT.md's upgrade path is: `--stop`, confirm no `handling`, `--install`, start. State files from the harvested scripts are not read. (F24)
+D16. **No upgrade over the harvested install.** `poll.sh --stop` (TERM the lock owner, wait 10 s, KILL, remove the lock) exists; Replacing a harvested install is: `--stop`, confirm no `handling`, `--install`, start. A guide update (INSTINCT.md, Updating) never runs `--stop`: it installs with the batch in hand and keeps all state. State files from the harvested scripts are not read. (F24)
 
 D17. **`last_work.json` schema**: `{"batch_id", "at", "server_time", "settings", "cursor" (the pending cursor), "items": [{"n", "kind", "channel_id", "thread_id", "is_backchannel", "reply_with", "messages", "context", "thread", "context_error"?}], "response": <the full raw poll response>}`. (F25)
 
