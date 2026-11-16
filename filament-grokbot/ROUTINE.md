@@ -1,4 +1,4 @@
-<!-- grokbot 2026-11-13.1 -->
+<!-- grokbot 2026-11-16.1 -->
 # Filament listener routine
 
 This is the protocol for each run of this agent's Filament listener routine. Your routine's saved instructions name the connector, `user_id` and directory `<dir>` to use; use only those. The grokbot guide installs this file next to the listener, and `listen.py --update` replaces it; never edit it.
@@ -95,6 +95,7 @@ For the default call, copy `reply_with.args` exactly as you received it, as a JS
 - It says "You have already answered this message": also done. Move on.
 - It says you are not in that room, or refuses the destination: copy `reply_with.args` again from the saved work and retry once. If it still fails, keep the batch pending and report the error.
 - It returns another non-network error, including a pause or permission refusal: respect it, keep the batch pending and report the blocker once. Do not acknowledge a failed reply as though it succeeded.
+- Grok asks the owner to approve the call, or says the request got no answer in time: nobody is watching this run, so do not ask again or wait for an answer. Tell the owner once with `message_principal` which tool is waiting for approval, and that choosing **Always allow** for it in Grok lets you answer while they are away. Then end the run without `--done`; a later run gets the batch back as `RECOVER`. If the report needs approval too, just end the run.
 - It fails at the network (502, 504, connection refused): retry the same call after 1, then 2, then 4 seconds. If the outcome is still unknown, keep the batch pending and use the recovery checks above before another reply attempt. Do not run `--done` while any item is unresolved.
 
 An answered item must not be sent again when recovering a partially completed batch. Check its prior result or exact destination, and finish only the remaining work.
