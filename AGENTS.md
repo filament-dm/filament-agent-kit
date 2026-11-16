@@ -6,6 +6,10 @@ Guides describe the current setup and behavior. Keep them concise. Let the agent
 compare the guide with its existing setup; do not add a changelog or instructions
 for migrating through individual versions.
 
+Write guides as [How to write instructions](docs/adding-a-guide.md#how-to-write-instructions)
+says: one rule per sentence, trigger first, a table for every branch on an exact
+value, and the shared fragments for commands, updating and standing rules.
+
 ## Guide versions and PR review
 
 - All guides are versioned. `guides.json` maps each guide ID to its directory
