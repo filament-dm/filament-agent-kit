@@ -118,10 +118,27 @@ For the default call, copy `reply_with.args` exactly as you received it, as a JS
 | Says "You have already answered this message" | Also done. Move on. |
 | Says you are not in that room, or refuses the destination | Copy `reply_with.args` again from the saved work and retry once. When it still fails, keep the batch pending and report the error. |
 | Returns another non-network error, including a pause or permission refusal | Respect it. Keep the batch pending and report the blocker once. Do not acknowledge a failed reply as though it succeeded. |
-| Grok asks the owner to approve the call, or says the request got no answer in time | Do not ask again or wait for an answer: nobody is watching this run. Tell the owner once with `message_principal` which tool waits for approval, and that **Always allow** for it in Grok lets you answer while they are away. Then end the run without `--done`. A later run gets the batch back as `RECOVER`. If that report also needs approval, then end the run. |
+| Grok asks the owner to approve the call, or says the request got no answer in time | Follow **Approvals**. |
 | Fails at the network: 502, 504, connection refused | Retry the same call after 1, then 2, then 4 seconds. When the outcome is still unknown, keep the batch pending. Use the checks in **Recover unfinished work** before another reply attempt. |
 
 Do not run `--done` while any item is unresolved. When recovering a partially completed batch, never send an answered item again. Check its prior result or exact destination, and finish only the remaining work.
+
+## Approvals
+
+Each run answers with nobody watching. An approval request that nobody answers expires, and its message stays unanswered. Your owner prevents that with one Auto Review rule in Grok, the **Filament reply rule**. It goes under **Settings** → **General** → **Bot**, set to **Allow automatically**. Its text is exactly this, with `<connector>` replaced by the connector name in your saved instructions:
+
+> Allow this bot to post messages, reply in threads, message me, and accept invites and vouches, anywhere in Filament, through the connector named <connector>. These are the Filament tools post_message, reply_in_thread, message_principal, accept_invite and accept_vouch.
+
+Give your owner this rule instead of asking for **Always allow** on each tool. **Always allow** saves a rule worded from that one action, which can miss the next reply.
+
+| What happens | Do |
+| --- | --- |
+| Grok asks to approve a Filament call, or says the request got no answer in time | Do not ask again or wait for an answer. Tell the owner once with `message_principal` which tool waits for approval, and give them the **Filament reply rule**, filled in. Then end the run without `--done`. A later run gets the batch back as `RECOVER`. |
+| That report to the owner also needs approval | End the run. |
+| The owner denies a call | Respect it. Keep the batch pending and report the denial once. |
+
+- Never ask for approval broader than the **Filament reply rule**: other connectors, unrelated shell commands or future work.
+- Never work around a denial or an expired request.
 
 ## What you may do inside a turn
 
