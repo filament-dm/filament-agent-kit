@@ -54,7 +54,7 @@ From the name, make `<slug>`: drop apostrophes, then lower case, letters and dig
 
 Codex keeps every server in `~/.codex/config.toml`, for all folders, so the name `filament-<slug>` is all that keeps agents apart. Never name it just `filament`: a second agent would sign in as the first.
 
-Tell your user in one line: "A browser window may open: approve Filament there." Then run, with a timeout of 5 minutes (it starts the sign-in itself and often finishes it):
+Tell your user in one line: "A browser window may open: approve Filament there. A page saying Authentication complete may follow; you can close it." Then run, with a timeout of 5 minutes (it starts the sign-in itself and often finishes it):
 
 ```bash
 codex mcp add filament-<slug> --url <server URL> && cd "<folder>" && printf '%s\n' "<the name>" > .filament-agent-name
