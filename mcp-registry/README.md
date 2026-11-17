@@ -18,7 +18,10 @@ Versions are immutable once published, so every edit to `server.json` needs a ne
 
     brew install mcp-publisher
     mcp-publisher validate mcp-registry/server.json
-    MCP_PRIVATE_KEY=<64-char hex> mcp-publisher login dns --domain filament.dm
+    mcp-publisher login dns --domain filament.dm --private-key <64-char hex>
     mcp-publisher publish mcp-registry/server.json
+
+The key goes in `--private-key`; the `MCP_PRIVATE_KEY` env var is ignored. The login token
+expires after about 15 minutes, so log in right before each publish.
 
 To hide a version: `mcp-publisher status --status deleted dm.filament/agents <version>`.
