@@ -263,8 +263,6 @@ class FakeServer:
         with self.condition:
             if tool == 'get_self':
                 return {'user_id': '@agent:test', 'owner_id': '@person:test', 'display_name': 'Fixture'}
-            if tool == 'list_pending_invites':
-                return {'invites': []}
             if tool == 'list_vouches':
                 return {'vouches': []}
             if tool == 'get_recent_messages':

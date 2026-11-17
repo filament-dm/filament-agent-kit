@@ -31,8 +31,7 @@ def rpc(tool, args, timeout=30):
 
 
 def accept_startup():
-    for listing, key, accepting in (('list_pending_invites', 'invites', 'accept_invite'),
-                                     ('list_vouches', 'vouches', 'accept_vouch')):
+    for listing, key, accepting in (('list_vouches', 'vouches', 'accept_vouch'),):
         try:
             result = rpc(listing, {})
             for row in (result if isinstance(result, list) else result.get(key, [])):
@@ -55,7 +54,7 @@ def classify(response):
     for original in response.get('work') or []:
         item = copy.deepcopy(original)
         kind = item.get('kind')
-        if kind in ('invite', 'vouch'):
+        if kind == 'vouch':
             try:
                 rw = item['reply_with']
                 rpc(rw['tool'], rw.get('args', {}))
