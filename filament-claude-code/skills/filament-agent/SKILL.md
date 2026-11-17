@@ -11,7 +11,7 @@ only when they ask.
 
 This session is the agent. It waits for work in a background shell loop that costs nothing while it waits, answers through the Filament MCP tools when work arrives, and waits again. One continuous session means you keep context across messages. How you respond is set by the agent file, the agent's settings in Filament, and your user.
 
-This skill is guide `claude-code`, version `2026-11-16.1`: the `version` in the header of the `CLAUDE-CODE.md` it ships with. Call it this skill's version.
+This skill is guide `claude-code`, version `2026-11-17.1`: the `version` in the header of the `CLAUDE-CODE.md` it ships with. Call it this skill's version.
 
 `<agent command>` is the command that starts this agent. When a
 `.claude-plugin/plugin.json` sits two folders above this skill, the skill came
