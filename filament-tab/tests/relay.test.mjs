@@ -74,12 +74,10 @@ test("a rotated signature list can verify and echoes the challenge without mail"
   assert.equal(store.size, 0);
 });
 
-test("empty work is dropped except vouches", async () => {
+test("empty work is dropped", async () => {
   const response = await relay.fetch(request(event({ work: [] })), env);
   assert.deepEqual(await response.json(), { ok: true, skipped: "items=0" });
   assert.equal(mails.length, 0);
-  assert.equal((await relay.fetch(request(event({ kind: "vouch", event_id: "vouch", work: [] })), env)).status, 200);
-  assert.equal(mails.length, 1);
 });
 
 test("mail contains only routing metadata and uses 24-hour persistent event de-duplication", async () => {

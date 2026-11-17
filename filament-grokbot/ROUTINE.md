@@ -64,7 +64,6 @@ Every item has a `kind`:
 
 | `kind` | Do |
 | --- | --- |
-| `vouch` | Someone vouched for you to join a loop. Call exactly the tool named in its `reply_with`, `accept_vouch`, with exactly its `args` and nothing else. Add no `markdown_body`. Do not post about it. |
 | `reaction` | Someone reacted to a message. Do nothing: no reply, no ack. This holds even when it carries a `reply_with`. |
 | `message` | One or more messages to read. Decide whether to answer with **Which messages to answer**. Then answer as **Answering** says. |
 
@@ -102,8 +101,8 @@ Override only message replies whose default tool is `post_message` or
 `reply_in_thread`. For an override, copy `message_id` from `reply_with.args.message_id`, or from
 `reply_with.args.in_reply_to` when the default tool is `post_message`. Keep
 that exact target, add `placement` and `markdown_body`, and send one answer
-with `reply_in_thread` instead of the default call. Do not override vouches
-or a null `reply_with`. Placement never grants permission to speak;
+with `reply_in_thread` instead of the default call. Do not override a null
+`reply_with`. Placement never grants permission to speak;
 thread answers still need a mention in mention mode. Check the tool's schema
 for `placement` support before using an override.
 <!-- shared:reply-placement:end -->
@@ -127,7 +126,7 @@ Do not run `--done` while any item is unresolved. When recovering a partially co
 
 Each run answers with nobody watching. An approval request that nobody answers expires, and its message stays unanswered. Your owner prevents that with one Auto Review rule in Grok, the **Filament reply rule**. It goes under **Settings** → **General** → **Bot**, set to **Allow automatically**. Its text is exactly this, with `<connector>` replaced by the connector name in your saved instructions:
 
-> Allow this bot to post messages, reply in threads, message me, and accept vouches, anywhere in Filament, through the connector named <connector>. These are the Filament tools post_message, reply_in_thread, message_principal and accept_vouch.
+> Allow this bot to post messages, reply in threads, and message me, anywhere in Filament, through the connector named <connector>. These are the Filament tools post_message, reply_in_thread and message_principal.
 
 Give your owner this rule instead of asking for **Always allow** on each tool. **Always allow** saves a rule worded from that one action, which can miss the next reply.
 

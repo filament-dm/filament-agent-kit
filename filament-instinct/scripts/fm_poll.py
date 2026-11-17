@@ -30,40 +30,12 @@ def rpc(tool, args, timeout=30):
     return call(tool, args, timeout=timeout, before=lock_write)
 
 
-def accept_startup():
-    for listing, key, accepting in (('list_vouches', 'vouches', 'accept_vouch'),):
-        try:
-            result = rpc(listing, {})
-            for row in (result if isinstance(result, list) else result.get(key, [])):
-                try:
-                    rpc(accepting, {'loop_id': row['loop_id']})
-                    log('ACCEPTED {} {}'.format(accepting, row['loop_id']))
-                except AuthErr:
-                    raise
-                except (NetErr, ToolErr, KeyError) as e:
-                    log('ACCEPT-FAILED ' + str(e))
-        except AuthErr:
-            raise
-        except (NetErr, ToolErr) as e:
-            log('ACCEPT-FAILED ' + str(e))
-
-
 def classify(response):
     kept, silent = [], []
     done = set(rd('replied_ids').split())
     for original in response.get('work') or []:
         item = copy.deepcopy(original)
         kind = item.get('kind')
-        if kind == 'vouch':
-            try:
-                rw = item['reply_with']
-                rpc(rw['tool'], rw.get('args', {}))
-                log('ACCEPTED {} {}'.format(kind, item.get('loop_id')))
-            except AuthErr:
-                raise
-            except (NetErr, ToolErr, KeyError, TypeError) as e:
-                log('ACCEPT-FAILED ' + str(e))
-            continue
         if kind != 'message':
             continue
         if item.get('reply_with') is None:
@@ -200,7 +172,6 @@ def main():
                 raise
             except (NetErr, ToolErr) as e:
                 log('SELF-FAILED ' + str(e))
-        accept_startup()
         while time.monotonic() - started < budget:
             log('heartbeat ' + str(heartbeat(before=lock_write)))
             args = {'wait_seconds': max(1, 25 // (10 if FAST else 1)), 'max_items': 10}

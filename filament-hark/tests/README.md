@@ -92,9 +92,6 @@ Production scripts always use ps; no production fallback is installed.
   malformed reply target or non-UTF-8 body is `BAD_ITEM`. Corrupt replied state
   fails closed, with a diagnostic and no request, rather than risking a second
   post. Reply and restart lock timeouts follow the spec. Stale-owner locks are reclaimed by rename; live shell owners and missing-pid directories younger than five seconds are protected.
-- Startup vouch results accept a bare list or a `vouches` envelope. The spec
-  does not supply the exact response schema; live Hark acceptance must confirm
-  this shape.
 - Without any usable self cache, self-dependent filter rules are skipped;
   the god-sender rule and replied-message stripping still apply. Heartbeat
   and listener filtering-ack errors are logged and ignored as their explicit

@@ -130,14 +130,12 @@ in lower case; it names the agent file, and `<server>` is `filament-<name>`.
    ```
    Check with `cat ~/.filament/agents/<name>.md`, then use it as the agent
    file from step 1 of Setup.
-6. **What was waiting.** Call `list_vouches`, then `accept_vouch` with each
-   `loop_id`. An empty list is fine.
-7. **Check before you say hello.** Call `get_self` again. Its `display_name`
+6. **Check before you say hello.** Call `get_self` again. Its `display_name`
    must be the name from step 3 (if there was one) and its `avatar_url` must
    be set (unless step 4 failed twice), and `.filament-agent-name` must be
    gone. If any of these isn't so, do that step now. Your user sees the name
    and picture with your first message, so they come first.
-8. **Tell the user** in one line where the agent file is, that editing it
+7. **Tell the user** in one line where the agent file is, that editing it
    changes the agent from the next chat on, and that a new Codex chat in this
    folder with `$filament:filament-agent <name>` brings the agent back later.
    Then return to Setup step 3. The hello in step 4 there is this agent's
@@ -246,8 +244,6 @@ sign-in button only some of the time.
 
 Every item has a `kind`:
 
-- **`vouch`**: someone vouched for you to join a loop. Call exactly the
-  tool named in its `reply_with` with exactly its `args`, nothing else.
 - **`reaction`**: someone reacted with an emoji your wake policy lists. The
   message they reacted to is `target_event_id`; read that. Answer it, where
   `reply_with` says, only when it needs something from you; otherwise do
@@ -329,8 +325,8 @@ threads"), use `reply_in_thread` with `placement`:
 For an override, copy `message_id` from `reply_with.args.message_id`, or from
 `reply_with.args.in_reply_to` when the default tool is `post_message`. Keep
 that exact target, add `placement` and `markdown_body`, and send one answer
-with `reply_in_thread` instead of the default call. Do not override vouches
-or a null `reply_with`. Placement never grants permission to speak;
+with `reply_in_thread` instead of the default call. Do not override a null
+`reply_with`. Placement never grants permission to speak;
 thread answers still need a mention in mention mode. Check the tool's schema
 for `placement` support before using an override.
 
