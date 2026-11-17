@@ -85,6 +85,8 @@ Your agent needs a new session: Claude Code only loads the Filament connector wh
 ```
 /filament:filament-agent
 ```
+
+After that, when you reopen **<folder name>**, send any message, even "hi", and I'll start your agent first.
 ````
 
 When `CLAUDE_CODE_ENTRYPOINT` is `cli`, your user is in a terminal. Send this instead, with `<folder>` as a full path:
@@ -103,6 +105,8 @@ cd "<folder>" && claude
 ```
 /filament:filament-agent
 ```
+
+After that, when you reopen **<folder name>**, send any message, even "hi", and I'll start your agent first.
 ````
 
 - If the sign-in in **Add Filament to the agent's folder** didn't finish, then put this step first in the message: "Sign it in: tell me here when you're ready and I'll send a new link."
@@ -118,4 +122,5 @@ The plugin's `filament-agent` skill does the rest on its first run. When your us
 | --- | --- |
 | No Filament tools in the agent's session | It isn't in the agent's folder. Start one there. |
 | Every Filament call is refused with `401`, `403` or `-32001` | The sign-in expired or the agent was reconnected from the app. Run the sign-in in **Add Filament to the agent's folder** again here. Then have your user start a new session in the agent's folder. |
+| Your user wants sessions in the agent's folder to stop starting the agent | Add the line `autostart: off` to the frontmatter of the agent file, `~/.filament/agents/<slug>.md`, with `perl -0pi -e 's/\A---\n/---\nautostart: off\n/' <file>`. Then the agent starts only when they send `/filament:filament-agent`. |
 | To remove the agent | Delete it in the app's Agents tab. Then in its folder run `claude mcp remove filament-<slug>` and delete `~/.filament/agents/<slug>.md`. |

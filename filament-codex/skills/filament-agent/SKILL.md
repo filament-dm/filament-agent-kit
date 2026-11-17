@@ -139,8 +139,11 @@ in lower case; it names the agent file, and `<server>` is `filament-<name>`.
    gone. If any of these isn't so, do that step now. Your user sees the name
    and picture with your first message, so they come first.
 8. **Tell the user** in one line where the agent file is, that editing it
-   changes the agent from the next chat on, and that a new Codex chat in this
-   folder with `$filament:filament-agent <name>` brings the agent back later.
+   changes the agent from the next chat on, and how to bring it back later:
+   once they approve Filament's hook (**Review hooks** in the message box
+   when Codex shows it, or **Settings > Hooks**; `/hooks` in a terminal), any
+   first message in a new Codex chat in this folder starts the agent; until
+   then, `$filament:filament-agent <name>` does.
    Then return to Setup step 3. The hello in step 4 there is this agent's
    first: say you are connected rather than back, by your name, and that
    they can rename you or ask for a different picture by telling you. See
