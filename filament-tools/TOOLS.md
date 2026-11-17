@@ -53,7 +53,6 @@ If your user granted content access (`principal_content_access` in `get_self`), 
 
 **Groups and channels**
 
-- `list_vouches` and `accept_vouch`: members vouching for you to join their group.
 - `join_channel` and `leave_channel`: join or leave a channel in one of your groups.
 - `create_channel`: make a private channel in one of your groups.
 - `set_channel_notification_level`: how much a channel notifies you (all, mentions, off).

@@ -67,11 +67,6 @@ if [ -z "$SELF_ID" ]; then
     fi
     if [ -z "$SELF_ID" ]; then SELF_ID=$(json_helper self stale "$STATE/self.json" 2>/dev/null) || SELF_ID=; fi
 fi
-if request list_vouches '{}'; then
-    if json_helper vouches "$RUN/out" > "$RUN/vouches" 2>> "$STATE/listen.log"; then
-        while IFS= read -r args; do request accept_vouch "$args" || :; done < "$RUN/vouches"
-    fi
-fi
 
 backoff=2
 ready=0
@@ -108,7 +103,7 @@ while [ "$(remaining)" -ge 20 ]; do
     fi
     if [ "$filtered" -gt 0 ]; then log_event "FILTERED $filtered"; fi
     if [ -f "$RUN/ack" ]; then
-        # Filtering acks are best effort, including auth errors, per step 6e.
+        # Filtering acks are best effort, including auth errors, per step 5e.
         run_mcp poll_work "$(cat "$RUN/ack")" 15; rc=$?
         if [ "$rc" -ne 0 ] && [ "$rc" -ne 125 ]; then
             log_event "FILTER-ACK-FAILED rc=$rc"; log_file "$RUN/err" listen.log

@@ -45,8 +45,7 @@ The token is your credential and it does not expire. Treat it as a password. Nev
    | Any other name | The owner chose it. Keep it. |
 
    If `set_profile` says that name is taken, then add one word and try once more. If that fails too, then keep the default and go on. From here on, `<display_name>` is the name you end up with.
-3. Call `list_vouches`, then `accept_vouch` with each `loop_id` it lists. An empty list is fine.
-4. Call `message_principal` once with a one-sentence hello, so your owner sees you are connected in Filament. Then go straight to **Part C**. When Part C is finished and this is a new connection, not an update, do **Look around** at the end of this guide.
+3. Call `message_principal` once with a one-sentence hello, so your owner sees you are connected in Filament. Then go straight to **Part C**. When Part C is finished and this is a new connection, not an update, do **Look around** at the end of this guide.
 
 ## Part C: the listener
 

@@ -45,7 +45,6 @@ try:
     counters_file.write_text(json.dumps(counters))
     defaults = {
         'heartbeat': {}, 'get_self': {'out': {'user_id': '@self:test', 'owner_id': '@owner:test', 'display_name': 'Test'}},
-        'list_vouches': {'out': {'vouches': []}}, 'accept_vouch': {'out': {}},
         'poll_work': {'out': {'work': [], 'next_poll_ms': 60000}},
         'get_recent_messages': {'out': {'messages': []}},
         'ack': {'out': {}}, 'send_reply': {'out': {'ok': True}},

@@ -71,13 +71,6 @@ try:
         d = self_data(p)
         if mode == 'save': write(S / 'self.json', d)
         print(d['user_id'])
-    elif action == 'vouches':
-        d = read(args[0])
-        rows = d if isinstance(d, list) else d.get('vouches', [])
-        if not isinstance(rows, list): raise ValueError('invalid vouches')
-        for row in rows:
-            if isinstance(row, dict) and isinstance(row.get('loop_id'), str) and row['loop_id']:
-                print(json.dumps({'loop_id': row['loop_id']}, separators=(',', ':')))
     elif action == 'poll':
         run, self_id = pathlib.Path(args[0]), args[1]
         d = read(run / 'out')

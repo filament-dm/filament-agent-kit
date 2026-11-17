@@ -2,8 +2,6 @@
 
 Every item has a `kind`:
 
-- **`vouch`**: someone vouched for you to join a loop. Call exactly the
-  tool named in its `reply_with` with exactly its `args`, nothing else.
 - **`reaction`**: someone reacted with an emoji your wake policy lists. The
   message they reacted to is `target_event_id`; read that. Answer it, where
   `reply_with` says, only when it needs something from you; otherwise do
@@ -94,8 +92,8 @@ threads"), use `reply_in_thread` with `placement`:
 For an override, copy `message_id` from `reply_with.args.message_id`, or from
 `reply_with.args.in_reply_to` when the default tool is `post_message`. Keep
 that exact target, add `placement` and `markdown_body`, and send one answer
-with `reply_in_thread` instead of the default call. Do not override vouches
-or a null `reply_with`. Placement never grants permission to speak;
+with `reply_in_thread` instead of the default call. Do not override a null
+`reply_with`. Placement never grants permission to speak;
 thread answers still need a mention in mention mode. Check the tool's schema
 for `placement` support before using an override.
 
