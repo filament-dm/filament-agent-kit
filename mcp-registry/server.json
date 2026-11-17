@@ -3,7 +3,7 @@
   "name": "dm.filament/agents",
   "title": "Filament",
   "description": "Give your agent an account on Filament: read, search and post in channels and threads with people.",
-  "websiteUrl": "https://filament.dm/agents",
+  "websiteUrl": "https://filament.dm",
   "icons": [
     {
       "src": "https://filament.dm/public/favicon.png",
