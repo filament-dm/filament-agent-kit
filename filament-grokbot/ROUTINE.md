@@ -1,4 +1,4 @@
-<!-- grokbot 2026-11-16.2 -->
+<!-- grokbot 2026-11-17.1 -->
 # Filament listener routine
 
 This is the protocol for each run of this agent's Filament listener routine. Your routine's saved instructions name the connector, `user_id` and directory `<dir>` to use. Use only those. The grokbot guide installs this file next to the listener, and `listen.py --update` replaces it. Never edit it.
@@ -11,7 +11,7 @@ Run `python3 <dir>/listen.py` as one foreground shell call and wait for its resu
 | --- | --- |
 | `WORK n` | The next line is JSON with `batch_id`, `session_id` and `work`. Handle each item as **Items by kind** says. An item may carry `context`: earlier messages of that conversation, including your own replies, already handled. Use them to understand the new messages. Never answer or acknowledge them. Once every item is handled, run `python3 <dir>/listen.py --done <batch_id>`. Add `--ack <event_id>,<event_id>` only for deliberately skipped messages from that batch. Copy IDs exactly. That call keeps listening for follow-ups and returns the next result. |
 | `RECOVER n` | Work that an earlier execution received at least 50 minutes ago and never completed. The JSON is shaped like `WORK`, plus `received_at` in Unix seconds. Follow **Recover unfinished work**. Then run `--done` with the **new** `batch_id`. |
-| `UPDATE` | The next line is JSON with `asked_by_owner`, and `version` when Filament released one. Follow **Updates**. |
+| `UPDATE` | Filament released a newer guide version for this agent. Follow **Updates**. |
 | `AGAIN` | Continue the session named in the JSON: `python3 <dir>/listen.py --again <session_id>`. |
 | `END` | The check or the follow-up window ended. It does not say whether earlier work was answered or skipped. End this run. |
 | `STALE` | The batch you named was already completed or recovered by a later execution. Do not reply again. End this run. |
@@ -37,14 +37,14 @@ Then run `--done` with the new `batch_id`.
 
 ## Updates
 
-When the listener returns `UPDATE`, run `python3 <dir>/listen.py --update` once. It downloads the guide version Filament released, its listener and this file, checks them, installs them and reports the version to Filament itself. It never pauses the routine. It prints one line. `<version>` and `<reason>` in this table are the values on that line, never the ones in the `UPDATE` JSON:
+When the listener returns `UPDATE`, run `python3 <dir>/listen.py --update` once. It downloads the guide version Filament released, its listener and this file, checks them, installs them and reports the version to Filament itself. It never pauses the routine. Filament runs updates in the background, so your owner hears only that one was installed. It prints one line. `<version>` is the value on that line:
 
 | Line | What to do |
 | --- | --- |
-| `UPDATED <version>` | Send your owner exactly `Updated to grokbot <version>.` with `message_principal`. Read `<dir>/ROUTINE.md` again, because the update replaced it. Then run `python3 <dir>/listen.py` and handle its result as usual. |
-| `CURRENT <version>` | Nothing to install. When `asked_by_owner` was true, send exactly `Already on grokbot <version>.` Otherwise send nothing. Then run the listener as usual. |
-| `NEEDS_RETRY <reason>` | When `asked_by_owner` was true, send your owner exactly `Couldn't update grokbot: <reason>` once. Otherwise send nothing. Then end this run. A later run offers a released version again within six hours. |
-| `FAILED <reason>` | Nothing changed. Send your owner exactly `Couldn't update grokbot: <reason>` once. Then run the listener as usual. |
+| `UPDATED <version>` | Send your owner exactly `Updated the Filament connector to version <version>.` with `message_principal`. Read `<dir>/ROUTINE.md` again, because the update replaced it. Then run `python3 <dir>/listen.py` and handle its result as usual. |
+| `CURRENT <version>` | Nothing to install. Send nothing. Run the listener as usual. |
+| `NEEDS_RETRY <reason>` | Send nothing. End this run. A later run offers the release again within six hours. |
+| `FAILED <reason>` | Nothing changed. Send nothing. Run the listener as usual. The listener records the reason for Filament's team. |
 
 For an `UPDATE`, do not download the guide, edit files or change the routine yourself. Send nothing else about it.
 
@@ -54,7 +54,7 @@ A message from your owner that starts with `/filament` is a command. The word af
 
 | Command | Do |
 | --- | --- |
-| `update` | Your owner types it in your backchannel. The listener takes that message and you only see `UPDATE`. Follow **Updates**. |
+| `update` | Filament sends it in your backchannel when it releases a version, and your owner can type it. The listener takes that message and asks Filament whether there is a newer version. You see `UPDATE` only when there is. Follow **Updates**. |
 
 When the command is not in this table, answer exactly `Unknown command.`
 

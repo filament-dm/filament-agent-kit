@@ -8,7 +8,8 @@ trigger with Filament, which then starts a run when work arrives and nobody is
 listening.
 Python owns empty polls; the model handles WORK. --update installs the guide
 version Filament released and reports it, so an update is this script's job,
-not the model's. This script cannot measure model tokens or guarantee provider
+not the model's. Filament runs updates in the background: the owner hears only
+that one was installed, and other outcomes are recorded here for --status. This script cannot measure model tokens or guarantee provider
 scheduling. State is private to one agent. Only --status and --check-state are
 read-only operations.
 """
@@ -31,7 +32,7 @@ import uuid
 
 # Kept equal to the guide version in GROKBOT.md, so listeners older than
 # 2026-11-13.1, which require it, can still update. This one never requires it.
-REVISION = '2026-11-16.2'
+REVISION = '2026-11-17.1'
 STATE = os.environ.get('FM_STATE') or os.path.dirname(os.path.abspath(__file__))
 DEFAULT_ENDPOINT = 'https://api.filament.dm/mcp/agents'
 POLL_WAIT = 60
@@ -67,8 +68,10 @@ ROUTINE = 'ROUTINE.md'
 # The guide version the last --update installed and reported.
 INSTALLED = 'guide_version'
 FETCH_LIMIT = 2 * 1024 * 1024
+# Filament sends it for a release, and the owner can type it. Either way it only
+# makes the listener ask get_self now; it is never answered by itself.
 UPDATE_COMMAND = '/filament update'
-# Filament's notices about a release; whether to update comes from get_self.
+# Filament's earlier notices about a release, handled like the command.
 NOTICE_PREFIXES = ('Filament: your grokbot guide has a new version',
                    'Filament: you are connected with the grokbot guide')
 # A release the update did not install is offered again after this long.
@@ -301,7 +304,8 @@ def status():
             'last_poll_at': state.get('last_poll_at') if state else None,
             'last_success_at': state.get('last_success_at') if state else None,
             'handler_timeout_seconds': HANDLER_TIMEOUT, 'wake': wake_summary(),
-            'recent_calls': records[-40:], 'model_tokens': None,
+            'recent_calls': records[-40:], 'last_update': load_update().get('last_result'),
+            'model_tokens': None,
             'limits': 'Counts cover this script only. Scheduler starts, model turns, cached tokens and billing are not observable here. A held lock may mean polling or retry backoff.'}
 
 
@@ -498,11 +502,10 @@ def load_update():
     return info
 
 
-def offer_update(call_id, asked=False, retry=True):
+def offer_update(call_id, retry=True):
     """Ask Filament once whether a newer guide is released; never blocks listening.
 
-    The next listener call returns UPDATE when one is. The owner's command is
-    answered even when there is none, so the owner hears that the bot is current.
+    The next listener call returns UPDATE when one is, and nothing otherwise.
     """
     try:
         offer = released(read_tool('get_self', {}, 15))
@@ -513,34 +516,30 @@ def offer_update(call_id, asked=False, retry=True):
     now = time.time()
     if offer:
         last = info['offered'].get(offer['version'])
-        if asked or not retry or not number(last) or now - last >= UPDATE_RETRY:
-            info.update(requested=True, version=offer['version'], asked_by_owner=asked)
+        if not retry or not number(last) or now - last >= UPDATE_RETRY:
+            info['requested'] = True
             info['offered'][offer['version']] = now
-    elif asked:
-        info.update(requested=True, version=None, asked_by_owner=True)
     write('update.json', json.dumps(info))
 
 
 def take_update():
-    """The update to hand to the model now, once."""
+    """Whether to hand UPDATE to the model now, once."""
     info = load_update()
     if not info.get('requested'):
-        return None
+        return False
     info['requested'] = False
     write('update.json', json.dumps(info))
-    offer = {'asked_by_owner': bool(info.get('asked_by_owner'))}
-    if info.get('version'):
-        offer['version'] = info['version']
-    return offer
+    return True
 
 
 def intercept(work, state, call_id):
-    """Take Filament's update notices and the owner's update command out of the work.
+    """Take the update command and Filament's notices out of the work.
 
-    They are acknowledged here and never handed to the model as messages. Whether
-    to update is Filament's answer in get_self, never the notice's text.
+    They are acknowledged here and never handed to the model as messages. They
+    only make the listener ask get_self now: whether to update is Filament's
+    answer there, never the message's text, and no one is told it is current.
     """
-    kept, asked, noticed = [], False, False
+    kept, check = [], False
     for item in work:
         messages = item.get('messages') if item.get('kind') == 'message' else None
         if not isinstance(messages, list):
@@ -551,20 +550,16 @@ def intercept(work, state, call_id):
             body = message.get('body') if isinstance(message, dict) else None
             if isinstance(body, str) and message.get('is_from_principal') \
                     and isinstance(message.get('event_id'), str):
-                if body.split()[:2] == UPDATE_COMMAND.split():
-                    asked = True
-                    state['acks'].append(message['event_id'])
-                    continue
-                if body.startswith(NOTICE_PREFIXES):
-                    noticed = True
+                if body.split()[:2] == UPDATE_COMMAND.split() or body.startswith(NOTICE_PREFIXES):
+                    check = True
                     state['acks'].append(message['event_id'])
                     continue
             rest.append(message)
         if rest:
             item['messages'] = rest
             kept.append(item)
-    if asked or noticed:
-        offer_update(call_id, asked=asked, retry=False)
+    if check:
+        offer_update(call_id, retry=False)
     return kept
 
 
@@ -774,9 +769,8 @@ def take_over(state, pending, follow):
 
 
 def listen(state, budget, session_max, call_id, metrics):
-    offer = take_update()
-    if offer is not None:
-        return 'UPDATE', offer
+    if take_update():
+        return 'UPDATE', None
     started = time.monotonic()
     session = state['session']
     session_end = session['started_at'] + session_max
@@ -829,11 +823,9 @@ def listen(state, budget, session_max, call_id, metrics):
         if response.get('cursor'):
             state['cursor'] = response['cursor']
         work = intercept(response.get('work') or [], state, call_id)
-        if not work:
-            offer = take_update()
-            if offer is not None:
-                save(state)
-                return 'UPDATE', offer
+        if not work and take_update():
+            save(state)
+            return 'UPDATE', None
         if work:
             state['counts']['work_batches'] += 1
             state['counts']['work_items'] += len(work)
@@ -978,6 +970,11 @@ def main():
             result, detail = update_listener()
         except (StateError, OSError) as exc:
             result, detail = 'FAILED', str(exc)
+        # The owner is not told about anything but UPDATED; this is the record.
+        event('UPDATE_RESULT', result=result, detail=detail)
+        info = load_update()
+        info['last_result'] = {'result': result, 'detail': detail, 'at': time.time()}
+        write('update.json', json.dumps(info))
         print('%s %s' % (result, detail) if detail else result)
         return
     call_id = uuid.uuid4().hex

@@ -808,9 +808,7 @@ class UpdateTest(ListenerCase):
         self.release()
         self.offered()
         self.fake.queue = [{'work': [notice('n1')]}]
-        output = self.run_copy('--check', '1')
-        self.assertEqual(output[0], 'UPDATE')
-        self.assertEqual(self.body(output), {'version': NEW, 'asked_by_owner': False})
+        self.assertEqual(self.run_copy('--check', '1'), ['UPDATE'])
         self.assertEqual(self.state_data()['acks'], ['n1'])
         self.assertIsNone(self.state_data()['pending'])
 
@@ -823,24 +821,48 @@ class UpdateTest(ListenerCase):
         batch = self.body(output)
         self.assertEqual([m['event_id'] for m in batch['work'][0]['messages']], ['e1'])
         # Once that work is done, the next result is the update.
-        output = self.run_copy('--done', batch['batch_id'], '--follow', '1')
-        self.assertEqual(output[0], 'UPDATE')
-        self.assertEqual(self.body(output), {'version': NEW, 'asked_by_owner': False})
+        self.assertEqual(self.run_copy('--done', batch['batch_id'], '--follow', '1'), ['UPDATE'])
 
-    def test_the_owner_command_asks_for_an_update(self):
+    def test_the_command_asks_for_a_released_update(self):
+        self.release()
+        self.offered()
         command = item('c1')
         command['messages'][0].update(body=' /filament update ', is_from_principal=True)
         self.fake.queue = [{'work': [command]}]
-        output = self.run_copy('--check', '1')
-        self.assertEqual(output[0], 'UPDATE')
-        # Nothing released: no version to misquote when answering the owner.
-        self.assertEqual(self.body(output), {'asked_by_owner': True})
+        self.assertEqual(self.run_copy('--check', '1'), ['UPDATE'])
+        self.assertEqual(self.state_data()['acks'], ['c1'])
+
+    def test_the_command_with_nothing_released_is_silent(self):
+        command = item('c1')
+        command['messages'][0].update(body='/filament update', is_from_principal=True)
+        self.fake.queue = [{'work': [command]}]
+        self.assertEqual(self.run_copy('--check', '1'), ['END'])
+        self.assertIn(['c1'], [call['args'].get('ack') for call in self.fake.calls])
+
+    def test_a_release_is_answered_once(self):
+        # The start offers the release, then Filament's command for it arrives.
+        self.release()
+        self.assertEqual(self.run_copy('--check', '1'), ['UPDATE'])
+        self.assertEqual(self.run_copy('--update'), ['UPDATED %s' % NEW])
+        self.fake.guide = {'reported': NEW, 'update': None}
+        command = item('c1')
+        command['messages'][0].update(body='/filament update', is_from_principal=True)
+        self.fake.queue = [{'work': [command]}]
+        self.assertEqual(self.run_copy('--check', '1'), ['END'])
+        self.assertIn(['c1'], [call['args'].get('ack') for call in self.fake.calls])
+
+    def test_an_update_that_fails_is_recorded_for_status(self):
+        self.release(version='2000-01-01.1')
+        self.assertEqual(self.run_copy('--update'), ['FAILED refusing to move back to 2000-01-01.1'])
+        last = json.loads('\n'.join(self.run_copy('--status')))['last_update']
+        self.assertEqual((last['result'], last['detail']), ('FAILED', 'refusing to move back to 2000-01-01.1'))
 
     def test_words_after_the_owner_command_are_ignored(self):
         command = item('c1')
         command['messages'][0].update(body='/filament update 2026-11-05.1', is_from_principal=True)
         self.fake.queue = [{'work': [command]}]
-        self.assertEqual(self.run_copy('--check', '1')[0], 'UPDATE')
+        self.assertEqual(self.run_copy('--check', '1')[0], 'END')
+        self.assertIn(['c1'], [call['args'].get('ack') for call in self.fake.calls])
 
     def test_another_word_is_not_the_update_command(self):
         command = item('c1')
