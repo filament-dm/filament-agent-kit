@@ -67,14 +67,11 @@ if [ -z "$SELF_ID" ]; then
     fi
     if [ -z "$SELF_ID" ]; then SELF_ID=$(json_helper self stale "$STATE/self.json" 2>/dev/null) || SELF_ID=; fi
 fi
-for kind in invites vouches; do
-    if [ "$kind" = invites ]; then list=list_pending_invites; accept=accept_invite; else list=list_vouches; accept=accept_vouch; fi
-    if request "$list" '{}'; then
-        if json_helper invites "$RUN/out" "$kind" > "$RUN/invites" 2>> "$STATE/listen.log"; then
-            while IFS= read -r args; do request "$accept" "$args" || :; done < "$RUN/invites"
-        fi
+if request list_vouches '{}'; then
+    if json_helper vouches "$RUN/out" > "$RUN/vouches" 2>> "$STATE/listen.log"; then
+        while IFS= read -r args; do request accept_vouch "$args" || :; done < "$RUN/vouches"
     fi
-done
+fi
 
 backoff=2
 ready=0

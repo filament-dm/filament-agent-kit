@@ -428,11 +428,9 @@ exit 3
             result = subprocess.run([BASH, '-c', 'source "$1"; classify_error "$2"', 'test', str(self.state / 'restart_listener.sh'), error], capture_output=True, text=True)
             self.assertEqual(result.stdout.strip(), expected, error)
 
-    def test_17_self_cache_invites_and_failure_coverage(self):
-        self.scenario(list_pending_invites=[{'out': {'invites': [{'loop_id': 'inv'}]}}],
-                      list_vouches=[{'out': {'vouches': [{'loop_id': 'vouch'}]}}], poll_work=[work(item())])
+    def test_17_self_cache_vouches_and_failure_coverage(self):
+        self.scenario(list_vouches=[{'out': {'vouches': [{'loop_id': 'vouch'}]}}], poll_work=[work(item())])
         self.run_script(rc=0, last='ITEMS 1')
-        self.assertEqual(self.calls('accept_invite')[0]['args'], {'loop_id': 'inv'})
         self.assertEqual(self.calls('accept_vouch')[0]['args'], {'loop_id': 'vouch'})
         self.run_script(rc=0, last='ITEMS 1')
         self.assertEqual(len(self.calls('get_self')), 1)
@@ -441,11 +439,10 @@ exit 3
         self.scenario(get_self=[{'rc': 1, 'err': 'offline'}], poll_work=[work(own, item('human'))])
         self.run_script(rc=0, last='ITEMS 1')
         self.assertEqual(self.calls('ack')[-1]['args']['ack'], ['self'])
-        for tool in ['get_self', 'list_pending_invites', 'accept_invite', 'list_vouches', 'accept_vouch']:
+        for tool in ['get_self', 'list_vouches', 'accept_vouch']:
             with self.subTest(tool=tool):
                 (self.state / 'self.json').unlink(missing_ok=True)
-                rules = {'list_pending_invites': [{'out': {'invites': [{'loop_id': 'x'}]}}],
-                         'list_vouches': [{'out': {'vouches': [{'loop_id': 'x'}]}}], tool: [{'rc': 1, 'err': '-32002'}]}
+                rules = {'list_vouches': [{'out': {'vouches': [{'loop_id': 'x'}]}}], tool: [{'rc': 1, 'err': '-32002'}]}
                 self.scenario(**rules)
                 self.run_script(rc=2, last='AGENT_RESERVED')
                 (self.state / 'auth_failed').unlink()

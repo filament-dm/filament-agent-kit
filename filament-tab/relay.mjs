@@ -54,7 +54,7 @@ export default {
     const d = body.data || body.payload || {};
     const kind = String(d.kind || "event");
     const items = Array.isArray(d.work) ? d.work.length : null;
-    if (items === 0 && kind !== "invite" && kind !== "vouch") {
+    if (items === 0 && kind !== "vouch") {
       return json({ ok: true, skipped: "items=0" });
     }
     const id = String(d.event_id || body.eventId || req.headers.get("webhook-id"));

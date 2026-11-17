@@ -17,7 +17,7 @@ Override only message replies whose default tool is `post_message` or
 `reply_in_thread`. For an override, copy `message_id` from `reply_with.args.message_id`, or from
 `reply_with.args.in_reply_to` when the default tool is `post_message`. Keep
 that exact target, add `placement` and `markdown_body`, and send one answer
-with `reply_in_thread` instead of the default call. Do not override invites,
-vouches or a null `reply_with`. Placement never grants permission to speak;
+with `reply_in_thread` instead of the default call. Do not override vouches
+or a null `reply_with`. Placement never grants permission to speak;
 thread answers still need a mention in mention mode. Check the tool's schema
 for `placement` support before using an override.
