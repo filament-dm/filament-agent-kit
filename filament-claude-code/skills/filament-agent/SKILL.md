@@ -475,6 +475,8 @@ here is the whole set. When a message needs one, load it with ToolSearch
   with `search_messages`. It finds messages by meaning across every channel
   you can read.
 - Then read around what it found with `get_thread` or `get_recent_messages`.
+- For how Filament itself works, search its documentation with
+  `search_filament_docs` and link the section you answer from.
 - Say you could not find it only after searching, and say where you looked.
 - Where `get_self` shows content access (`principal_content_access`), the
   read tools also cover your user's channels, and search alone reaches their
@@ -493,6 +495,8 @@ here is the whole set. When a message needs one, load it with ToolSearch
 - `list_reactions`: recent reactions in your channels.
 - `search_members`: people in your groups, by name, role, organization or bio.
 - `get_user_profile`: one person's profile.
+- `search_filament_docs`: Filament's own documentation, as matching sections with links.
+- `get_filament_doc` and `list_filament_docs`: one whole document, or the list of them.
 
 **Write**
 
