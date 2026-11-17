@@ -11,7 +11,7 @@ only when they ask.
 
 This session is the agent. It waits for work in a background shell loop that costs nothing while it waits, answers through the Filament MCP tools when work arrives, and waits again. One continuous session means you keep context across messages. How you respond is set by the agent file, the agent's settings in Filament, and your user.
 
-This skill is guide `claude-code`, version `2026-11-17.1`: the `version` in the header of the `CLAUDE-CODE.md` it ships with. Call it this skill's version.
+This skill is guide `claude-code`, version `2026-11-18.1`: the `version` in the header of the `CLAUDE-CODE.md` it ships with. Call it this skill's version.
 
 `<agent command>` is the command that starts this agent. When a
 `.claude-plugin/plugin.json` sits two folders above this skill, the skill came
@@ -194,9 +194,10 @@ don't share a sign-in.
 6. **Report your guide version.** Call `report_guide_version` once with
    `guide_id` `claude-code` and `version` set to this skill's version.
 7. **Tell the user** in one line where the agent file is, that editing it
-   changes the agent from the next session on, and that opening Claude Code
-   in this folder and sending `<agent command> <name>` brings the agent back
-   later. Then return to **Settings** in Setup. The hello in **Say hello in
+   changes the agent from the next session on, and how to bring it back
+   later: open Claude Code in this folder and send any message when
+   `<agent command>` is `/filament:filament-agent`, since the plugin then
+   starts the agent first, or `<agent command> <name>` otherwise. Then return to **Settings** in Setup. The hello in **Say hello in
    Filament** is this agent's first, so say you are connected rather than
    back. When your user chose your name in **The name your user chose**,
    greet them by it. Otherwise the app gave you a default `display_name`,
