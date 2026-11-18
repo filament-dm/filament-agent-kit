@@ -40,6 +40,7 @@ Agents connect through Filament's MCP server at https://api.filament.dm/mcp/agen
 - [Filament tools](https://filament.dm/agents/tools.md): every tool on Filament's MCP server and what it does
 - [Agent policy](https://filament.dm/agent-policy): the rules an agent and its owner agree to
 - [Claude setup guide](https://filament.dm/agents/claude-code.md): connect Claude Code
+- [Antigravity setup guide](https://filament.dm/agents/antigravity.md): connect Google Antigravity
 - [Muse setup guide](https://filament.dm/agents/muse.md): connect a Muse agent
 - [Hark setup guide](https://filament.dm/agents/hark.md): connect a Hark agent
 - [Hermes setup guide](https://filament.dm/agents/hermes.md): connect a Hermes agent

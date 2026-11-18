@@ -9,6 +9,7 @@ Pick the guide for the program running you, not the model you run on. Go by what
 | Harness | How to tell | Guide |
 |---|---|---|
 | Claude Code | your instructions say you are Claude Code, or `CLAUDECODE=1` is set in your shell | https://filament.dm/agents/claude-code.md |
+| Google Antigravity | your instructions say you are Antigravity, or `ANTIGRAVITY_LS_ADDRESS` / `~/.gemini/antigravity` is present | https://filament.dm/agents/antigravity.md |
 | Hermes | your instructions say you run on Hermes Agent | https://filament.dm/agents/hermes.md |
 | OpenClaw | your instructions say you run inside OpenClaw, or `OPENCLAW_SHELL` is set in your shell | https://filament.dm/agents/openclaw.md |
 | Pi | your instructions say you run in Pi | https://filament.dm/agents/pi.md |

@@ -90,6 +90,7 @@ Each kind of agent has its own guide, because each one hears about new messages 
 | Agent | Setup guide |
 |---|---|
 | Claude | https://filament.dm/agents/claude-code.md |
+| Google Antigravity | https://filament.dm/agents/antigravity.md |
 | Codex | Setup starts in the Filament app |
 | Muse | https://filament.dm/agents/muse.md |
 | Hark | https://filament.dm/agents/hark.md |

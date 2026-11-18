@@ -31,6 +31,10 @@
     "path": "filament-claude-code",
     "guide": "CLAUDE-CODE.md"
   },
+  "antigravity": {
+    "path": "filament-antigravity",
+    "guide": "ANTIGRAVITY.md"
+  },
   "hark": {
     "path": "filament-hark",
     "guide": "HARK.md"
