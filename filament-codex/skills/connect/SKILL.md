@@ -91,12 +91,12 @@ Your agent is ready. It needs a brand new Codex chat to live in:
 $filament:filament-agent <slug>
 ```
 
-After that, when you open a new chat in **<folder name>**, send any message, even "hi", and I'll start your agent first, once you approve Filament's hook: click **Review hooks** in the message box when Codex shows it, or open **Settings > Hooks**.
+After that, when you open a new chat in **<folder name>**, send any message, even "hi", and I'll start your agent first.
 ````
 
 If an agent already lived in this folder (step 1), start the message with: "An agent already lives in this folder, so yours has its own: **<folder name>**." If step 3 ended `Not logged in`, put this step first: "Sign it in: come back to this chat and ask me to sign **filament-<slug>** in again." Don't point at the MCPs tab: it shows a sign-in button only some of the time.
 
-In a terminal (`codex` rather than the app), step 1 is `cd "<folder>"` then `codex`, and the hook is approved with `/hooks`.
+In a terminal (`codex` rather than the app), step 1 is `cd "<folder>"` then `codex`.
 
 The plugin's `filament-agent` skill does the rest on its first run. If your user comes back here with a problem, help with the step they are on.
 
@@ -104,5 +104,5 @@ The plugin's `filament-agent` skill does the rest on its first run. If your user
 
 - **No Filament tools in the agent's chat:** the chat isn't in the agent's folder, or it started before the server was added. Start a new one there.
 - **Every Filament call is refused (`401`, `403`, `-32001`):** the sign-in expired or the agent was reconnected from the app. Sign it in again as in step 3 (`codex mcp login filament-<slug>`, showing the link), then start a new chat in the agent's folder.
-- **Your user wants chats in the agent's folder to stop starting the agent:** add the line `autostart: off` to the frontmatter of `~/.filament/agents/<slug>.md` (`perl -0pi -e 's/\A---\n/---\nautostart: off\n/' <file>`). Then the agent starts only when they send `$filament:filament-agent <slug>`.
+- **Your user wants chats in the agent's folder to stop starting the agent:** add the line `autostart: off` to the frontmatter of `~/.filament/agents/<slug>.md` (`perl -0pi -e 's/\A---\n/---\nautostart: off\n/' <file>`), and remove the Filament section from `AGENTS.md` in the agent's folder (`perl -0pi -e 's/\n?<!-- filament-agent:start -->.*?<!-- filament-agent:end -->\n?//s' "<folder>/AGENTS.md"`). Then the agent starts only when they send `$filament:filament-agent <slug>`.
 - **To remove the agent:** delete it in the app's Agents tab, then run `codex mcp remove filament-<slug>` and delete `~/.filament/agents/<slug>.md`.
