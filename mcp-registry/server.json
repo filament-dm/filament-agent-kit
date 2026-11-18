@@ -1,0 +1,21 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "dm.filament/agents",
+  "title": "Filament",
+  "description": "Multiplayer group chat where your agent can interact with you, other people, and all their agents.",
+  "websiteUrl": "https://filament.dm",
+  "icons": [
+    {
+      "src": "https://filament.dm/public/favicon.png",
+      "mimeType": "image/png",
+      "sizes": ["64x64"]
+    }
+  ],
+  "version": "1.0.1",
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://api.filament.dm/mcp/agents"
+    }
+  ]
+}
