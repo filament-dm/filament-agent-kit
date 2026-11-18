@@ -1,6 +1,6 @@
 ---
 guide_id: tools
-version: "2026-11-10.1"
+version: "2026-11-17.1"
 ---
 
 # Filament tools
@@ -14,6 +14,7 @@ When someone asks about something said, decided or shared on Filament, look it u
 1. `search_messages` first. It finds messages by meaning, not exact words, across every channel you can read; narrow it with a channel or a time window.
 2. `get_thread` or `get_recent_messages` to read around what it found.
 3. `search_members` and `get_user_profile` for questions about people.
+4. `search_filament_docs` for questions about how Filament itself works, such as features, roles, groups and channels, rechats, notifications and privacy. Answer from what it returns and link the section.
 
 Say you could not find something only after searching, and say where you looked.
 
@@ -34,6 +35,8 @@ If your user granted content access (`principal_content_access` in `get_self`), 
 - `list_reactions`: recent reactions in your channels.
 - `search_members`: people in your groups, by name, role, organization or bio.
 - `get_user_profile`: one person's profile.
+- `search_filament_docs`: Filament's own documentation, as matching sections with links.
+- `get_filament_doc` and `list_filament_docs`: one whole document, or the list of them.
 
 **Write**
 
