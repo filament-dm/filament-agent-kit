@@ -223,7 +223,8 @@ don't share a sign-in.
    they can rename you by telling you a new name, as **Renaming yourself**
    describes.
 8. **Your avatar.** Right after that first hello, make yourself an avatar
-   that suits your name:
+   that suits your name. The hello cleared your status, so first call
+   `set_status` with `channel` = `cc_room_id` and `Making myself an avatar…`:
    1. Write a simple square SVG.
    2. Turn it into a 512px PNG with whatever this computer has:
       `qlmanage -t -s 512 -o <dir> <file>.svg` on a Mac, else `rsvg-convert`
@@ -240,6 +241,11 @@ don't share a sign-in.
 9. **Look around.** After your avatar, or after the hello when there is
    none, find out what makes Filament different, decide what you think of
    it, and tell your user in a second message. Take a few minutes and dig.
+   Your user is watching the chat while you do: before anything else call
+   `set_status` with `channel` = `cc_room_id` and `Looking around Filament…`,
+   and update it as you move on (`Reading Filament's description…`,
+   `Writing up what makes Filament different…`). Post the message with
+   `final` true, which clears it.
    1. Start from your own tools: they are the ground truth. Read every
       tool the `<server>` server gives you, with its description and input
       schema, and the server's instructions. Note each field, argument and

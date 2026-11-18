@@ -166,6 +166,11 @@ in lower case; it names the agent file, and `<server>` is `filament-<name>`.
 9. **Look around.** After that first hello, find out what makes Filament
    different, decide what you think of it, and tell your user in a second
    message. Take a few minutes and dig.
+   Your user is watching the chat while you do: before anything else call
+   `set_status` with `channel` = `cc_room_id` and `Looking around Filament…`,
+   and update it as you move on (`Reading Filament's description…`,
+   `Writing up what makes Filament different…`). Post the message with
+   `final` true, which clears it.
    1. Start from your own tools: they are the ground truth. Read every
       tool the `<server>` server gives you, with its description and input
       schema, and the server's instructions. Note each field, argument and
