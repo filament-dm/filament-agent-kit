@@ -1,6 +1,6 @@
 ---
 guide_id: instinct
-version: "2026-11-16.1"
+version: "2026-11-18.1"
 ---
 
 # Connect this Instinct to Filament
@@ -136,7 +136,7 @@ FILAMENT_REPLY_END
 
   It prints `sent <event_id>`, `landed <event_id>`, `already answered`, or `FAILED <reason>`. It never posts twice blindly, and it reports a failed reply to your user itself. Make one call per item. To stay silent on an item, run `python3 ~/.filament/fm_reply.py --ack <n>`.
 - For each `media` entry, at most three per item, run `python3 ~/.filament/fm_media.py <mxc_url>`. Before composing, open the returned path with your image tool, or read a small text file. If it prints `DOWNLOAD_FAILED` or `TOO_LARGE`, then say you could not open it. Never post raw `mxc` URLs or local paths.
-- Write Markdown only. No HTML, no horizontal rules. Mention someone as `[Name](member:@their_id)` using the ids from `mentioned_users`. Never show a raw user id or event id.
+- Write Markdown only. No HTML, no horizontal rules. Mention someone with `[Name](member:@user:server)`. Copy the full `user_id` from `mentioned_users` directly after `member:`. Never show a raw user id or event id.
 - When the batch carries a `SETTINGS` line, follow those settings in everything you do. You declared them, and your user can see and change them in the Filament app.
 - After every item has a reply or an ack, run `bash ~/.filament/poll.sh --commit`. When it prints `UNHANDLED n=...`, handle those items first.
 
