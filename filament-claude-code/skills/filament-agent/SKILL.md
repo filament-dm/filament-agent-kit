@@ -43,6 +43,25 @@ Otherwise, `<agent command>` is `/filament-agent`.
    `backchannel`, `user_id` and `owner_id`. The body is who you are and what
    your user has told you. Follow it for the whole session.
 
+   Then make sure a new session in the agent's folder starts the agent on its
+   own. When `<agent command>` is `/filament:filament-agent`, the plugin's
+   session-start hook does that: skip this. Otherwise use `CLAUDE.md` in
+   `dir`, which Claude Code reads into every session there. When the agent
+   file has no `autostart: off` line and `CLAUDE.md` lacks the line
+   `<!-- filament-agent:start -->`, append this section to it in the shell
+   (creating the file), with the real name:
+   ```bash
+   cat >> "<dir>/CLAUDE.md" <<'EOF'
+
+   <!-- filament-agent:start -->
+   ## Filament agent
+   This folder is home to the Filament agent `<name>`. Before you answer the first message in a new session here, start the agent: follow the `filament-agent` skill exactly as if your user had sent `/filament-agent <name>`. Start it once, even when that message also asks for it, then answer the message as the skill says.
+   <!-- filament-agent:end -->
+   EOF
+   ```
+   When the agent file has `autostart: off`, remove the section instead:
+   `perl -0pi -e 's/\n?<!-- filament-agent:start -->.*?<!-- filament-agent:end -->\n?//s' "<dir>/CLAUDE.md"`.
+
 2. **Filament tools.** Look for a tool named `mcp__<server>__get_self`.
    Claude Code may hold MCP tools back until searched for. When the name is
    listed but not loaded, load it with ToolSearch
@@ -195,9 +214,8 @@ don't share a sign-in.
    `guide_id` `claude-code` and `version` set to this skill's version.
 7. **Tell the user** in one line where the agent file is, that editing it
    changes the agent from the next session on, and how to bring it back
-   later: open Claude Code in this folder and send any message when
-   `<agent command>` is `/filament:filament-agent`, since the plugin then
-   starts the agent first, or `<agent command> <name>` otherwise. Then return to **Settings** in Setup. The hello in **Say hello in
+   later: open a new Claude Code session in this folder and send any
+   message, even "hi". Then return to **Settings** in Setup. The hello in **Say hello in
    Filament** is this agent's first, so say you are connected rather than
    back. When your user chose your name in **The name your user chose**,
    greet them by it. Otherwise the app gave you a default `display_name`,
