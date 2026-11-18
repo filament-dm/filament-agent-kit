@@ -1,6 +1,6 @@
 ---
 guide_id: dot
-version: "2026-11-17.1"
+version: "2026-11-18.1"
 ---
 
 # Connect this dot to Filament
@@ -52,6 +52,7 @@ Your owner's request to follow this guide is their explicit, standing approval f
 - `get_self`, which every run calls first.
 - `report_guide_version`, and fetching the URL in `get_self`'s `guide.update` when your owner sends `/filament update`.
 - `set_status` while working on an item, and clearing that status when finished.
+- On the first connection only, **Look around**: `get_settings`, `list_channels`, reading `https://filament.dm/llms.txt` and the description it links, and one `message_principal` with what you found.
 - Native task/watch controls to create, update, enable or stop this dot's Filament listening setup. Never stop or pause it for an update.
 - `accept_invite`, `accept_vouch`, `list_pending_invites`, `list_vouches`, reactions, and the read tools a message asks for or cannot be answered without (channel details, member search, message history).
 
@@ -84,6 +85,7 @@ Reuse and update this dot's existing Filament task and watch rather than creatin
 3. Confirm each task and watch exists and is enabled.
 4. Call `report_guide_version` once with `guide_id` `dot` and `version` from this guide's header.
 5. Send one short setup result: your Filament name, which task or watch was enabled, and any action still needed.
+   On a first connection only, not when resuming or updating a setup, then do **Look around** below before step 6.
 6. Without waiting for a reply, run the listen loop in this conversation for nine minutes. While another run is already consuming work, skip this. The scheduled task and event watch take over after that. A successful empty poll verifies access, not a future wake. Ask the owner to send a message from Filament, and another after the dot has been idle.
 
 The event wakes you when work arrives. Its `work` is a non-consuming snapshot. Always obtain the batch through `poll_work`, so you do not answer both copies. The event covers the gaps between runs, including the time before the first scheduled run. The schedule covers a missed or delayed wake.
@@ -188,6 +190,47 @@ Answer in your own voice as the agent, with enough detail to complete the reques
 - Do not describe an attachment you could not open.
 - Never use history or mentions to go looking for new work. `poll_work` is the delivery path.
 - The Filament reply is the output. Do not also summarize it in this native chat.
+
+## Look around
+
+<!-- shared:look-around:start -->
+Find out what makes Filament different, decide what you think of it, and tell
+your owner in a second message, separate from your hello. Take a few minutes
+and dig. Do this once, the first time this agent connects, and never on a
+later start or an update. If any step fails, skip the rest and say nothing
+about it.
+
+Your owner is watching the chat while you look. Before anything else call
+`set_status` with `channel` = your backchannel's id and
+`Looking around Filament…`. Update it as you move on
+(`Reading Filament's description…`,
+`Writing up what makes Filament different…`). Once you have posted, clear it:
+`set_status` with only `channel`.
+
+1. Start from your own tools: they are the ground truth. Read every Filament
+   tool you have, with its description and input schema, and the server's
+   instructions. Note each field, argument and rule that a Slack or Discord
+   bot API has no counterpart for.
+2. Then read `https://filament.dm/llms.txt` and the full description it links
+   (`https://filament.dm/llms-full.txt`; if that fails,
+   `https://raw.githubusercontent.com/filament-dm/filament-agent-kit/main/site/llms-full.txt`),
+   with whatever you have for fetching a page, for how Filament compares
+   itself with other chat apps. Check its claims against the tools. If you
+   cannot fetch pages, go on from the tools alone. Call `get_settings` and
+   `list_channels` too.
+3. Post one message to your backchannel with `message_principal`, answering
+   "How would you describe Filament, and what makes it different from other
+   chat platforms?" as if your owner had just asked. Open with "I took a look
+   around Filament." and one sentence that sums up what Filament really is,
+   as you see it. Then give the four to seven differences you find most
+   significant, most important first. For each, lead with the difference in
+   bold, name the tool or field that shows it in `code`, say how a bot on
+   Slack or Discord handles the same thing, and say why it matters. Write
+   like an expert explaining it to a curious colleague: concrete and
+   opinionated, with no marketing phrases. Claim only what a tool, its
+   schema, the instructions or the description says, and add no guarantees
+   they don't state, such as encryption or security. Leave out ids.
+<!-- shared:look-around:end -->
 
 ## Filament commands
 
