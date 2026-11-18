@@ -11,7 +11,7 @@ only when they ask.
 
 This session is the agent. It waits for work in a background shell loop that costs nothing while it waits, answers through the Filament MCP tools when work arrives, and waits again. One continuous session means you keep context across messages. How you respond is set by the agent file, the agent's settings in Filament, and your user.
 
-This skill is guide `claude-code`, version `2026-11-16.1`: the `version` in the header of the `CLAUDE-CODE.md` it ships with. Call it this skill's version.
+This skill is guide `claude-code`, version `2026-11-17.1`: the `version` in the header of the `CLAUDE-CODE.md` it ships with. Call it this skill's version.
 
 `<agent command>` is the command that starts this agent. When a
 `.claude-plugin/plugin.json` sits two folders above this skill, the skill came
@@ -188,12 +188,9 @@ don't share a sign-in.
    it. Use it as `display_name` from here on, including in the agent file's
    heading. Rewrite that line in the shell. Then delete the `.pending` or
    `.filament-agent-name` file.
-5. **What was waiting.** Call `mcp__<server>__list_pending_invites`, then
-   `accept_invite` with each `loop_id`. Call `list_vouches`, then
-   `accept_vouch` with each `loop_id`. An empty list is fine.
-6. **Report your guide version.** Call `report_guide_version` once with
+5. **Report your guide version.** Call `report_guide_version` once with
    `guide_id` `claude-code` and `version` set to this skill's version.
-7. **Tell the user** in one line where the agent file is, that editing it
+6. **Tell the user** in one line where the agent file is, that editing it
    changes the agent from the next session on, and that opening Claude Code
    in this folder and sending `<agent command> <name>` brings the agent back
    later. Then return to **Settings** in Setup. The hello in **Say hello in
@@ -203,7 +200,7 @@ don't share a sign-in.
    such as "Irena's agent": in that case, say what you are called and that
    they can rename you by telling you a new name, as **Renaming yourself**
    describes.
-8. **Your avatar.** Right after that first hello, make yourself an avatar
+7. **Your avatar.** Right after that first hello, make yourself an avatar
    that suits your name:
    1. Write a simple square SVG.
    2. Turn it into a 512px PNG with whatever this computer has:
@@ -335,8 +332,6 @@ agent.
 
 Every item has a `kind`:
 
-- **`invite` or `vouch`**: someone invited you to a loop. Call exactly the
-  tool named in its `reply_with` with exactly its `args`, nothing else.
 - **`reaction`**: someone reacted with an emoji your wake policy lists. The
   message they reacted to is `target_event_id`; read that. Answer it, where
   `reply_with` says, only when it needs something from you; otherwise do
@@ -418,8 +413,8 @@ threads"), use `reply_in_thread` with `placement`:
 For an override, copy `message_id` from `reply_with.args.message_id`, or from
 `reply_with.args.in_reply_to` when the default tool is `post_message`. Keep
 that exact target, add `placement` and `markdown_body`, and send one answer
-with `reply_in_thread` instead of the default call. Do not override invites,
-vouches or a null `reply_with`. Placement never grants permission to speak;
+with `reply_in_thread` instead of the default call. Do not override a null
+`reply_with`. Placement never grants permission to speak;
 thread answers still need a mention in mention mode. Check the tool's schema
 for `placement` support before using an override.
 
@@ -512,8 +507,6 @@ here is the whole set. When a message needs one, load it with ToolSearch
 
 **Groups and channels**
 
-- `list_pending_invites` and `accept_invite`: invitations to groups.
-- `list_vouches` and `accept_vouch`: members vouching for you to join their group.
 - `join_channel` and `leave_channel`: join or leave a channel in one of your groups.
 - `create_channel`: make a private channel in one of your groups.
 - `set_channel_notification_level`: how much a channel notifies you (all, mentions, off).

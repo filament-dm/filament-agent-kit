@@ -181,13 +181,11 @@ class Connector(unittest.TestCase):
                                                   is_implicitly_mentioned=True, reply_expected=True)]),
                 item('null', reply_with=None), item('back', is_backchannel=True,
                         messages=[message('back', is_mention=False)]), item('mention'),
-                {'kind': 'reaction'}, {'kind': 'invite', 'loop_id': 'loop1',
-                    'reply_with': {'tool': 'accept_invite', 'args': {'loop_id': 'loop1'}}}]
+                {'kind': 'reaction'}]
         batch = self.deliver(*rows)
         self.assertEqual([it['messages'][0]['event_id'] for it in batch['items']], ['implicit', 'back', 'mention'])
         self.assertEqual(self.read('run.out').count('\nANSWER '), 3)
         self.assertEqual(set(self.read('pending_acks').split()), {'self', 'system', 'agent'})
-        self.assertEqual(self.server.tool_calls('accept_invite')[0]['args'], {'loop_id': 'loop1'})
         for n in (1, 2, 3):
             self.assertEqual(self.run_cmd('fm_reply.py', '--ack', str(n)).returncode, 0)
         self.assertIn('COMMITTED', self.run_cmd('sh', '--commit').out)
@@ -541,12 +539,10 @@ class Connector(unittest.TestCase):
         self.assertEqual(self.server.tool_calls('poll_work')[-1]['token_hash'], digest)
 
     def test_23_auth_routes_startup_enrichment_reply_lookup_notice(self):
-        for tool in ('get_self', 'list_pending_invites', 'list_vouches', 'accept_invite', 'get_recent_messages'):
+        for tool in ('get_self', 'get_recent_messages'):
             with self.subTest(tool=tool):
                 for name in ('token_dead', 'self.json', 'pending_cursor'):
                     (self.state / name).unlink(missing_ok=True)
-                if tool == 'accept_invite':
-                    self.server.plan('list_pending_invites', {'result': {'invites': [{'loop_id': 'l'}]}})
                 self.server.plan(tool, {'error': {'code': -32001, 'message': 'auth'}})
                 if tool == 'get_recent_messages':
                     self.server.add(item())
