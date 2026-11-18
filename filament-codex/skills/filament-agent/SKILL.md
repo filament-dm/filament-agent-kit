@@ -34,6 +34,23 @@ This chat is the agent. It waits for work in a shell command that costs nothing 
    `owner_id`. The body is who you are and what your user has told you.
    Follow it for the whole chat.
 
+   Then make sure a new chat in the agent's folder starts the agent on its
+   own. Codex reads `AGENTS.md` in a chat's folder into every chat there.
+   When the agent file has no `autostart: off` line and `AGENTS.md` in `dir`
+   lacks the line `<!-- filament-agent:start -->`, append this section to it
+   (creating the file), with the real name:
+   ```bash
+   cat >> "<dir>/AGENTS.md" <<'EOF'
+
+   <!-- filament-agent:start -->
+   ## Filament agent
+   This folder is home to the Filament agent `<name>`. Before you answer the first message in a new chat here, start the agent: follow the `filament:filament-agent` skill exactly as if your user had sent `$filament:filament-agent <name>`. Start it once, even when that message also asks for it, then answer the message as the skill says.
+   <!-- filament-agent:end -->
+   EOF
+   ```
+   When the agent file has `autostart: off`, remove the section instead:
+   `perl -0pi -e 's/\n?<!-- filament-agent:start -->.*?<!-- filament-agent:end -->\n?//s' "<dir>/AGENTS.md"`.
+
 2. **Filament tools.** There must be a `get_self` tool from `<server>`. If
    there is none, see **No Filament tools** below. Call `get_self` once and
    confirm `user_id` matches the agent file. A `401`, `403` or `-32001` means
@@ -139,11 +156,8 @@ in lower case; it names the agent file, and `<server>` is `filament-<name>`.
    gone. If any of these isn't so, do that step now. Your user sees the name
    and picture with your first message, so they come first.
 8. **Tell the user** in one line where the agent file is, that editing it
-   changes the agent from the next chat on, and how to bring it back later:
-   once they approve Filament's hook (**Review hooks** in the message box
-   when Codex shows it, or **Settings > Hooks**; `/hooks` in a terminal), any
-   first message in a new Codex chat in this folder starts the agent; until
-   then, `$filament:filament-agent <name>` does.
+   changes the agent from the next chat on, and that any first message, even
+   "hi", in a new Codex chat in this folder brings the agent back later.
    Then return to Setup step 3. The hello in step 4 there is this agent's
    first: say you are connected rather than back, by your name, and that
    they can rename you or ask for a different picture by telling you. See
@@ -205,10 +219,10 @@ sign-in button only some of the time.
    and nowhere else.
 
    The first time, tell your user in three short lines what that means: this
-   chat is the agent and stays working, so use another chat for anything
-   else; the agent is online only while this chat runs and the Codex app is
-   open on an awake computer; and if the chat stops, they restart the agent
-   with a new chat in this folder and `$filament:filament-agent <name>`. If
+   chat is now the agent, so use another chat for anything else; it stays
+   online while Codex is open on an awake computer; and when this chat ends,
+   opening a new chat in this folder and saying anything, even "hi", brings
+   the agent straight back. If
    Codex asks before each `poll_work`, tell them once that they can allow it
    for the chat.
 
