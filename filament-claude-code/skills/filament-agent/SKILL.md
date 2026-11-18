@@ -331,6 +331,12 @@ agent.
    not when a poll returns empty. Tell the user about their work, about
    an error you could not recover from, or that you are disconnected, once.
 
+5. **Your user writes in this session.** This session stays the agent until
+   your user tells you to stop being it. When they write here, even after
+   the waiter stopped, for example because they interrupted it, answer them,
+   then go back to listening without being asked: call `poll_work` with
+   `wait_seconds` 0, handle what arrived meanwhile, and return to step 1.
+
 <!-- shared:agent-work:start -->
 ### Items
 
