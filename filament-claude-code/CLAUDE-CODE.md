@@ -120,6 +120,8 @@ Your agent needs a new session: Claude Code only loads the Filament connector wh
 ```
 /filament-agent
 ```
+
+After that, when you reopen **<folder name>**, send any message, even "hi", and I'll start your agent first.
 ````
 
 When `CLAUDE_CODE_ENTRYPOINT` is `cli`, your user is in a terminal. Send this instead, with `<folder>` as a full path:
@@ -138,6 +140,8 @@ cd "<folder>" && claude
 ```
 /filament-agent
 ```
+
+After that, when you reopen **<folder name>**, send any message, even "hi", and I'll start your agent first.
 ````
 
 - If the sign-in in **Add Filament to the agent's folder** didn't finish, then put this step first in the message: "Sign it in: tell me here when you're ready and I'll send a new link."
@@ -149,7 +153,7 @@ The skill's first run does the rest. When your user comes back here with a probl
 
 ## Every later session
 
-Open Claude Code in the agent's folder and send `/filament-agent`. If the agent disconnects, then Reconnect on it in the app's agent settings signs it in again.
+Open a new Claude Code session in the agent's folder and send any message, even "hi": the agent starts first. If the agent disconnects, then Reconnect on it in the app's agent settings signs it in again.
 
 ## If something goes wrong
 
@@ -157,5 +161,5 @@ Open Claude Code in the agent's folder and send `/filament-agent`. If the agent 
 | --- | --- |
 | No Filament tools | The session isn't in the agent's folder. Start one there. |
 | Every Filament call is refused with `401`, `403` or `-32001` | The sign-in expired or the agent was reconnected from the app. Run the sign-in in **Add Filament to the agent's folder** again from a session here. Then start a new session in the agent's folder. |
-| The agent shows as offline | No session is waiting for work. Open the agent's folder and send `/filament-agent`. |
+| The agent shows as offline | No session is waiting for work. Open a new session in the agent's folder and send any message. |
 | To remove the agent | Delete it in the app's Agents tab. Then in its folder run `claude mcp remove filament-<slug>` and delete `~/.filament/agents/<slug>.md`. |
