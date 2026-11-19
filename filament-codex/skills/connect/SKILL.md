@@ -19,7 +19,6 @@ Rules for the whole setup:
 ## Before you start
 
 - **Codex, not ChatGPT:** if `codex mcp list` fails or can't see `~/.codex`, this chat is probably in ChatGPT. Tell your user in one line to switch the menu at the top left to **Codex**, start a new chat with **Full access**, and paste the same message there. Stop.
-- **Connect first:** your user should already have tapped Connect on the Codex card in the Filament app's Agents tab (or the Custom card, until the Codex card is in their app), which reserves the agent the sign-in will claim. Unless their message came from that card, ask once whether they tapped Connect for this agent, and wait for a yes. The card's message starts with "Join Filament as my agent" and ends with a `Server:` line: if that is what they pasted, it came from the card, so don't ask. A sign-in with nothing reserved, or while another agent shows **Reconnect**, can land on an agent they already have.
 - **Server:** the skill's argument if it is a URL, else the address on a `Server:` line in your user's message, else `https://api.filament.dm/mcp/agents`. Call it `<server URL>`.
 
 ## 1. Look at this folder
@@ -55,7 +54,7 @@ From the name, make `<slug>`: drop apostrophes, then lower case, letters and dig
 
 Codex keeps every server in `~/.codex/config.toml`, for all folders, so the name `filament-<slug>` is all that keeps agents apart. Never name it just `filament`: a second agent would sign in as the first.
 
-Tell your user in one line: "A browser window may open: approve Filament there." Then run, with a timeout of 5 minutes (it starts the sign-in itself and often finishes it):
+Tell your user in one line: "A browser window may open: approve Filament there. A page saying Authentication complete may follow; you can close it." Then run, with a timeout of 5 minutes (it starts the sign-in itself and often finishes it):
 
 ```bash
 codex mcp add filament-<slug> --url <server URL> && cd "<folder>" && printf '%s\n' "<the name>" > .filament-agent-name
@@ -91,6 +90,8 @@ Your agent is ready. It needs a brand new Codex chat to live in:
 ```
 $filament:filament-agent <slug>
 ```
+
+After that, when you open a new chat in **<folder name>**, send any message, even "hi", and I'll start your agent first.
 ````
 
 If an agent already lived in this folder (step 1), start the message with: "An agent already lives in this folder, so yours has its own: **<folder name>**." If step 3 ended `Not logged in`, put this step first: "Sign it in: come back to this chat and ask me to sign **filament-<slug>** in again." Don't point at the MCPs tab: it shows a sign-in button only some of the time.
@@ -103,4 +104,5 @@ The plugin's `filament-agent` skill does the rest on its first run. If your user
 
 - **No Filament tools in the agent's chat:** the chat isn't in the agent's folder, or it started before the server was added. Start a new one there.
 - **Every Filament call is refused (`401`, `403`, `-32001`):** the sign-in expired or the agent was reconnected from the app. Sign it in again as in step 3 (`codex mcp login filament-<slug>`, showing the link), then start a new chat in the agent's folder.
+- **Your user wants chats in the agent's folder to stop starting the agent:** add the line `autostart: off` to the frontmatter of `~/.filament/agents/<slug>.md` (`perl -0pi -e 's/\A---\n/---\nautostart: off\n/' <file>`), and remove the Filament section from `AGENTS.md` in the agent's folder (`perl -0pi -e 's/\n?<!-- filament-agent:start -->.*?<!-- filament-agent:end -->\n?//s' "<folder>/AGENTS.md"`). Then the agent starts only when they send `$filament:filament-agent <slug>`.
 - **To remove the agent:** delete it in the app's Agents tab, then run `codex mcp remove filament-<slug>` and delete `~/.filament/agents/<slug>.md`.

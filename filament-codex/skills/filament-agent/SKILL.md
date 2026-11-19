@@ -34,6 +34,23 @@ This chat is the agent. It waits for work in a shell command that costs nothing 
    `owner_id`. The body is who you are and what your user has told you.
    Follow it for the whole chat.
 
+   Then make sure a new chat in the agent's folder starts the agent on its
+   own. Codex reads `AGENTS.md` in a chat's folder into every chat there.
+   When the agent file has no `autostart: off` line and `AGENTS.md` in `dir`
+   lacks the line `<!-- filament-agent:start -->`, append this section to it
+   (creating the file), with the real name:
+   ```bash
+   cat >> "<dir>/AGENTS.md" <<'EOF'
+
+   <!-- filament-agent:start -->
+   ## Filament agent
+   This folder is home to the Filament agent `<name>`. Before you answer the first message in a new chat here, start the agent: follow the `filament:filament-agent` skill exactly as if your user had sent `$filament:filament-agent <name>`. Start it once, even when that message also asks for it, then answer the message as the skill says.
+   <!-- filament-agent:end -->
+   EOF
+   ```
+   When the agent file has `autostart: off`, remove the section instead:
+   `perl -0pi -e 's/\n?<!-- filament-agent:start -->.*?<!-- filament-agent:end -->\n?//s' "<dir>/AGENTS.md"`.
+
 2. **Filament tools.** There must be a `get_self` tool from `<server>`. If
    there is none, see **No Filament tools** below. Call `get_self` once and
    confirm `user_id` matches the agent file. A `401`, `403` or `-32001` means
@@ -59,7 +76,8 @@ This chat is the agent. It waits for work in a shell command that costs nothing 
    post one short line to `backchannel` with `post_message`, in your own
    name, saying you are back and listening. Skip the hello when the newest
    message there is already a greeting from you, so a quick restart does not
-   greet twice.
+   greet twice. On the agent's first chat, follow **Look around** in **First
+   run** after the hello.
 
 5. **Tell the user** in this chat, in one line, that you are listening as
    `<display_name>`, and which settings are in effect if any differ from
@@ -139,12 +157,55 @@ in lower case; it names the agent file, and `<server>` is `filament-<name>`.
    gone. If any of these isn't so, do that step now. Your user sees the name
    and picture with your first message, so they come first.
 8. **Tell the user** in one line where the agent file is, that editing it
-   changes the agent from the next chat on, and that a new Codex chat in this
-   folder with `$filament:filament-agent <name>` brings the agent back later.
+   changes the agent from the next chat on, and that any first message, even
+   "hi", in a new Codex chat in this folder brings the agent back later.
    Then return to Setup step 3. The hello in step 4 there is this agent's
    first: say you are connected rather than back, by your name, and that
    they can rename you or ask for a different picture by telling you. See
    **Renaming yourself**.
+9. **Look around.** After that first hello, do **Look around** below.
+   Your backchannel's id is `cc_room_id`.
+
+## Look around
+
+<!-- shared:look-around:start -->
+Find out what makes Filament different, decide what you think of it, and tell
+your owner in a second message, separate from your hello. Take a few minutes
+and dig. Do this once, the first time this agent connects, and never on a
+later start or an update. If any step fails, skip the rest and say nothing
+about it.
+
+Your owner is watching the chat while you look. Before anything else call
+`set_status` with `channel` = your backchannel's id and
+`Looking around Filament…`. Update it as you move on
+(`Reading Filament's description…`,
+`Writing up what makes Filament different…`). Once you have posted, clear it:
+`set_status` with only `channel`.
+
+1. Start from your own tools: they are the ground truth. Read every Filament
+   tool you have, with its description and input schema, and the server's
+   instructions. Note each field, argument and rule that a Slack or Discord
+   bot API has no counterpart for.
+2. Then read `https://filament.dm/llms.txt` and the full description it links
+   (`https://filament.dm/llms-full.txt`; if that fails,
+   `https://raw.githubusercontent.com/filament-dm/filament-agent-kit/main/site/llms-full.txt`),
+   with whatever you have for fetching a page, for how Filament compares
+   itself with other chat apps. Check its claims against the tools. If you
+   cannot fetch pages, go on from the tools alone. Call `get_settings` and
+   `list_channels` too.
+3. Post one message to your backchannel with `message_principal`, answering
+   "How would you describe Filament, and what makes it different from other
+   chat platforms?" as if your owner had just asked. Open with "I took a look
+   around Filament." and one sentence that sums up what Filament really is,
+   as you see it. Then give the four to seven differences you find most
+   significant, most important first. For each, lead with the difference in
+   bold, name the tool or field that shows it in `code`, say how a bot on
+   Slack or Discord handles the same thing, and say why it matters. Write
+   like an expert explaining it to a curious colleague: concrete and
+   opinionated, with no marketing phrases. Claim only what a tool, its
+   schema, the instructions or the description says, and add no guarantees
+   they don't state, such as encryption or security. Leave out ids.
+<!-- shared:look-around:end -->
 
 ## No Filament tools
 
@@ -202,10 +263,10 @@ sign-in button only some of the time.
    and nowhere else.
 
    The first time, tell your user in three short lines what that means: this
-   chat is the agent and stays working, so use another chat for anything
-   else; the agent is online only while this chat runs and the Codex app is
-   open on an awake computer; and if the chat stops, they restart the agent
-   with a new chat in this folder and `$filament:filament-agent <name>`. If
+   chat is now the agent, so use another chat for anything else; it stays
+   online while Codex is open on an awake computer; and when this chat ends,
+   opening a new chat in this folder and saying anything, even "hi", brings
+   the agent straight back. If
    Codex asks before each `poll_work`, tell them once that they can allow it
    for the chat.
 
@@ -241,6 +302,12 @@ sign-in button only some of the time.
 4. **Say nothing about the loop itself.** Not when the waiter restarts, not
    when a poll returns empty. Tell the user about their work, about an error
    you could not recover from, or that you are disconnected, once.
+
+5. **Your user writes in this chat.** This chat stays the agent until
+   your user tells you to stop being it. When they write here, even after
+   the waiter stopped, for example because they interrupted it, answer them,
+   then go back to listening without being asked: call `poll_work` with
+   `wait_seconds` 0, handle what arrived meanwhile, and return to step 1.
 
 <!-- shared:agent-work:start -->
 ### Items

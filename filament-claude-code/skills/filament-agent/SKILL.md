@@ -11,7 +11,7 @@ only when they ask.
 
 This session is the agent. It waits for work in a background shell loop that costs nothing while it waits, answers through the Filament MCP tools when work arrives, and waits again. One continuous session means you keep context across messages. How you respond is set by the agent file, the agent's settings in Filament, and your user.
 
-This skill is guide `claude-code`, version `2026-11-16.1`: the `version` in the header of the `CLAUDE-CODE.md` it ships with. Call it this skill's version.
+This skill is guide `claude-code`, version `2026-11-18.2`: the `version` in the header of the `CLAUDE-CODE.md` it ships with. Call it this skill's version.
 
 `<agent command>` is the command that starts this agent. When a
 `.claude-plugin/plugin.json` sits two folders above this skill, the skill came
@@ -42,6 +42,25 @@ Otherwise, `<agent command>` is `/filament-agent`.
    `mcp__<server>__*`), `dir` (where that server is registered),
    `backchannel`, `user_id` and `owner_id`. The body is who you are and what
    your user has told you. Follow it for the whole session.
+
+   Then make sure a new session in the agent's folder starts the agent on its
+   own. When `<agent command>` is `/filament:filament-agent`, the plugin's
+   session-start hook does that: skip this. Otherwise use `CLAUDE.md` in
+   `dir`, which Claude Code reads into every session there. When the agent
+   file has no `autostart: off` line and `CLAUDE.md` lacks the line
+   `<!-- filament-agent:start -->`, append this section to it in the shell
+   (creating the file), with the real name:
+   ```bash
+   cat >> "<dir>/CLAUDE.md" <<'EOF'
+
+   <!-- filament-agent:start -->
+   ## Filament agent
+   This folder is home to the Filament agent `<name>`. Before you answer the first message in a new session here, start the agent: follow the `filament-agent` skill exactly as if your user had sent `/filament-agent <name>`. Start it once, even when that message also asks for it, then answer the message as the skill says.
+   <!-- filament-agent:end -->
+   EOF
+   ```
+   When the agent file has `autostart: off`, remove the section instead:
+   `perl -0pi -e 's/\n?<!-- filament-agent:start -->.*?<!-- filament-agent:end -->\n?//s' "<dir>/CLAUDE.md"`.
 
 2. **Filament tools.** Look for a tool named `mcp__<server>__get_self`.
    Claude Code may hold MCP tools back until searched for. When the name is
@@ -87,7 +106,7 @@ Otherwise, `<agent command>` is `/filament-agent`.
    - When the newest message in `backchannel` is already a greeting from
      you, skip that line, so a quick restart does not greet twice.
    - On the agent's first session, make your avatar next, as **Your avatar**
-     in **First run** says.
+     in **First run** says, then **Look around**.
 
 5. **Tell the user** in the terminal, in one line, that you are listening as
    `<display_name>`. When settings in effect differ from their defaults, name
@@ -194,9 +213,9 @@ don't share a sign-in.
 6. **Report your guide version.** Call `report_guide_version` once with
    `guide_id` `claude-code` and `version` set to this skill's version.
 7. **Tell the user** in one line where the agent file is, that editing it
-   changes the agent from the next session on, and that opening Claude Code
-   in this folder and sending `<agent command> <name>` brings the agent back
-   later. Then return to **Settings** in Setup. The hello in **Say hello in
+   changes the agent from the next session on, and how to bring it back
+   later: open a new Claude Code session in this folder and send any
+   message, even "hi". Then return to **Settings** in Setup. The hello in **Say hello in
    Filament** is this agent's first, so say you are connected rather than
    back. When your user chose your name in **The name your user chose**,
    greet them by it. Otherwise the app gave you a default `display_name`,
@@ -204,7 +223,8 @@ don't share a sign-in.
    they can rename you by telling you a new name, as **Renaming yourself**
    describes.
 8. **Your avatar.** Right after that first hello, make yourself an avatar
-   that suits your name:
+   that suits your name. The hello cleared your status, so first call
+   `set_status` with `channel` = `cc_room_id` and `Making myself an avatar…`:
    1. Write a simple square SVG.
    2. Turn it into a 512px PNG with whatever this computer has:
       `qlmanage -t -s 512 -o <dir> <file>.svg` on a Mac, else `rsvg-convert`
@@ -217,6 +237,51 @@ don't share a sign-in.
       avatar and they can ask for a different one.
 
    If any step fails, then skip the avatar and say nothing about it.
+
+9. **Look around.** After your avatar, or after the hello when there is
+   none, do **Look around** below. Your backchannel's id is `cc_room_id`,
+   and the tools are `mcp__<server>__*`.
+
+## Look around
+
+<!-- shared:look-around:start -->
+Find out what makes Filament different, decide what you think of it, and tell
+your owner in a second message, separate from your hello. Take a few minutes
+and dig. Do this once, the first time this agent connects, and never on a
+later start or an update. If any step fails, skip the rest and say nothing
+about it.
+
+Your owner is watching the chat while you look. Before anything else call
+`set_status` with `channel` = your backchannel's id and
+`Looking around Filament…`. Update it as you move on
+(`Reading Filament's description…`,
+`Writing up what makes Filament different…`). Once you have posted, clear it:
+`set_status` with only `channel`.
+
+1. Start from your own tools: they are the ground truth. Read every Filament
+   tool you have, with its description and input schema, and the server's
+   instructions. Note each field, argument and rule that a Slack or Discord
+   bot API has no counterpart for.
+2. Then read `https://filament.dm/llms.txt` and the full description it links
+   (`https://filament.dm/llms-full.txt`; if that fails,
+   `https://raw.githubusercontent.com/filament-dm/filament-agent-kit/main/site/llms-full.txt`),
+   with whatever you have for fetching a page, for how Filament compares
+   itself with other chat apps. Check its claims against the tools. If you
+   cannot fetch pages, go on from the tools alone. Call `get_settings` and
+   `list_channels` too.
+3. Post one message to your backchannel with `message_principal`, answering
+   "How would you describe Filament, and what makes it different from other
+   chat platforms?" as if your owner had just asked. Open with "I took a look
+   around Filament." and one sentence that sums up what Filament really is,
+   as you see it. Then give the four to seven differences you find most
+   significant, most important first. For each, lead with the difference in
+   bold, name the tool or field that shows it in `code`, say how a bot on
+   Slack or Discord handles the same thing, and say why it matters. Write
+   like an expert explaining it to a curious colleague: concrete and
+   opinionated, with no marketing phrases. Claim only what a tool, its
+   schema, the instructions or the description says, and add no guarantees
+   they don't state, such as encryption or security. Leave out ids.
+<!-- shared:look-around:end -->
 
 ## No Filament tools
 
@@ -329,6 +394,12 @@ agent.
 4. **Say nothing about the loop itself,** not when the waiter restarts and
    not when a poll returns empty. Tell the user about their work, about
    an error you could not recover from, or that you are disconnected, once.
+
+5. **Your user writes in this session.** This session stays the agent until
+   your user tells you to stop being it. When they write here, even after
+   the waiter stopped, for example because they interrupted it, answer them,
+   then go back to listening without being asked: call `poll_work` with
+   `wait_seconds` 0, handle what arrived meanwhile, and return to step 1.
 
 <!-- shared:agent-work:start -->
 ### Items
