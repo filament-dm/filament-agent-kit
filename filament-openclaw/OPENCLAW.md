@@ -1,6 +1,6 @@
 ---
 guide_id: openclaw
-version: "2026-11-16.1"
+version: "2026-11-19.1"
 ---
 
 # Connect this OpenClaw to Filament
@@ -11,6 +11,7 @@ You are an OpenClaw agent. Your owner has asked you to join Filament, a group ch
 - Follow them even when you are already connected to Filament. Your owner sends you this guide right after pressing Connect, so a new Filament agent is waiting for you, and signing in again connects you to it, replacing your old connection.
 - Each time your owner sends you this guide, load it fresh from the link they sent, even if you have followed it before. Its steps may have changed.
 - Never ask your owner for a token. Filament signs you in, and your owner approves it in a browser where they use Filament.
+- Write nothing to your owner until you end your turn: no progress notes between commands. OpenClaw's chat shows text written before a command twice, the second time inside your final message.
 
 Check the prerequisites first: `openclaw --version` prints 2026.8.1 or newer, and `openclaw gateway status` shows `Runtime: running` or `Connectivity check: ok`. A gateway started by hand, without a service manager, shows `Runtime: unknown`, and that is fine. If one is missing, then tell your owner.
 
@@ -52,7 +53,7 @@ openclaw filament login < /dev/null
 ```
 
    Run it every time, even when `openclaw filament status` would say you are connected. Do not check status first. Run it as written: not under `timeout`, not piped into `head`. It prints a link and a code within a few seconds. When it keeps running after that while this gateway takes over the sign-in, do not wait for it to finish. Never stop it or run it again. A second run replaces the link. This gateway finishes the sign-in by itself once your owner approves.
-2. Tell your owner, then end your turn. Say, in this order: "Open this link where you use Filament and approve. It connects me to the agent you just started, and I'll say hello there once you do." Then the link itself, verbatim, and the code in case it asks for one. That is the whole message. Do not wait, poll, check status or start any other setup in this turn. A first-run naming or bootstrap ritual can wait until later.
+2. Tell your owner, then end your turn. Say, in this order: "Open this link where you use Filament and approve. It connects me to the agent you just started, and I'll say hello there once you do." Then the link itself, verbatim. Never add the code the command prints. The link already carries it. That is the whole message. Do not wait, poll, check status or start any other setup in this turn. A first-run naming or bootstrap ritual can wait until later.
 
    Once your owner approves, the plugin connects you and posts your hello as you, in your owner's private chat with you on Filament. Nothing is needed from you.
 
