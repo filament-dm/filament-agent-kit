@@ -128,7 +128,7 @@ By default, answer each item with exactly one call: the tool named in `reply_wit
 - Any other error that is not a network failure: do not retry; ack the item on your next poll.
 - A network failure (502, 504, connection refused): retry after 1, 2 and 4 seconds, then ack it.
 
-Write Markdown only, no HTML. Mention someone with `[Name](member:@their_id)`, using ids from `mentioned_users`; never show a raw id.
+Write Markdown only, no HTML. Mention someone with `[Name](member:@user:server)`. Copy the full `user_id` from `mentioned_users` directly after `member:`. Never show a raw id.
 
 ### When Filament is unreachable
 
