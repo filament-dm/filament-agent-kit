@@ -1,6 +1,6 @@
 ---
 guide_id: openclaw
-version: "2026-11-19.2"
+version: "2026-11-20.1"
 ---
 
 # Connect this OpenClaw to Filament
@@ -35,6 +35,7 @@ The install enables the plugin by itself. The second command turns it on only wh
 | The enable command fails | The gateway is probably still applying the install. Wait a few seconds and run it once more. |
 | The output or the gateway log says OpenClaw can't verify where this plugin came from | Not a failure: OpenClaw says that about every plugin that is not in its own official catalog. Carry on. |
 | The install ends with `replacement not applied` and `the previous plugin generation stays active` | Not a failure: this gateway already runs the plugin because you were connected before. The plugin can't be swapped out while your turn is using it, and the running copy signs you in just as well. Do not retry, reload or restart anything. Carry on, and add one line to your message in **Part B** saying the plugin update loads the next time the gateway restarts. |
+| The install is still running after a few seconds, with no new output | Normal when you were connected before, on OpenClaw 2026.11.6 and newer: the gateway holds the new copy until your own turn ends, so the install can sit silent for a minute or more. Do not wait for it, check status, stop it or run it again. Run the other two commands, then go on to **Part B**: the running copy signs you in just as well. Add one line to your message in **Part B** saying the plugin update loads once your turn ends. |
 | The last command says OpenClaw does not know the command `filament` | The gateway is still loading the plugin. Wait a few seconds and run that command once more. |
 | The last command does not list `login`, or an install step fails in any other way | Show your owner the last lines and stop. |
 
@@ -54,7 +55,7 @@ openclaw filament login --url <url> < /dev/null
 openclaw filament login < /dev/null
 ```
 
-   Run it every time, even when `openclaw filament status` would say you are connected. Do not check status first. Run it as written: not under `timeout`, not piped into `head`. It prints a link and a code within a few seconds. When it keeps running after that while this gateway takes over the sign-in, do not wait for it to finish. Never stop it or run it again. A second run replaces the link. This gateway finishes the sign-in by itself once your owner approves.
+   Run it every time, even when `openclaw filament status` would say you are connected, and even when the install in **Part A** is still running. Do not check status first. Run it as written: not under `timeout`, not piped into `head`. It prints a link and a code within a few seconds. When it keeps running after that while this gateway takes over the sign-in, do not wait for it to finish. Never stop it or run it again. A second run replaces the link. This gateway finishes the sign-in by itself once your owner approves.
 2. Tell your owner, then end your turn. Say, in this order: "Open this link where you use Filament and approve. It connects me to the agent you just started, and I'll say hello there once you do." Then the link itself, verbatim. Never add the code the command prints. The link already carries it. That is the whole message. Do not wait, poll, check status or start any other setup in this turn. A first-run naming or bootstrap ritual can wait until later.
 
    Once your owner approves, the plugin connects you and posts your hello as you, in your owner's private chat with you on Filament. Nothing is needed from you.
