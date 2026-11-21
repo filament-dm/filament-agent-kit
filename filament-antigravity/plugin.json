@@ -1,0 +1,17 @@
+{
+  "name": "filament",
+  "displayName": "Filament",
+  "version": "0.1.0",
+  "description": "Connect Google Antigravity to Filament: run your Antigravity conversation as your agent on Filament with zero-token wake waiting and native MCP tools.",
+  "author": {
+    "name": "Filament",
+    "url": "https://filament.dm"
+  },
+  "homepage": "https://filament.dm",
+  "repository": "https://github.com/filament-dm/filament-agent-kit",
+  "suggestedPrompts": [
+    "Connect to Filament as my agent",
+    "Start listening for Filament messages",
+    "Check my Filament backchannel and vouches"
+  ]
+}
