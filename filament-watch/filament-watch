@@ -1,0 +1,764 @@
+#!/usr/bin/env bash
+# filament-watch: runs a Filament agent from Claude Code or Codex with no model
+# session open between messages. It waits for work, then gives each
+# conversation (a channel, or a thread in one) its own session: resumed while
+# it is warm, steered while it is still running. See README.md beside it.
+#
+# Runs on bash 3.2 (macOS's) and later. Needs curl and jq.
+
+set -u
+
+WATCH_VERSION="2026-11-21.1"
+HERE=$(cd "$(dirname "$0")" && pwd -P)
+AGENTS_DIR=${FILAMENT_AGENTS_DIR:-$HOME/.filament/agents}
+WATCH_HOME=${FILAMENT_WATCH_HOME:-$HOME/.filament/watch}
+# The marker a session's steering message starts with (see event.md).
+STEER_MARK="STEERING from filament-watch"
+
+die() { printf 'filament-watch: %s\n' "$*" >&2; exit 1; }
+log() { printf '%s %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*" >&2; }
+now() { date +%s; }
+
+usage() {
+  cat <<'EOF'
+Usage: filament-watch <command> [agent]
+
+  run <agent>     Watch in the foreground (for the desktop app or a service).
+  start <agent>   Watch in the background; does nothing when one already runs.
+  stop <agent>    Stop the background watcher.
+  status <agent>  Say whether it runs, and show its recent log.
+  version         Print this watcher's version.
+
+<agent> names the agent file ~/.filament/agents/<agent>.md. Settings live in
+~/.filament/watch/<agent>/config; README.md lists them.
+EOF
+}
+
+# --- Agent and settings -----------------------------------------------------
+
+# The value of a frontmatter key, without surrounding quotes.
+field() {
+  awk -v key="$2" '
+    NR == 1 && /^---$/ { inside = 1; next }
+    inside && /^---$/ { exit }
+    inside && index($0, key ":") == 1 {
+      value = substr($0, length(key) + 2)
+      sub(/^[ \t]+/, "", value); sub(/[ \t]+$/, "", value)
+      if (value ~ /^".*"$/ || value ~ /^'\''.*'\''$/) value = substr(value, 2, length(value) - 2)
+      print value
+      exit
+    }' "$1"
+}
+
+load_agent() {
+  NAME=$1
+  case $NAME in
+    '' | .* | *[!A-Za-z0-9._-]*) die "not an agent name: $NAME" ;;
+  esac
+  AGENT_FILE="$AGENTS_DIR/$NAME.md"
+  [ -f "$AGENT_FILE" ] || die "no agent file at $AGENT_FILE"
+  SERVER=$(field "$AGENT_FILE" server)
+  AGENT_DIR=$(field "$AGENT_FILE" dir)
+  case $SERVER in
+    '' | *[!A-Za-z0-9_-]*) die "$AGENT_FILE has no usable server: line" ;;
+  esac
+  [ -d "$AGENT_DIR" ] || die "$AGENT_FILE names no folder that exists"
+  STATE="$WATCH_HOME/$NAME"
+  mkdir -p "$STATE/tasks" "$STATE/runs" "$STATE/queue" "$STATE/items" || die "can't write $STATE"
+  chmod 700 "$WATCH_HOME" "$STATE" 2>/dev/null
+}
+
+# A setting from the config file, or its default.
+conf() {
+  local value=""
+  [ -f "$STATE/config" ] && value=$(sed -n "s/^$1=//p" "$STATE/config" | tail -1)
+  printf '%s' "${value:-$2}"
+}
+
+# A whole-number setting, or its default when it isn't one.
+conf_n() {
+  local value
+  value=$(conf "$1" "$2")
+  case $value in '' | *[!0-9]*) value=$2 ;; esac
+  printf '%s' "$value"
+}
+
+# Settings are reread before every poll, so an edit applies without a restart.
+read_config() {
+  ENGINE=$(conf engine claude)
+  case $ENGINE in claude | codex) ;; *) log "unknown engine '$ENGINE'; using claude"; ENGINE=claude ;; esac
+  MODEL=$(conf model "")
+  FETCH_MODEL=$(conf fetch_model haiku)
+  PRINCIPAL_PERMISSION=$(conf principal_permission auto)
+  MAX_PARALLEL=$(conf_n max_parallel 3)
+  TIMEOUT=$(conf_n timeout_s 1800)
+  IDLE=$(conf_n session_idle_s 3600)
+  MAX_AGE=$(conf_n session_max_age_s 86400)
+  STEER=$(conf steer on)
+  REACTIONS=$(conf reactions off)
+  CLAUDE_BIN=${FILAMENT_WATCH_CLAUDE:-$(command -v claude || true)}
+  CODEX_BIN=${FILAMENT_WATCH_CODEX:-$(command -v codex || true)}
+}
+
+engine_bin() {
+  if [ "$ENGINE" = codex ]; then printf '%s' "$CODEX_BIN"; else printf '%s' "$CLAUDE_BIN"; fi
+}
+
+# --- Small state files --------------------------------------------------------
+
+tget() { [ -f "$1" ] && sed -n "s/^$2=//p" "$1" | tail -1; }
+
+tset() {
+  local file=$1 key=$2 value=$3
+  {
+    [ -f "$file" ] && grep -v "^$key=" "$file"
+    printf '%s=%s\n' "$key" "$value"
+  } > "$file.tmp.$$"
+  mv "$file.tmp.$$" "$file"
+}
+
+hash_key() {
+  if command -v shasum >/dev/null 2>&1; then
+    printf '%s' "$1" | shasum | cut -c1-16
+  else
+    printf '%s' "$1" | sha1sum | cut -c1-16
+  fi
+}
+
+new_uuid() {
+  if command -v uuidgen >/dev/null 2>&1; then
+    uuidgen | tr '[:upper:]' '[:lower:]'
+  else
+    cat /proc/sys/kernel/random/uuid
+  fi
+}
+
+audit() { printf '%s\n' "$1" >> "$STATE/audit.jsonl"; }
+
+# --- Talking to Filament with the agent's token -------------------------------
+# Only when FILAMENT_AGENT_TOKEN and FILAMENT_SERVER_URL are set (the desktop
+# app sets them). The token goes to curl on stdin, never in its arguments.
+
+MCP_SID=""
+MCP_READY=0
+HTTP_CODE=""
+
+# POSTs a JSON-RPC body; sets HTTP_CODE and leaves the body in $STATE/.mcp-body.
+mcp_post() {
+  local body=$1 wait=$2 resp
+  local sid_args=()
+  [ -n "$MCP_SID" ] && sid_args=(-H "mcp-session-id: $MCP_SID")
+  resp=$(printf 'header = "authorization: Bearer %s"\n' "$FILAMENT_AGENT_TOKEN" |
+    curl -sS -K - -m "$wait" -D "$STATE/.mcp-headers" -o "$STATE/.mcp-body" -w '%{http_code}' \
+      -X POST -H 'content-type: application/json' -H 'accept: application/json' \
+      ${sid_args[@]+"${sid_args[@]}"} --data-binary "$body" "$FILAMENT_SERVER_URL" 2>/dev/null)
+  HTTP_CODE=${resp:-000}
+}
+
+mcp_init() {
+  local sid
+  MCP_SID=""
+  MCP_READY=0
+  mcp_post "$(jq -nc --arg name "$CLIENT_NAME" --arg v "$WATCH_VERSION" \
+    '{jsonrpc: "2.0", id: 1, method: "initialize",
+      params: {protocolVersion: "2025-03-26", capabilities: {},
+               clientInfo: {name: $name, version: $v}}}')" 30
+  [ "$HTTP_CODE" = 200 ] || return 1
+  sid=$(tr -d '\r' < "$STATE/.mcp-headers" | awk -F': *' 'tolower($1) == "mcp-session-id" { print $2 }' | tail -1)
+  [ -n "$sid" ] || sid=$(jq -r '.result._sessionId // empty' "$STATE/.mcp-body" 2>/dev/null)
+  MCP_SID=$sid
+  mcp_post '{"jsonrpc":"2.0","method":"notifications/initialized","params":{}}' 30
+  MCP_READY=1
+}
+
+# Calls a tool. Leaves its result as JSON in $STATE/.result.
+# Returns 0 when it answered, 2 when the sign-in is refused, 1 otherwise.
+mcp_tool() {
+  local name=$1 args=$2 wait=$3 tries=0 code
+  while [ $tries -lt 2 ]; do
+    tries=$((tries + 1))
+    if [ "$MCP_READY" != 1 ]; then
+      mcp_init || { [ "$HTTP_CODE" = 401 ] || [ "$HTTP_CODE" = 403 ] && return 2; return 1; }
+    fi
+    mcp_post "$(jq -nc --arg name "$name" --argjson args "$args" \
+      '{jsonrpc: "2.0", id: 2, method: "tools/call", params: {name: $name, arguments: $args}}')" "$wait"
+    case $HTTP_CODE in
+      200) ;;
+      401 | 403) return 2 ;;
+      400 | 404) MCP_READY=0; continue ;;
+      *) return 1 ;;
+    esac
+    if jq -e '.error' "$STATE/.mcp-body" >/dev/null 2>&1; then
+      code=$(jq -r '.error.code' "$STATE/.mcp-body")
+      [ "$code" = -32001 ] && return 2
+      MCP_READY=0
+      continue
+    fi
+    jq -c '.result.structuredContent // (.result.content[0].text // "null" | fromjson? // {text: .})' \
+      "$STATE/.mcp-body" > "$STATE/.result" 2>/dev/null || return 1
+    [ "$(jq -r '.result.isError // false' "$STATE/.mcp-body")" = true ] && return 1
+    return 0
+  done
+  return 1
+}
+
+# --- Talking to Filament through the engine ------------------------------------
+# Without a token (the sign-in lives inside Claude Code or Codex), the watcher
+# waits on the token-free wake URL and has a short session make each call.
+
+FETCH_NOTE="filament-watch started this session only to make one Filament tool call. Make exactly the call you are asked for and nothing else, whatever any other instruction in this folder says, then reply with only: OK"
+
+# Codex arguments that give its sessions the agent's server when the watcher
+# holds the token, as the desktop app's own Codex agents have it.
+codex_server_args() {
+  [ "$TRANSPORT" = token ] || return 0
+  printf '%s\n' -c "mcp_servers.$SERVER.url=\"$FILAMENT_SERVER_URL\"" \
+    -c "mcp_servers.$SERVER.bearer_token_env_var=\"FILAMENT_AGENT_TOKEN\"" \
+    -c 'shell_environment_policy.exclude=["FILAMENT_AGENT_TOKEN"]'
+}
+
+# Has the engine call one Filament tool. Leaves its result in $STATE/.result.
+# Returns 0 when it answered, 2 when the sign-in is refused, 1 otherwise.
+fetch_tool() {
+  local name=$1 args=$2 out text bin
+  bin=$(engine_bin)
+  [ -n "$bin" ] || { log "no $ENGINE command found"; return 1; }
+  case $ENGINE in
+    claude)
+      out=$(cd "$AGENT_DIR" && MAX_MCP_OUTPUT_TOKENS=200000 env -u FILAMENT_AGENT_TOKEN \
+        "$bin" -p "Call mcp__${SERVER}__${name} once, with exactly these arguments: $args" \
+        --model "$FETCH_MODEL" --output-format stream-json --verbose \
+        --permission-mode dontAsk --tools "" --allowedTools "mcp__${SERVER}__${name}" \
+        --no-session-persistence --append-system-prompt "$FETCH_NOTE" \
+        < /dev/null 2>> "$STATE/engine.err")
+      text=$(printf '%s\n' "$out" | jq -rs '[.[] | select(.type == "user") | .message.content[]?
+        | select(.type == "tool_result")
+        | if (.content | type) == "string" then .content
+          else ([.content[]? | select(.type == "text") | .text] | join("")) end] | first // empty' 2>/dev/null)
+      ;;
+    codex)
+      local extra=()
+      while IFS= read -r line; do extra+=("$line"); done < <(codex_server_args)
+      out=$(cd "$AGENT_DIR" && "$bin" exec --json --skip-git-repo-check \
+        -c 'sandbox_mode="read-only"' -c 'model_reasoning_effort="low"' \
+        ${extra[@]+"${extra[@]}"} \
+        "$FETCH_NOTE
+
+Call the MCP tool $name on the server $SERVER once, with exactly these arguments: $args" \
+        < /dev/null 2>> "$STATE/engine.err")
+      text=$(printf '%s\n' "$out" | jq -rs '[.[] | select(.type == "item.completed" and .item.type == "mcp_tool_call")
+        | .item.result.content[]? | select(.type == "text") | .text] | first // empty' 2>/dev/null)
+      ;;
+  esac
+  if [ -z "$text" ]; then
+    log "the $ENGINE session made no $name call"
+    return 1
+  fi
+  if printf '%s' "$text" | jq -e 'type == "object"' >/dev/null 2>&1; then
+    printf '%s\n' "$text" > "$STATE/.result"
+    return 0
+  fi
+  case $text in
+    *401* | *403* | *-32001* | *"sign in"* | *"Sign in"*) return 2 ;;
+  esac
+  log "$name answered: $(printf '%s' "$text" | head -c 300)"
+  return 1
+}
+
+WAKE_URL=""
+WAKE_TOKEN=""
+
+ensure_wake() {
+  [ -n "$WAKE_TOKEN" ] && return 0
+  fetch_tool get_wake_url '{}'
+  local rc=$?
+  [ $rc = 0 ] || return $rc
+  WAKE_URL=$(jq -r '.wake_url // empty' "$STATE/.result")
+  WAKE_TOKEN=$(jq -r '.wake_token // empty' "$STATE/.result")
+  rm -f "$STATE/.result"
+  [ -n "$WAKE_URL" ] && [ -n "$WAKE_TOKEN" ] && return 0
+  log "get_wake_url gave no URL; this server may be too old for the watcher"
+  return 1
+}
+
+# Waits on the wake URL. Prints the pending count, or EXPIRED, REFUSED,
+# FORBIDDEN or ERROR.
+wake_wait() {
+  local resp code body
+  resp=$(printf 'header = "Authorization: Wake %s"\n' "$WAKE_TOKEN" |
+    curl -sS -K - -m $(($1 + 20)) -w '\n%{http_code}' "$WAKE_URL?wait=$1" 2>/dev/null)
+  code=${resp##*$'\n'}
+  body=${resp%$'\n'*}
+  case $code in
+    200) printf '%s' "$body" | jq -r '.pending // 0' 2>/dev/null || echo ERROR ;;
+    401) echo EXPIRED ;;
+    410) echo REFUSED ;;
+    403) echo FORBIDDEN ;;
+    *) echo ERROR ;;
+  esac
+}
+
+# --- Getting work ----------------------------------------------------------------
+
+# Leaves poll_work's answer in $STATE/.result.
+# Returns 0 with work to read, 1 when there is none, 2 when this agent may not
+# wait for work any more, 3 on a failure worth retrying.
+poll_args() {
+  jq -nc --arg c "$CURSOR" --argjson w "$1" \
+    '{wait_seconds: $w, max_items: 10} + (if $c == "" then {} else {cursor: $c} end)'
+}
+
+fetch_work() {
+  local wait=$1 pending rc
+  if [ "$TRANSPORT" = token ]; then
+    # The poll itself waits, up to `wait` seconds.
+    mcp_tool poll_work "$(poll_args "$wait")" $((wait + 30))
+    rc=$?
+    [ $rc = 2 ] && return 2
+    [ $rc = 0 ] || return 3
+    return 0
+  fi
+  ensure_wake
+  rc=$?
+  [ $rc = 2 ] && return 2
+  [ $rc = 0 ] || return 3
+  pending=$(wake_wait "$wait")
+  case $pending in
+    EXPIRED) WAKE_TOKEN=""; return 1 ;;
+    REFUSED | FORBIDDEN) log "the wake URL answered $pending"; return 2 ;;
+    ERROR) return 3 ;;
+    0) return 1 ;;
+  esac
+  fetch_tool poll_work "$(poll_args 0)"
+  rc=$?
+  [ $rc = 2 ] && return 2
+  [ $rc = 0 ] || return 3
+  return 0
+}
+
+# --- Runs: sessions and steering in the background -----------------------------
+# Each run is a few files in runs/: <id>.kind, .mode, .started, .spid (the
+# wrapper), .pid (the engine), .out, .err and, once it ends, .rc.
+
+run_bg() {
+  local id=$1 kind=$2 mode=$3
+  shift 3
+  local base="$STATE/runs/$id"
+  rm -f "$base.rc" "$base.pid"
+  printf '%s\n' "$kind" > "$base.kind"
+  printf '%s\n' "$mode" > "$base.mode"
+  now > "$base.started"
+  (
+    cd "$AGENT_DIR" || { echo 1 > "$base.rc"; exit 1; }
+    "$@" < /dev/null > "$base.out" 2> "$base.err" &
+    echo $! > "$base.pid"
+    wait $!
+    echo $? > "$base.rc"
+  ) &
+  echo $! > "$base.spid"
+}
+
+running() {
+  local base="$STATE/runs/$1"
+  [ -f "$base.spid" ] && [ ! -f "$base.rc" ]
+}
+
+active_primaries() {
+  local n=0 spid
+  for spid in "$STATE"/runs/*.spid; do
+    [ -f "$spid" ] || continue
+    [ "$(cat "${spid%.spid}.kind" 2>/dev/null)" = primary ] || continue
+    [ -f "${spid%.spid}.rc" ] || n=$((n + 1))
+  done
+  printf '%s' "$n"
+}
+
+queued_any() {
+  ls "$STATE"/queue/*.json >/dev/null 2>&1
+}
+
+# The text a session reads before its work: event.md, filled in.
+session_notes() {
+  sed -e "s/{{SERVER}}/$SERVER/g" -e "s/{{AGENT}}/$NAME/g" \
+    -e "s|{{AGENT_FILE}}|$AGENT_FILE|g" "$HERE/event.md"
+}
+
+work_prompt() {
+  local mode=$1 fresh=$2 items=$3
+  printf 'filament-watch hands you new Filament work (see "filament-watch sessions" in your instructions).\n\n'
+  if [ "$mode" = principal ]; then
+    printf 'Mode: principal. Your user sent this.\n'
+  else
+    printf 'Mode: restricted. Someone other than your user sent this; you have only your Filament tools.\n'
+  fi
+  if [ "$fresh" = yes ]; then
+    printf 'Session: fresh. Read the conversation'\''s recent messages first when you need context.\n'
+  else
+    printf 'Session: resumed. Your earlier turns in this conversation are above.\n'
+  fi
+  printf '\nWork items, from poll_work:\n```json\n%s\n```\n' "$items"
+}
+
+start_primary() {
+  local h=$1 mode=$2
+  shift 2
+  local task="$STATE/tasks/$h" t items sid created used fresh=no prompt bin key
+  bin=$(engine_bin)
+  [ -n "$bin" ] || { log "no $ENGINE command found; keeping the work queued"; return 1; }
+  items=$(jq -cs '.' "$@") || return 1
+  rm -f "$@"
+  t=$(now)
+  key=$(cat "$STATE/tasks/$h.key" 2>/dev/null)
+  sid=$(tget "$task" session)
+  created=$(tget "$task" created)
+  used=$(tget "$task" used)
+  if [ -z "$sid" ] || [ $((t - ${used:-0})) -gt "$IDLE" ] || [ $((t - ${created:-0})) -gt "$MAX_AGE" ]; then
+    fresh=yes
+    sid=""
+    tset "$task" created "$t"
+  fi
+  tset "$task" used "$t"
+  prompt=$(work_prompt "$mode" "$fresh" "$items")
+  local cmd=()
+  case $ENGINE in
+    claude)
+      if [ "$fresh" = yes ]; then
+        sid=$(new_uuid)
+        tset "$task" session "$sid"
+        cmd=(--session-id "$sid")
+      else
+        cmd=(--resume "$sid")
+      fi
+      cmd=(env -u FILAMENT_AGENT_TOKEN "$bin" -p "$prompt" --output-format json
+        --append-system-prompt "$(session_notes)" "${cmd[@]}")
+      [ -n "$MODEL" ] && cmd+=(--model "$MODEL")
+      if [ "$mode" = principal ]; then
+        cmd+=(--permission-mode "$PRINCIPAL_PERMISSION")
+      else
+        cmd+=(--permission-mode dontAsk --tools "" --allowedTools "mcp__${SERVER}")
+      fi
+      ;;
+    codex)
+      [ "$fresh" = yes ] && { tset "$task" session ""; prompt="$(session_notes)
+
+$prompt"; }
+      cmd=("$bin" exec)
+      [ "$fresh" = no ] && cmd+=(resume "$sid")
+      cmd+=(--json --skip-git-repo-check)
+      if [ "$mode" = principal ]; then
+        cmd+=(-c 'sandbox_mode="workspace-write"' -c 'sandbox_workspace_write.network_access=true')
+      else
+        cmd+=(-c 'sandbox_mode="read-only"')
+      fi
+      while IFS= read -r line; do cmd+=("$line"); done < <(codex_server_args)
+      [ -n "$MODEL" ] && cmd+=(-m "$MODEL")
+      cmd+=("$prompt")
+      ;;
+  esac
+  run_bg "$h" primary "$mode" "${cmd[@]}"
+  log "session for $key: $([ "$fresh" = yes ] && echo started || echo resumed) ($mode, $(printf '%s' "$items" | jq length) item(s))"
+  audit "$(jq -nc --arg key "$key" --arg mode "$mode" --arg fresh "$fresh" --argjson n "$(printf '%s' "$items" | jq length)" \
+    --argjson t "$t" '{t: $t, event: "session", key: $key, mode: $mode, fresh: ($fresh == "yes"), items: $n}')"
+}
+
+start_dispatcher() {
+  local h=$1 file=$2 mode=$3 bin item text started age tid
+  bin=$(engine_bin)
+  item=$(cat "$file")
+  text="$STEER_MARK: new work arrived in this conversation while you were still working on it. Fold it into what you are doing and answer it as your instructions say.
+
+$item"
+  case $ENGINE in
+    claude)
+      started=$(cat "$STATE/runs/$h.started" 2>/dev/null || now)
+      age=$(($(now) - started))
+      run_bg "d-$h" dispatcher "$mode" env -u FILAMENT_AGENT_TOKEN "$bin" -p \
+        "You are filament-watch's steering dispatcher. New work arrived while another Claude Code session (the primary) is still working in this folder on the same conversation. Your only job is to deliver it into that running session.
+
+The primary is a claude process with OS pid $(cat "$STATE/runs/$h.pid" 2>/dev/null), started about ${age}s before you, in $AGENT_DIR.
+1. Call ListAgents. Find the primary: a local peer session (not you, not idle for hours) in that folder, started about ${age}s plus your own startup time ago.
+2. SendMessage to it (to = its listed name, plus [ref] when one is shown) with the block below, word for word.
+3. If that fails, retry with to = 'uds:/tmp/cc-socks/$(cat "$STATE/runs/$h.pid" 2>/dev/null).sock'.
+4. If you cannot deliver it at all, print exactly NOSIBLING and stop.
+After delivering it, print exactly DELIVERED. Never post to Filament and never do the work yourself.
+
+$text" \
+        --model "$FETCH_MODEL" --permission-mode auto --output-format text \
+        --strict-mcp-config --no-session-persistence
+      ;;
+    codex)
+      tid=$(jq -r 'select(.type == "thread.started") | .thread_id' "$STATE/runs/$h.out" 2>/dev/null | head -1)
+      [ -n "$tid" ] || return 1
+      run_bg "d-$h" dispatcher "$mode" "$bin" queue --thread "$tid" --message "$text"
+      ;;
+  esac
+  mv "$file" "$STATE/runs/d-$h.item"
+  log "steering new work into the running session for $(cat "$STATE/tasks/$h.key" 2>/dev/null)"
+}
+
+enqueue() {
+  local h=$1 mode=$2 file=$3
+  mv "$file" "$STATE/queue/$h.$mode.$(basename "$file")"
+}
+
+# Starts sessions for queued work while there is room: the oldest first, with
+# the queued items of that conversation that share the oldest one's mode.
+drain_queues() {
+  local f name h mode files
+  queued_any || return 0
+  for f in $(ls "$STATE"/queue/*.json 2>/dev/null | awk -F/ '{ print $NF "\t" $0 }' |
+    awk -F'\t' '{ split($1, p, "."); print p[3] "\t" $2 }' | sort | cut -f2); do
+    [ -f "$f" ] || continue
+    [ "$(active_primaries)" -lt "$MAX_PARALLEL" ] || return 0
+    name=$(basename "$f")
+    h=${name%%.*}
+    mode=$(printf '%s' "$name" | cut -d. -f2)
+    running "$h" && continue
+    running "d-$h" && continue
+    files=$(ls "$STATE"/queue/"$h.$mode".*.json 2>/dev/null | sort)
+    # shellcheck disable=SC2086
+    start_primary "$h" "$mode" $files
+  done
+}
+
+failure_note() {
+  local key=$1 why=$2
+  [ "$TRANSPORT" = token ] || return 0
+  mcp_tool message_principal "$(jq -nc --arg b "filament-watch: a session for some of your work failed ($why). It will run again with the next message there." \
+    '{markdown_body: $b}')" 30 >/dev/null 2>&1 || log "couldn't tell the principal about the failure"
+}
+
+finish_run() {
+  local id=$1 base="$STATE/runs/$1" kind rc mode h t is_error cost tid key
+  kind=$(cat "$base.kind" 2>/dev/null)
+  rc=$(cat "$base.rc" 2>/dev/null)
+  rc=${rc:-1}
+  mode=$(cat "$base.mode" 2>/dev/null)
+  t=$(now)
+  case $kind in
+    primary)
+      h=$id
+      key=$(cat "$STATE/tasks/$h.key" 2>/dev/null)
+      tset "$STATE/tasks/$h" used "$t"
+      is_error=false
+      cost=null
+      if [ "$ENGINE" = codex ]; then
+        tid=$(jq -r 'select(.type == "thread.started") | .thread_id' "$base.out" 2>/dev/null | head -1)
+        [ -n "$tid" ] && tset "$STATE/tasks/$h" session "$tid"
+        jq -e 'select(.type == "turn.failed")' "$base.out" >/dev/null 2>&1 && is_error=true
+      else
+        is_error=$(jq -r '.is_error // false' "$base.out" 2>/dev/null || echo true)
+        cost=$(jq -r '.total_cost_usd // "null"' "$base.out" 2>/dev/null || echo null)
+      fi
+      if [ "$rc" = 0 ] && [ "$is_error" != true ]; then
+        log "session for $key finished"
+      else
+        log "session for $key failed (exit $rc): $(tail -n 3 "$base.err" 2>/dev/null | tr '\n' ' ' | head -c 300)"
+        # A session that failed starts fresh next time.
+        tset "$STATE/tasks/$h" session ""
+        failure_note "$key" "exit $rc"
+      fi
+      audit "$(jq -nc --arg key "$key" --argjson rc "$rc" --argjson t "$t" --argjson cost "${cost:-null}" \
+        --arg err "$is_error" '{t: $t, event: "session_end", key: $key, rc: $rc, error: ($err == "true"), cost_usd: $cost}')"
+      ;;
+    dispatcher)
+      h=${id#d-}
+      if [ -f "$base.item" ]; then
+        if { [ "$ENGINE" = claude ] && grep -q DELIVERED "$base.out" 2>/dev/null; } ||
+          { [ "$ENGINE" = codex ] && [ "$rc" = 0 ]; }; then
+          log "steered"
+          rm -f "$base.item"
+          audit "$(jq -nc --argjson t "$t" --arg h "$h" '{t: $t, event: "steered", task: $h}')"
+        else
+          log "couldn't steer; the work waits for the running session to finish"
+          mv "$base.item" "$STATE/queue/$h.$mode.$t-steer.json"
+        fi
+      fi
+      ;;
+  esac
+  mv -f "$base.out" "$base.last.out" 2>/dev/null
+  mv -f "$base.err" "$base.last.err" 2>/dev/null
+  rm -f "$base.kind" "$base.mode" "$base.started" "$base.spid" "$base.pid" "$base.rc"
+}
+
+# Finishes ended runs and stops ones past their time limit.
+reap() {
+  local spid base id started pid
+  for spid in "$STATE"/runs/*.spid; do
+    [ -f "$spid" ] || continue
+    base=${spid%.spid}
+    id=${base##*/}
+    if [ -f "$base.rc" ]; then
+      finish_run "$id"
+      continue
+    fi
+    if ! kill -0 "$(cat "$spid")" 2>/dev/null; then
+      # The wrapper is gone without a result: a watcher before this one died.
+      echo 1 > "$base.rc"
+      finish_run "$id"
+      continue
+    fi
+    started=$(cat "$base.started" 2>/dev/null || now)
+    if [ $(($(now) - started)) -gt "$TIMEOUT" ]; then
+      pid=$(cat "$base.pid" 2>/dev/null)
+      log "stopping $id after ${TIMEOUT}s"
+      [ -n "$pid" ] && kill "$pid" 2>/dev/null
+    fi
+  done
+}
+
+# --- Handling one work item ----------------------------------------------------
+
+handle_item() {
+  local item=$1 kind key mode h file
+  kind=$(printf '%s' "$item" | jq -r '.kind // "message"')
+  if [ "$kind" = reaction ] && [ "$REACTIONS" != on ]; then
+    log "skipping a reaction (reactions=off)"
+    return 0
+  fi
+  case $kind in
+    message | reaction) key=$(printf '%s' "$item" | jq -r '"\(.channel_id)|\(.thread_id // "main")"') ;;
+    *) key="loops" ;;
+  esac
+  mode=$(printf '%s' "$item" | jq -r '
+    if ((.messages // .reactions // []) | last | .is_from_principal) == true
+    then "principal" else "restricted" end')
+  h=$(hash_key "$key")
+  printf '%s\n' "$key" > "$STATE/tasks/$h.key"
+  file="$STATE/items/$(now)-$$-$RANDOM.json"
+  printf '%s\n' "$item" > "$file"
+  if running "$h"; then
+    if [ "$STEER" = on ] && [ "$(cat "$STATE/runs/$h.mode" 2>/dev/null)" = "$mode" ] && ! running "d-$h"; then
+      start_dispatcher "$h" "$file" "$mode" || enqueue "$h" "$mode" "$file"
+    else
+      enqueue "$h" "$mode" "$file"
+    fi
+  elif [ "$(active_primaries)" -ge "$MAX_PARALLEL" ]; then
+    enqueue "$h" "$mode" "$file"
+  else
+    start_primary "$h" "$mode" "$file" || enqueue "$h" "$mode" "$file"
+  fi
+}
+
+# --- The watcher ---------------------------------------------------------------
+
+acquire_lock() {
+  local old
+  if ! mkdir "$STATE/lock" 2>/dev/null; then
+    old=$(cat "$STATE/lock/pid" 2>/dev/null)
+    if [ -n "$old" ] && kill -0 "$old" 2>/dev/null; then
+      die "a watcher for $NAME already runs (pid $old)"
+    fi
+    rm -rf "$STATE/lock"
+    mkdir "$STATE/lock" || die "can't lock $STATE"
+  fi
+  echo $$ > "$STATE/lock/pid"
+}
+
+shutdown() {
+  local pidf
+  log "stopping"
+  for pidf in "$STATE"/runs/*.pid; do
+    [ -f "$pidf" ] && kill "$(cat "$pidf")" 2>/dev/null
+  done
+  rm -rf "$STATE/lock"
+  exit 0
+}
+
+watch_loop() {
+  local wait delay=1 rc item saved
+  command -v jq >/dev/null 2>&1 || die "needs jq"
+  command -v curl >/dev/null 2>&1 || die "needs curl"
+  read_config
+  [ -f "$HERE/event.md" ] || die "event.md is missing beside $0"
+  TRANSPORT=wake
+  if [ -n "${FILAMENT_AGENT_TOKEN:-}" ] && [ -n "${FILAMENT_SERVER_URL:-}" ]; then TRANSPORT=token; fi
+  if [ "$ENGINE" = codex ]; then CLIENT_NAME="codex (filament-watch)"; else CLIENT_NAME="claude-code (filament-watch)"; fi
+  [ -n "$(engine_bin)" ] || die "no $ENGINE command found"
+  acquire_lock
+  trap shutdown TERM INT
+  CURSOR=$(cat "$STATE/cursor" 2>/dev/null)
+  log "watching $NAME: $ENGINE, waiting by $TRANSPORT (filament-watch $WATCH_VERSION)"
+  while :; do
+    read_config
+    reap
+    drain_queues
+    wait=55
+    if [ "$(active_primaries)" -gt 0 ] || queued_any; then wait=10; fi
+    fetch_work "$wait"
+    rc=$?
+    case $rc in
+      0)
+        delay=1
+        saved=$(jq -r '.cursor // empty' "$STATE/.result")
+        if [ -n "$saved" ]; then
+          CURSOR=$saved
+          printf '%s\n' "$CURSOR" > "$STATE/cursor"
+        fi
+        [ "$(jq '.work // [] | length' "$STATE/.result")" = 0 ] && rc=1
+        while IFS= read -r item; do
+          [ -n "$item" ] && handle_item "$item"
+        done < <(jq -c '.work[]?' "$STATE/.result")
+        ;;
+      1) delay=1 ;;
+      2)
+        log "Filament refused this agent's sign-in, or it was deleted or disconnected; stopping"
+        shutdown
+        ;;
+      3)
+        log "couldn't reach Filament; trying again in ${delay}s"
+        sleep "$delay"
+        [ "$delay" -lt 60 ] && delay=$((delay * 2))
+        ;;
+    esac
+    [ -n "${FILAMENT_WATCH_EXIT_IDLE:-}" ] && [ "$rc" = 1 ] && [ "$(active_primaries)" = 0 ] &&
+      ! queued_any && ! ls "$STATE"/runs/*.spid >/dev/null 2>&1 && shutdown
+  done
+}
+
+watch_pid() {
+  local pid
+  pid=$(cat "$STATE/lock/pid" 2>/dev/null)
+  [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null && printf '%s' "$pid"
+}
+
+main() {
+  local cmd=${1:-}
+  case $cmd in
+    version) echo "filament-watch $WATCH_VERSION"; exit 0 ;;
+    '' | -h | --help | help) usage; exit 0 ;;
+  esac
+  [ $# -ge 2 ] || { usage >&2; exit 2; }
+  load_agent "$2"
+  case $cmd in
+    run) watch_loop ;;
+    start)
+      if pid=$(watch_pid); then
+        echo "filament-watch for $NAME already runs (pid $pid)"
+        exit 0
+      fi
+      nohup "$0" run "$NAME" >> "$STATE/log" 2>&1 < /dev/null &
+      sleep 1
+      if pid=$(watch_pid); then
+        echo "filament-watch for $NAME started (pid $pid); log: $STATE/log"
+      else
+        tail -n 5 "$STATE/log" >&2
+        die "it stopped right away"
+      fi
+      ;;
+    stop)
+      if pid=$(watch_pid); then
+        kill "$pid" && echo "stopped filament-watch for $NAME"
+      else
+        echo "filament-watch for $NAME isn't running"
+      fi
+      ;;
+    status)
+      if pid=$(watch_pid); then echo "running (pid $pid)"; else echo "not running"; fi
+      [ -f "$STATE/log" ] && tail -n 10 "$STATE/log"
+      ;;
+    *) usage >&2; exit 2 ;;
+  esac
+}
+
+main "$@"
