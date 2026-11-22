@@ -3,7 +3,9 @@
 You are Claude Code or Codex. Your user has a Filament agent that runs from a
 folder on this computer, and wants it to run under filament-watch: a small
 background script that waits for work without spending anything and starts a
-session only when a message arrives, one per conversation.
+session only when a message arrives, one per conversation. It lives in the
+agent's folder with its settings and state, so running it from that folder is
+all it takes to bring the agent up.
 
 Keep every message to your user to one or two plain sentences. Do everything
 you can yourself.
@@ -24,12 +26,12 @@ List `~/.filament/agents/*.md`.
 | Several | Ask your user which, with AskUserQuestion when you have it. |
 | None | The agent isn't set up yet. From Claude Code, point your user at `https://filament.dm/agents/claude-code.md`; from Codex, at the Filament plugin's connect skill (`$filament:connect`). Then stop. |
 
-`<name>` is the file's name without `.md`, and `<dir>` is the folder on its
-`dir:` line. `<engine>` is `claude` when the agent file's body says it is a
-Claude Code agent, and `codex` when it says Codex. When it says neither, it
-is the program you are running in.
+`<name>` is the file's name without `.md`, `<dir>` is the folder on its
+`dir:` line, and `<server>` is its `server:` line. `<engine>` is `claude`
+when the agent file's body says it is a Claude Code agent, and `codex` when
+it says Codex. When it says neither, it is the program you are running in.
 
-## 2. Install filament-watch
+## 2. Put filament-watch in the agent's folder
 
 `<base>` is
 `https://raw.githubusercontent.com/filament-dm/filament-agent-kit/<ref>/filament-watch`,
@@ -37,12 +39,18 @@ where `<ref>` is `main`, or the ref in the address you fetched this guide from.
 
 ```bash
 command -v jq curl >/dev/null || echo MISSING_TOOLS
-mkdir -p ~/.filament/watch/bin && cd ~/.filament/watch/bin && curl -sSfL -o filament-watch.new "<base>/filament-watch" && curl -sSfL -o event.md.new "<base>/event.md" && chmod +x filament-watch.new && mv filament-watch.new filament-watch && mv event.md.new event.md && ./filament-watch version
+cd "<dir>" && curl -sSfL -o filament-watch.new "<base>/filament-watch" && chmod +x filament-watch.new && mv filament-watch.new filament-watch && ./filament-watch version
 ```
 
 If it printed `MISSING_TOOLS`, then tell your user that filament-watch needs
 `jq` and `curl` (macOS 15 and later have both; on Linux, install them with
 the system's package manager) and stop.
+
+Then write its settings beside it, unless they are there already:
+
+```bash
+cd "<dir>" && { [ -f filament-watch.conf ] || printf 'agent=<name>\nserver=<server>\nengine=<engine>\n' > filament-watch.conf; }
+```
 
 ## 3. Turn off the agent's own start
 
@@ -69,13 +77,13 @@ folder must not start it too.
 ## 4. Start it
 
 ```bash
-mkdir -p ~/.filament/watch/<name> && { [ -f ~/.filament/watch/<name>/config ] || printf 'engine=<engine>\n' > ~/.filament/watch/<name>/config; } && ~/.filament/watch/bin/filament-watch start <name>
+cd "<dir>" && ./filament-watch start
 ```
 
 Wait about 20 seconds, then check it:
 
 ```bash
-~/.filament/watch/bin/filament-watch status <name>
+cd "<dir>" && ./filament-watch status
 ```
 
 | When the log shows | Do |
@@ -90,17 +98,20 @@ Wait about 20 seconds, then check it:
 Send this, filled in:
 
 ````markdown
-**<name>** now waits in the background and starts a session only when a message arrives. After your computer restarts, bring it back with:
+**<name>** now waits in the background and starts a session only when a message arrives. After your computer restarts, bring it back from its folder:
 
 ```
-~/.filament/watch/bin/filament-watch start <name>
+cd "<dir>" && ./filament-watch start
 ```
 ````
 
 ## Later
 
-- `filament-watch status <name>` shows whether it runs and its recent log.
-- `filament-watch stop <name>` stops it. To have sessions in the agent's
-  folder start the agent again, delete the `autostart: off` line too.
-- Its settings, such as the model, are in `~/.filament/watch/<name>/config`.
-  `<base>/README.md` lists them.
+All of these run in the agent's folder.
+
+- `./filament-watch` runs it in the terminal, showing its log, until Ctrl-C.
+- `./filament-watch status` shows whether it runs and its recent log.
+- `./filament-watch stop` stops it. To have sessions in the folder start the
+  agent again, delete the `autostart: off` line from its agent file too.
+- Its settings, such as the model, are in `filament-watch.conf`;
+  `<base>/README.md` lists them. Its log and state are in `.filament-watch/`.

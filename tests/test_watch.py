@@ -17,7 +17,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-WATCH = ROOT / "filament-watch/filament-watch"
+SCRIPT = ROOT / "filament-watch/filament-watch"
 BASH = os.environ.get("FILAMENT_WATCH_TEST_BASH", "bash")
 
 FAKE_CLAUDE = r'''#!/usr/bin/env python3
@@ -147,15 +147,20 @@ class WatchTests(unittest.TestCase):
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
         base = Path(tmp.name).resolve()
-        self.home = base / "watch"
         self.fake_dir = base / "fake"
         self.fake_dir.mkdir()
-        folder = base / "agent"
-        folder.mkdir()
-        agents = base / "agents"
-        agents.mkdir()
-        (agents / "tester.md").write_text(
-            f"---\nserver: filament-tester\ndir: {folder}\nautostart: off\n---\n# Tester\n"
+        # The agent's folder holds the watcher, its settings and its state.
+        self.folder = base / "Filament Agents" / "Tester"
+        self.folder.mkdir(parents=True)
+        self.watch = self.folder / "filament-watch"
+        shutil.copy(SCRIPT, self.watch)
+        self.conf = self.folder / "filament-watch.conf"
+        self.conf.write_text("agent=tester\nserver=filament-tester\nengine=claude\n")
+        self.state = self.folder / ".filament-watch"
+        self.agents = base / "agents"
+        self.agents.mkdir()
+        (self.agents / "tester.md").write_text(
+            f"---\nserver: filament-tester\ndir: {self.folder}\nautostart: off\n---\n# Tester\n"
         )
         self.claude = base / "claude"
         self.claude.write_text(FAKE_CLAUDE)
@@ -165,8 +170,7 @@ class WatchTests(unittest.TestCase):
         self.env = {
             "PATH": os.environ["PATH"],
             "HOME": str(base),
-            "FILAMENT_AGENTS_DIR": str(agents),
-            "FILAMENT_WATCH_HOME": str(self.home),
+            "FILAMENT_AGENTS_DIR": str(self.agents),
             "FILAMENT_WATCH_CLAUDE": str(self.claude),
             "FILAMENT_WATCH_EXIT_IDLE": "1",
             "FAKE_DIR": str(self.fake_dir),
@@ -176,8 +180,8 @@ class WatchTests(unittest.TestCase):
         return {**self.env, "FILAMENT_AGENT_TOKEN": "fmcp_testtoken",
                 "FILAMENT_SERVER_URL": f"{self.server.url}/mcp"}
 
-    def run_watch(self, env):
-        proc = subprocess.run([BASH, str(WATCH), "run", "tester"], env=env,
+    def run_watch(self, env, *args):
+        proc = subprocess.run([BASH, str(self.watch), *args], env=env, cwd=self.folder.parent,
                               capture_output=True, text=True, timeout=60)
         self.log = proc.stderr
         return proc
@@ -199,7 +203,7 @@ class WatchTests(unittest.TestCase):
 
     def test_a_principal_message_starts_a_session_with_every_tool(self):
         self.server.batches = [{"result": {"work": [message_item("$e1")], "cursor": "c1"}}]
-        self.run_watch(self.token_env())
+        self.run_watch(self.token_env(), "run")
         work = self.claude_calls("work")
         self.assertEqual(len(work), 1, self.log)
         args = work[0]
@@ -208,7 +212,7 @@ class WatchTests(unittest.TestCase):
         self.assertIn("Mode: principal", self.value(args, "-p"))
         self.assertIn("$e1", self.value(args, "-p"))
         self.assertIn("mcp__filament-tester__*", self.value(args, "--append-system-prompt"))
-        self.assertEqual((self.home / "tester/cursor").read_text().strip(), "c1")
+        self.assertEqual((self.state / "cursor").read_text().strip(), "c1")
         # The next poll passes the cursor, which acknowledges the work.
         polls = [c["arguments"] for c in self.server.calls if c["name"] == "poll_work"]
         self.assertEqual(polls[1].get("cursor"), "c1")
@@ -219,6 +223,37 @@ class WatchTests(unittest.TestCase):
         calls = [json.loads(line) for line in (self.fake_dir / "calls.jsonl").read_text().splitlines()]
         self.assertTrue(calls)
         self.assertFalse(any(c["token"] for c in calls))
+
+    def test_it_runs_with_no_command_and_keeps_its_state_in_the_folder(self):
+        self.server.batches = [{"result": {"work": [message_item("$e1")], "cursor": "c1"}}]
+        self.run_watch(self.token_env())
+        self.assertEqual(len(self.claude_calls("work")), 1, self.log)
+        self.assertEqual((self.state / ".gitignore").read_text(), "*\n")
+        self.assertTrue((self.state / "audit.jsonl").is_file())
+        self.assertFalse((self.folder.parent.parent / ".filament").exists())
+
+    def test_sessions_learn_who_they_are_from_the_agent_file(self):
+        self.server.batches = [{"result": {"work": [message_item("$e1")], "cursor": "c1"}}]
+        self.run_watch(self.token_env())
+        notes = self.value(self.claude_calls("work")[0], "--append-system-prompt")
+        self.assertIn(f"cat '{self.agents / 'tester.md'}'", notes)
+        self.assertIn("filament-watch.conf", notes)
+        self.assertIn("### Which messages to answer", notes)
+        self.assertNotIn("{{", notes)
+
+    def test_without_an_agent_file_sessions_call_get_self(self):
+        (self.agents / "tester.md").unlink()
+        self.server.batches = [{"result": {"work": [message_item("$e1")], "cursor": "c1"}}]
+        self.run_watch(self.token_env())
+        notes = self.value(self.claude_calls("work")[0], "--append-system-prompt")
+        self.assertIn("get_self", notes)
+
+    def test_settings_without_a_name_take_it_from_the_agent_file(self):
+        self.conf.write_text("engine=claude\n")
+        self.run_watch(self.token_env())
+        conf = self.conf.read_text()
+        self.assertIn("agent=tester\n", conf, self.log)
+        self.assertIn("server=filament-tester\n", conf)
 
     def test_someone_else_gets_only_filament_tools(self):
         item = message_item("$e1", principal=False, backchannel=False)
@@ -260,7 +295,7 @@ class WatchTests(unittest.TestCase):
         self.assertEqual(len(dispatch), 1)
         self.assertIn("STEERING from filament-watch", self.value(dispatch[0], "-p"))
         self.assertIn("$e2", self.value(dispatch[0], "-p"))
-        audit = (self.home / "tester/audit.jsonl").read_text()
+        audit = (self.state / "audit.jsonl").read_text()
         self.assertIn('"steered"', audit)
 
     def test_work_that_cannot_be_steered_runs_after_the_session(self):
@@ -286,7 +321,7 @@ class WatchTests(unittest.TestCase):
         proc = self.run_watch(self.token_env())
         self.assertEqual(proc.returncode, 0)
         self.assertIn("refused", self.log)
-        self.assertFalse((self.home / "tester/lock").exists())
+        self.assertFalse((self.state / "lock").exists())
 
     def test_without_a_token_it_waits_on_the_wake_url(self):
         fetch = self.fake_dir / "fetch"
@@ -306,15 +341,15 @@ class WatchTests(unittest.TestCase):
         work = self.claude_calls("work")
         self.assertEqual(len(work), 1)
         self.assertIn("$e1", self.value(work[0], "-p"))
-        self.assertEqual((self.home / "tester/cursor").read_text().strip(), "c1")
+        self.assertEqual((self.state / "cursor").read_text().strip(), "c1")
 
     def test_start_twice_runs_one_watcher(self):
         env = {**self.token_env()}
         env.pop("FILAMENT_WATCH_EXIT_IDLE")
-        start = lambda: subprocess.run([BASH, str(WATCH), "start", "tester"], env=env,
+        start = lambda: subprocess.run([BASH, str(self.watch), "start"], env=env,
                                        capture_output=True, text=True, timeout=30)
         first = start()
-        self.addCleanup(lambda: subprocess.run([BASH, str(WATCH), "stop", "tester"], env=env,
+        self.addCleanup(lambda: subprocess.run([BASH, str(self.watch), "stop"], env=env,
                                                capture_output=True, timeout=30))
         self.assertIn("started", first.stdout, first.stderr)
         self.assertIn("already runs", start().stdout)

@@ -6,7 +6,15 @@ each conversation its own session. `WATCH.md` is the setup guide an agent
 follows to install it; this file is for the people who maintain it.
 
 It is one bash script (bash 3.2, as macOS ships it, and later) and needs
-only `curl` and `jq`, which macOS 15 and later include.
+only `curl` and `jq`, which macOS 15 and later include. A copy lives in each
+agent's folder, beside that agent's settings and state, so
+
+```bash
+cd "<agent folder>" && ./filament-watch
+```
+
+runs the agent, and `start`, `stop` and `status` do the same in the
+background.
 
 ## How it waits
 
@@ -34,20 +42,23 @@ nothing either way.
 - **Modes.** Work whose newest message is from the agent's owner runs with
   every tool (`--permission-mode auto` for Claude Code). Anyone else's runs
   with only the agent's Filament tools.
-- **The session's instructions** are `event.md`: how this setup works, plus
-  the kit's shared rules for answering (`shared/agent-work.md`, kept in sync
-  by `scripts/shared.py`).
+- **The session's instructions** are `event_text` in the script: how this
+  setup works, plus the kit's shared rules for answering
+  (`shared/agent-work.md`, kept in sync by `scripts/shared.py`), so the
+  script is the only file to copy.
 - **Acknowledging.** The next `poll_work` passes the cursor, which
   acknowledges what was handed out, as Zirumel's watcher does: each item is
   handed to a session at most once.
 
 ## Settings
 
-`~/.filament/watch/<agent>/config`, one `key=value` per line, reread before
-every poll:
+`filament-watch.conf` in the agent's folder, one `key=value` per line,
+reread before every poll:
 
 | Key | Default | Meaning |
 | --- | --- | --- |
+| `agent` | from the agent file | the agent's name: its kit agent file is `~/.filament/agents/<agent>.md` |
+| `server` | from the agent file | the name the agent's Filament server has in Claude Code or Codex |
 | `engine` | `claude` | `claude` or `codex` |
 | `model` | the engine's own | model for work sessions |
 | `fetch_model` | `haiku` | model for fetch and steering sessions (Claude Code) |
@@ -59,16 +70,29 @@ every poll:
 | `steer` | `on` | `off` queues new work instead of steering |
 | `reactions` | `off` | `on` starts sessions for reactions too |
 
-`FILAMENT_WATCH_CLAUDE` and `FILAMENT_WATCH_CODEX` name the engine commands
-when they aren't on the path.
+Without `agent` or `server`, it looks for the kit agent file whose `dir:` is
+this folder and writes both in. Without an agent file, sessions learn who
+they are from `get_self`. `FILAMENT_WATCH_CLAUDE` and `FILAMENT_WATCH_CODEX`
+name the engine commands when they aren't on the path.
 
 ## Files
 
-`~/.filament/watch/<agent>/` holds `log`, `audit.jsonl` (one line per
-session and steer), `cursor`, `tasks/` (each conversation's session),
-`queue/` (work waiting for its conversation) and `runs/` (running sessions).
-Nothing there holds a credential: in wake mode the wake token stays in the
-watcher's memory.
+In the agent's folder:
+
+| Path | What |
+| --- | --- |
+| `filament-watch` | this script |
+| `filament-watch.conf` | its settings |
+| `.filament-watch/log` | its log, when it runs with `start` or in a terminal |
+| `.filament-watch/audit.jsonl` | one line per session and steer |
+| `.filament-watch/cursor` | where `poll_work` left off |
+| `.filament-watch/tasks/` | each conversation's session |
+| `.filament-watch/queue/`, `runs/` | work waiting for its conversation, and running sessions |
+
+`.filament-watch/` ignores itself in git. Nothing there holds a credential:
+in wake mode the wake token stays in the watcher's memory. The agent's
+sign-in stays where its engine keeps it (Claude Code's or Codex's own
+settings), and its kit agent file stays in `~/.filament/agents`.
 
 ## Not yet
 
