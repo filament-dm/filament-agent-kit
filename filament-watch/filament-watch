@@ -71,6 +71,11 @@ agent_file_for() {
   return 1
 }
 
+# A folder the desktop app set up for Pi has Pi's agent directory in it.
+default_engine() {
+  if [ -d "$AGENT_DIR/.pi-agent" ]; then printf pi; else printf claude; fi
+}
+
 load_agent() {
   AGENT_DIR=$(cd "$1" 2>/dev/null && pwd -P) || die "no folder at $1"
   CONF="$AGENT_DIR/filament-watch.conf"
@@ -78,6 +83,11 @@ load_agent() {
   NAME=$(conf agent "")
   SERVER=$(conf server "")
   AGENT_FILE=""
+  # Pi's agent is its folder's .pi-agent: its server is always `filament`.
+  if [ "$(conf engine "$(default_engine)")" = pi ]; then
+    [ -n "$NAME" ] || NAME=$(basename "$AGENT_DIR" | tr '[:upper:]' '[:lower:]' | tr -cs 'a-z0-9' '-' | sed 's/^-*//; s/-*$//')
+    SERVER=filament
+  fi
   [ -n "$NAME" ] && [ -f "$AGENTS_DIR/$NAME.md" ] && AGENT_FILE="$AGENTS_DIR/$NAME.md"
   # Without them in the settings, take them from the agent file and keep them.
   if [ -z "$NAME" ] || [ -z "$SERVER" ]; then
@@ -116,8 +126,8 @@ conf_n() {
 
 # Settings are reread before every poll, so an edit applies without a restart.
 read_config() {
-  ENGINE=$(conf engine claude)
-  case $ENGINE in claude | codex) ;; *) log "unknown engine '$ENGINE'; using claude"; ENGINE=claude ;; esac
+  ENGINE=$(conf engine "$(default_engine)")
+  case $ENGINE in claude | codex | pi) ;; *) log "unknown engine '$ENGINE'; using claude"; ENGINE=claude ;; esac
   MODEL=$(conf model "")
   FETCH_MODEL=$(conf fetch_model haiku)
   PRINCIPAL_PERMISSION=$(conf principal_permission auto)
@@ -886,6 +896,7 @@ acquire_lock() {
 shutdown() {
   local pidf
   log "stopping"
+  [ -n "$PI_PID" ] && kill "$PI_PID" 2>/dev/null
   for pidf in "$STATE"/runs/*.pid; do
     [ -f "$pidf" ] && kill "$(cat "$pidf")" 2>/dev/null
   done
@@ -893,11 +904,54 @@ shutdown() {
   exit 0
 }
 
+# --- Pi ------------------------------------------------------------------------
+# Filament's Pi package waits for work and answers inside Pi itself, so for
+# Pi the watcher keeps one `pi --mode rpc` running on the folder's own Pi
+# agent directory, and starts it again whenever it stops.
+
+PI_PID=""
+
+pi_loop() {
+  local pi_dir="$AGENT_DIR/.pi-agent" fifo="$STATE/pi.in" base delay started ran rc cont
+  local bin=${FILAMENT_WATCH_PI:-$(command -v pi || true)}
+  [ -n "$bin" ] || die "no pi command found"
+  [ -d "$pi_dir" ] || die "no Pi agent directory at $pi_dir"
+  base=$(printf '%s' "${FILAMENT_WATCH_PI_RESTART_S:-5}" | tr -cd 0-9)
+  base=${base:-5}
+  [ "$base" -gt 0 ] || base=1
+  delay=$base
+  acquire_lock
+  [ -t 2 ] && LOG_TEE=1
+  trap shutdown TERM INT
+  rm -f "$fifo"
+  mkfifo -m 600 "$fifo" || die "can't make $fifo"
+  # Held open read-write, so Pi's stdin never ends while the watcher runs.
+  exec 3<>"$fifo"
+  log "watching $NAME in $AGENT_DIR: pi, whose Filament package waits for work (filament-watch $WATCH_VERSION)"
+  while :; do
+    cont=""
+    ls "$pi_dir"/sessions/*/*.jsonl >/dev/null 2>&1 && cont=--continue
+    started=$(now)
+    (cd "$AGENT_DIR" && PI_CODING_AGENT_DIR="$pi_dir" exec "$bin" --mode rpc $cont) < "$fifo" > /dev/null &
+    PI_PID=$!
+    log "started pi (pid $PI_PID)${cont:+, continuing its session}"
+    wait "$PI_PID"
+    rc=$?
+    PI_PID=""
+    ran=$(($(now) - started))
+    [ "$ran" -ge 60 ] && delay=$base
+    log "pi stopped (exit $rc) after ${ran}s; starting it again in ${delay}s"
+    sleep "$delay"
+    [ "$ran" -lt 60 ] && [ "$delay" -lt 300 ] && delay=$((delay * 2))
+  done
+}
+
 watch_loop() {
   local wait delay=1 rc item saved
+  read_config
+  [ "$ENGINE" = pi ] && { pi_loop; return; }
   command -v jq >/dev/null 2>&1 || die "needs jq"
   command -v curl >/dev/null 2>&1 || die "needs curl"
-  read_config
   TRANSPORT=wake
   if [ -n "${FILAMENT_AGENT_TOKEN:-}" ] && [ -n "${FILAMENT_SERVER_URL:-}" ]; then TRANSPORT=token; fi
   if [ "$ENGINE" = codex ]; then CLIENT_NAME="codex (filament-watch)"; else CLIENT_NAME="claude-code (filament-watch)"; fi

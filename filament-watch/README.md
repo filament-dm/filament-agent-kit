@@ -28,6 +28,15 @@ without a token the watcher has a short session make the `poll_work` call
 and reads the tool's result from that session's output. Waiting itself costs
 nothing either way.
 
+## Pi
+
+Filament's Pi package already waits for work and answers inside Pi, so for
+Pi the watcher only keeps one `pi --mode rpc` running on the folder's own Pi
+agent directory, `.pi-agent/` (where the desktop app sets a Pi agent up, its
+sign-in in `.pi-agent/mcp.json`), and starts it again when it stops,
+continuing its session. A folder with `.pi-agent/` runs Pi without
+settings. Everything below this section is for Claude Code and Codex.
+
 ## What it does with work
 
 - **One session per conversation.** A channel, or a thread in one, is a
@@ -57,9 +66,9 @@ reread before every poll:
 
 | Key | Default | Meaning |
 | --- | --- | --- |
-| `agent` | from the agent file | the agent's name: its kit agent file is `~/.filament/agents/<agent>.md` |
+| `agent` | from the agent file (Pi: the folder's name) | the agent's name: its kit agent file is `~/.filament/agents/<agent>.md` |
 | `server` | from the agent file | the name the agent's Filament server has in Claude Code or Codex |
-| `engine` | `claude` | `claude` or `codex` |
+| `engine` | `pi` when the folder has `.pi-agent/`, else `claude` | `claude`, `codex` or `pi` |
 | `model` | the engine's own | model for work sessions |
 | `fetch_model` | `haiku` | model for fetch and steering sessions (Claude Code) |
 | `principal_permission` | `auto` | Claude Code permission mode for the owner's work |
@@ -72,8 +81,8 @@ reread before every poll:
 
 Without `agent` or `server`, it looks for the kit agent file whose `dir:` is
 this folder and writes both in. Without an agent file, sessions learn who
-they are from `get_self`. `FILAMENT_WATCH_CLAUDE` and `FILAMENT_WATCH_CODEX`
-name the engine commands when they aren't on the path.
+they are from `get_self`. `FILAMENT_WATCH_CLAUDE`, `FILAMENT_WATCH_CODEX`
+and `FILAMENT_WATCH_PI` name the engine commands when they aren't on the path.
 
 ## Files
 

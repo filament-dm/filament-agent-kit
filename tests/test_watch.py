@@ -12,6 +12,7 @@ import shutil
 import subprocess
 import tempfile
 import threading
+import time
 import unittest
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -51,6 +52,21 @@ else:
     (fake / "done" / str(time.time())).write_text("")
     print(json.dumps({"type": "result", "is_error": False, "total_cost_usd": 0.01,
                       "session_id": value("--session-id") or value("--resume")}))
+'''
+
+
+FAKE_PI = r'''#!/usr/bin/env python3
+import json, os, sys, time
+from pathlib import Path
+
+fake = Path(os.environ["FAKE_DIR"])
+with open(fake / "pi.jsonl", "a") as f:
+    f.write(json.dumps({"args": sys.argv[1:], "pid": os.getpid(), "cwd": os.getcwd(),
+                        "agent_dir": os.environ.get("PI_CODING_AGENT_DIR")}) + "\n")
+if os.environ.get("FAKE_PI_EXIT"):
+    sys.exit(1)
+sys.stdin.read()
+(fake / "pi-eof").write_text("")
 '''
 
 
@@ -353,6 +369,88 @@ class WatchTests(unittest.TestCase):
                                                capture_output=True, timeout=30))
         self.assertIn("started", first.stdout, first.stderr)
         self.assertIn("already runs", start().stdout)
+
+
+@unittest.skipUnless(shutil.which("jq"), "needs jq")
+class PiTests(unittest.TestCase):
+    """For Pi, the watcher keeps one `pi --mode rpc` running on the folder's
+    own Pi agent directory; Filament's Pi package does the rest."""
+
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        base = Path(tmp.name).resolve()
+        self.fake_dir = base / "fake"
+        self.fake_dir.mkdir()
+        self.folder = base / "Filament Agents" / "My Pi Agent"
+        (self.folder / ".pi-agent").mkdir(parents=True)
+        self.watch = self.folder / "filament-watch"
+        shutil.copy(SCRIPT, self.watch)
+        pi = base / "pi"
+        pi.write_text(FAKE_PI)
+        pi.chmod(0o755)
+        self.env = {
+            "PATH": os.environ["PATH"],
+            "HOME": str(base),
+            "FILAMENT_AGENTS_DIR": str(base / "agents"),
+            "FILAMENT_WATCH_PI": str(pi),
+            "FILAMENT_WATCH_PI_RESTART_S": "1",
+            "FAKE_DIR": str(self.fake_dir),
+        }
+
+    def watch_cmd(self, command, env=None):
+        return subprocess.run([BASH, str(self.watch), command], env=env or self.env,
+                              capture_output=True, text=True, timeout=30)
+
+    def started(self):
+        path = self.fake_dir / "pi.jsonl"
+        return [json.loads(line) for line in path.read_text().splitlines()] if path.exists() else []
+
+    def wait_for(self, check, seconds=10):
+        deadline = time.time() + seconds
+        while time.time() < deadline:
+            if check():
+                return True
+            time.sleep(0.1)
+        return False
+
+    def test_it_runs_pi_on_the_folders_agent_directory(self):
+        self.assertIn("started", self.watch_cmd("start").stdout)
+        self.addCleanup(lambda: self.watch_cmd("stop"))
+        self.assertTrue(self.wait_for(lambda: self.started()), self.watch_cmd("status").stdout)
+        run = self.started()[0]
+        self.assertEqual(run["args"], ["--mode", "rpc"])
+        self.assertEqual(run["agent_dir"], str(self.folder / ".pi-agent"))
+        self.assertEqual(run["cwd"], str(self.folder))
+        log = (self.folder / ".filament-watch/log").read_text()
+        self.assertIn("watching my-pi-agent", log)
+        # Its stdin stays open while the watcher runs.
+        time.sleep(1)
+        self.assertFalse((self.fake_dir / "pi-eof").exists())
+        self.assertEqual(len(self.started()), 1)
+
+    def test_stop_stops_pi(self):
+        self.watch_cmd("start")
+        self.assertTrue(self.wait_for(lambda: self.started()))
+        pid = self.started()[0]["pid"]
+        self.assertIn("stopped", self.watch_cmd("stop").stdout)
+
+        def gone():
+            try:
+                os.kill(pid, 0)
+                return False
+            except ProcessLookupError:
+                return True
+        self.assertTrue(self.wait_for(gone))
+
+    def test_pi_starts_again_and_continues_its_session(self):
+        sessions = self.folder / ".pi-agent/sessions/--x--"
+        sessions.mkdir(parents=True)
+        (sessions / "s.jsonl").write_text("{}\n")
+        self.watch_cmd("start", {**self.env, "FAKE_PI_EXIT": "1"})
+        self.addCleanup(lambda: self.watch_cmd("stop"))
+        self.assertTrue(self.wait_for(lambda: len(self.started()) >= 2), self.watch_cmd("status").stdout)
+        self.assertEqual(self.started()[1]["args"], ["--mode", "rpc", "--continue"])
 
 
 if __name__ == "__main__":
