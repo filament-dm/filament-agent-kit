@@ -37,11 +37,11 @@ prompt = value("-p") or ""
 if prompt.startswith("/filament:filament-agent "):
     # The kit's first run: names the agent, writes its agent file, says hello.
     name_file = Path(".filament-agent-name")
-    if os.environ.get("FAKE_FIRST_RUN") != "fail" and name_file.exists():
+    if os.environ.get("FAKE_FIRST_RUN") != "fail" and (name_file.exists() or os.environ.get("FAKE_FIRST_RUN_ALWAYS")):
         slug = prompt.split(" ", 1)[1].strip()
         Path(os.environ["FILAMENT_AGENTS_DIR"], slug + ".md").write_text(
             f"---\nserver: filament-{slug}\ndir: {os.getcwd()}\n---\n# {slug}\n")
-        name_file.unlink()
+        name_file.unlink(missing_ok=True)
     print(json.dumps({"type": "result", "is_error": False}))
 elif value("--output-format") == "stream-json":
     tool = (value("--allowedTools") or "").split("__")[-1]
@@ -323,7 +323,8 @@ class WatchTests(unittest.TestCase):
         (self.folder / ".filament-agent-name").write_text("Tester\n")
         env = {**self.token_env(), "FILAMENT_AGENT_TOKEN": "fmcp_revoked"}
         proc = self.run_watch(env)
-        self.assertEqual(proc.returncode, 0, self.log)
+        # Refusal has its own exit status: the desktop app stops running it.
+        self.assertEqual(proc.returncode, 3, self.log)
         self.assertIn("refused this agent's sign-in", self.log)
         self.assertEqual(self.claude_calls(), [])
 
@@ -369,6 +370,29 @@ class WatchTests(unittest.TestCase):
         # The owner's next turn picks their own session back up.
         self.assertEqual(self.value(owner_again, "--resume"), self.value(owner, "--session-id"))
 
+    def test_a_batch_mixing_in_someone_else_runs_restricted(self):
+        item = message_item("$e1")
+        item["messages"].insert(0, {"event_id": "$x", "body": "hi", "is_from_principal": False})
+        self.server.batches = [{"result": {"work": [item], "cursor": "c1"}}]
+        self.run_watch(self.token_env())
+        args = self.claude_calls("work")[0]
+        self.assertEqual(self.value(args, "--permission-mode"), "dontAsk", self.log)
+        self.assertIn("Mode: restricted", self.value(args, "-p"))
+
+    def test_a_first_session_stopped_partway_runs_again(self):
+        (self.agents / "tester.md").unlink()
+        # A first session ran here and removed the marker, but wrote no agent file.
+        self.state.mkdir(exist_ok=True)
+        (self.state / "first-run.out").write_text("{}")
+        (self.folder / ".filament-agent-name").write_text("Tester\n")
+        (self.folder / ".filament-agent-name").unlink()
+        self.server.batches = [{"result": {"work": [message_item("$e1")], "cursor": "c1"}}]
+        env = {**self.token_env(), "FAKE_FIRST_RUN_ALWAYS": "1"}
+        self.run_watch(env)
+        calls = self.claude_calls()
+        self.assertEqual(self.value(calls[0], "-p"), "/filament:filament-agent tester", self.log)
+        self.assertTrue((self.agents / "tester.md").exists())
+
     def test_another_thread_gets_its_own_session(self):
         self.server.batches = [{"result": {"work": [
             message_item("$e1"), message_item("$e2", thread="$root")], "cursor": "c1"}}]
@@ -388,6 +412,9 @@ class WatchTests(unittest.TestCase):
         dispatch = self.claude_calls("dispatcher")
         self.assertEqual(len(dispatch), 1)
         self.assertIn("STEERING from filament-watch", self.value(dispatch[0], "-p"))
+        # It gets only what delivering takes.
+        self.assertEqual(self.value(dispatch[0], "--tools"), "ListAgents,SendMessage")
+        self.assertEqual(self.value(dispatch[0], "--permission-mode"), "dontAsk")
         self.assertIn("$e2", self.value(dispatch[0], "-p"))
         audit = (self.state / "audit.jsonl").read_text()
         self.assertIn('"steered"', audit)
@@ -413,7 +440,7 @@ class WatchTests(unittest.TestCase):
     def test_a_refused_sign_in_stops_the_watcher(self):
         self.server.status_for_poll = 401
         proc = self.run_watch(self.token_env())
-        self.assertEqual(proc.returncode, 0)
+        self.assertEqual(proc.returncode, 3)
         self.assertIn("refused", self.log)
         self.assertFalse((self.state / "lock").exists())
 
@@ -525,6 +552,7 @@ class PiTests(unittest.TestCase):
         proc = subprocess.run([BASH, str(self.watch), "run"], env={**self.env, "FAKE_PI_REFUSED": "1"},
                               capture_output=True, text=True, timeout=30)
         self.assertIn("refused", proc.stderr)
+        self.assertEqual(proc.returncode, 3)
         self.assertEqual(len(self.started()), 1)
         self.assertFalse((self.folder / ".filament-watch/lock").exists())
         # Started again, it stops before starting Pi.
