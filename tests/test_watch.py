@@ -74,6 +74,10 @@ with open(fake / "pi.jsonl", "a") as f:
                         "agent_dir": os.environ.get("PI_CODING_AGENT_DIR")}) + "\n")
 if os.environ.get("FAKE_PI_EXIT"):
     sys.exit(1)
+if os.environ.get("FAKE_PI_REFUSED"):
+    paused = Path(os.environ["PI_CODING_AGENT_DIR"], "filament")
+    paused.mkdir(parents=True, exist_ok=True)
+    (paused / "paused.json").write_text(json.dumps({"reason": "credential rejected", "at": 1}))
 sys.stdin.read()
 (fake / "pi-eof").write_text("")
 '''
@@ -470,6 +474,18 @@ class PiTests(unittest.TestCase):
             except ProcessLookupError:
                 return True
         self.assertTrue(self.wait_for(gone))
+
+    def test_a_refused_pi_agent_stops_the_watcher(self):
+        proc = subprocess.run([BASH, str(self.watch), "run"], env={**self.env, "FAKE_PI_REFUSED": "1"},
+                              capture_output=True, text=True, timeout=30)
+        self.assertIn("refused", proc.stderr)
+        self.assertEqual(len(self.started()), 1)
+        self.assertFalse((self.folder / ".filament-watch/lock").exists())
+        # Started again, it stops before starting Pi.
+        again = subprocess.run([BASH, str(self.watch), "run"], env=self.env,
+                               capture_output=True, text=True, timeout=30)
+        self.assertIn("refused", again.stderr)
+        self.assertEqual(len(self.started()), 1)
 
     def test_pi_starts_again_and_continues_its_session(self):
         sessions = self.folder / ".pi-agent/sessions/--x--"

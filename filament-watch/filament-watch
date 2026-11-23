@@ -975,6 +975,17 @@ shutdown() {
 
 PI_PID=""
 
+# The Pi package pauses itself, with Pi still running, when Filament refuses
+# the agent's sign-in (deleted, disconnected or signed out).
+pi_refused() {
+  grep -q '"credential rejected"' "$AGENT_DIR/.pi-agent/filament/paused.json" 2>/dev/null
+}
+
+pi_stop_refused() {
+  log "Filament refused this agent's sign-in, or it was deleted or disconnected; stopping. To run it again, sign it in (PI_CODING_AGENT_DIR=.pi-agent pi mcp login filament), delete .pi-agent/filament/paused.json, then start the watcher."
+  shutdown
+}
+
 pi_loop() {
   local pi_dir="$AGENT_DIR/.pi-agent" fifo="$STATE/pi.in" base delay started ran rc cont
   local bin=${FILAMENT_WATCH_PI:-$(command -v pi || true)}
@@ -992,6 +1003,7 @@ pi_loop() {
   # Held open read-write, so Pi's stdin never ends while the watcher runs.
   exec 3<>"$fifo"
   log "watching $NAME in $AGENT_DIR: pi, whose Filament package waits for work (filament-watch $WATCH_VERSION)"
+  pi_refused && pi_stop_refused
   while :; do
     cont=""
     ls "$pi_dir"/sessions/*/*.jsonl >/dev/null 2>&1 && cont=--continue
@@ -999,6 +1011,10 @@ pi_loop() {
     (cd "$AGENT_DIR" && PI_CODING_AGENT_DIR="$pi_dir" exec "$bin" --mode rpc $cont) < "$fifo" > /dev/null &
     PI_PID=$!
     log "started pi (pid $PI_PID)${cont:+, continuing its session}"
+    while kill -0 "$PI_PID" 2>/dev/null; do
+      pi_refused && pi_stop_refused
+      sleep 2
+    done
     wait "$PI_PID"
     rc=$?
     PI_PID=""
