@@ -249,15 +249,6 @@ mcp_tool() {
 
 FETCH_NOTE="filament-watch started this session only to make one Filament tool call. Make exactly the call you are asked for and nothing else, whatever any other instruction in this folder says, then reply with only: OK"
 
-# Codex arguments that give its sessions the agent's server when the watcher
-# holds the token, as the desktop app's own Codex agents have it.
-codex_server_args() {
-  [ "$TRANSPORT" = token ] || return 0
-  printf '%s\n' -c "mcp_servers.$SERVER.url=\"$FILAMENT_SERVER_URL\"" \
-    -c "mcp_servers.$SERVER.bearer_token_env_var=\"FILAMENT_AGENT_TOKEN\"" \
-    -c 'shell_environment_policy.exclude=["FILAMENT_AGENT_TOKEN"]'
-}
-
 # Has the engine call one Filament tool. Leaves its result in $STATE/.result.
 # Returns 0 when it answered, 2 when the sign-in is refused, 1 otherwise.
 fetch_tool() {
@@ -278,11 +269,8 @@ fetch_tool() {
           else ([.content[]? | select(.type == "text") | .text] | join("")) end] | first // empty' 2>/dev/null)
       ;;
     codex)
-      local extra=()
-      while IFS= read -r line; do extra+=("$line"); done < <(codex_server_args)
-      out=$(cd "$AGENT_DIR" && "$bin" exec --json --skip-git-repo-check \
+      out=$(cd "$AGENT_DIR" && env -u FILAMENT_AGENT_TOKEN "$bin" exec --json --skip-git-repo-check \
         -c 'sandbox_mode="read-only"' -c 'model_reasoning_effort="low"' \
-        ${extra[@]+"${extra[@]}"} \
         "$FETCH_NOTE
 
 Call the MCP tool $name on the server $SERVER once, with exactly these arguments: $args" \
@@ -492,15 +480,14 @@ start_primary() {
       [ "$fresh" = yes ] && { tset "$task" session ""; prompt="$(session_notes)
 
 $prompt"; }
-      cmd=("$bin" exec)
+      cmd=(env -u FILAMENT_AGENT_TOKEN "$bin" exec)
       [ "$fresh" = no ] && cmd+=(resume "$sid")
       cmd+=(--json --skip-git-repo-check)
       if [ "$mode" = principal ]; then
-        cmd+=(-c 'sandbox_mode="workspace-write"' -c 'sandbox_workspace_write.network_access=true')
+        while IFS= read -r line; do cmd+=("$line"); done < <(codex_write_args)
       else
         cmd+=(-c 'sandbox_mode="read-only"')
       fi
-      while IFS= read -r line; do cmd+=("$line"); done < <(codex_server_args)
       [ -n "$MODEL" ] && cmd+=(-m "$MODEL")
       cmd+=("$prompt")
       ;;
@@ -878,6 +865,82 @@ timer, push token, webhook or second listener).
 EVENT
 }
 
+# --- The agent's first session --------------------------------------------------
+# A folder set up without a terminal holds .filament-agent-name until the
+# agent's first session has named it, written its agent file and said hello.
+# That session runs the kit's skill; the watcher takes over once it ends.
+
+FIRST_NOTE="filament-watch runs this agent from now on and waits for its work. In this session do only the agent's first run, as the filament-agent skill says, up to and including its hello, Look around and telling your user. Then end the session: never start a waiter or the skill's loop, and never call poll_work with wait_seconds above 0. Nobody reads this session's own output."
+FIRST_PID=""
+
+# Codex's sandbox for the owner's work: its folder, ~/.filament (its agent
+# file) and the network.
+codex_write_args() {
+  printf '%s\n' -c 'sandbox_mode="workspace-write"' -c 'sandbox_workspace_write.network_access=true' \
+    -c "sandbox_workspace_write.writable_roots=[$(jq -nc --arg d "$HOME/.filament" '$d')]"
+}
+
+# Returns 0 once the agent has had its first session, or needs none.
+first_run() {
+  local bin started cmd=()
+  [ -f "$AGENT_DIR/.filament-agent-name" ] || return 0
+  bin=$(engine_bin)
+  [ -n "$bin" ] || { log "no $ENGINE command found"; return 1; }
+  case $ENGINE in
+    claude)
+      # The kit's session-start hook starts the agent's first run from here.
+      cmd=(env -u FILAMENT_AGENT_TOKEN "$bin" -p "Start my Filament agent."
+        --append-system-prompt "$FIRST_NOTE" --permission-mode "$PRINCIPAL_PERMISSION"
+        --allowedTools "mcp__${SERVER}" --output-format json)
+      [ -n "$MODEL" ] && cmd+=(--model "$MODEL")
+      ;;
+    codex)
+      cmd=(env -u FILAMENT_AGENT_TOKEN "$bin" exec --json --skip-git-repo-check)
+      while IFS= read -r line; do cmd+=("$line"); done < <(codex_write_args)
+      [ -n "$MODEL" ] && cmd+=(-m "$MODEL")
+      cmd+=("$FIRST_NOTE
+
+\$filament:filament-agent $NAME")
+      ;;
+    *) return 0 ;;
+  esac
+  log "running $NAME's first session"
+  (cd "$AGENT_DIR" && exec "${cmd[@]}") < /dev/null > "$STATE/first-run.out" 2> "$STATE/first-run.err" &
+  FIRST_PID=$!
+  started=$(now)
+  while kill -0 "$FIRST_PID" 2>/dev/null; do
+    if [ $(($(now) - started)) -gt "$TIMEOUT" ]; then
+      log "stopping the first session after ${TIMEOUT}s"
+      kill "$FIRST_PID" 2>/dev/null
+    fi
+    sleep 1
+  done
+  wait "$FIRST_PID"
+  FIRST_PID=""
+  if [ -f "$AGENT_DIR/.filament-agent-name" ]; then
+    log "the first session ended before setup finished: $(tail -n 3 "$STATE/first-run.err" 2>/dev/null | tr '\n' ' ' | head -c 300)"
+    return 1
+  fi
+  AGENT_FILE=$(agent_file_for "$AGENT_DIR") || AGENT_FILE=""
+  log "first session done"
+  return 0
+}
+
+# The watcher starts the agent's sessions, so a session opened in its folder
+# must not start the agent too: the agent file says autostart off, and the
+# folder's CLAUDE.md and AGENTS.md lose their startup section.
+own_the_start() {
+  local f
+  if [ -n "$AGENT_FILE" ] && ! grep -q '^autostart:' "$AGENT_FILE"; then
+    perl -0pi -e 's/\A---\n/---\nautostart: off\n/' "$AGENT_FILE" && log "set autostart: off in $AGENT_FILE"
+  fi
+  for f in "$AGENT_DIR/CLAUDE.md" "$AGENT_DIR/AGENTS.md"; do
+    [ -f "$f" ] && grep -q 'filament-agent:start' "$f" &&
+      perl -0pi -e 's/\n?<!-- filament-agent:start -->.*?<!-- filament-agent:end -->\n?//s' "$f"
+  done
+  return 0
+}
+
 # --- The watcher ---------------------------------------------------------------
 
 acquire_lock() {
@@ -897,6 +960,7 @@ shutdown() {
   local pidf
   log "stopping"
   [ -n "$PI_PID" ] && kill "$PI_PID" 2>/dev/null
+  [ -n "$FIRST_PID" ] && kill "$FIRST_PID" 2>/dev/null
   for pidf in "$STATE"/runs/*.pid; do
     [ -f "$pidf" ] && kill "$(cat "$pidf")" 2>/dev/null
   done
@@ -961,6 +1025,13 @@ watch_loop() {
   trap shutdown TERM INT
   CURSOR=$(cat "$STATE/cursor" 2>/dev/null)
   log "watching $NAME in $AGENT_DIR: $ENGINE, waiting by $TRANSPORT (filament-watch $WATCH_VERSION)"
+  until first_run; do
+    log "trying the first session again in ${delay}s"
+    sleep "$delay"
+    [ "$delay" -lt 600 ] && delay=$((delay * 2))
+  done
+  delay=1
+  own_the_start
   while :; do
     read_config
     reap

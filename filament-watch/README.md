@@ -37,6 +37,16 @@ sign-in in `.pi-agent/mcp.json`), and starts it again when it stops,
 continuing its session. A folder with `.pi-agent/` runs Pi without
 settings. Everything below this section is for Claude Code and Codex.
 
+## A new agent
+
+A folder set up without a terminal (the desktop app) holds
+`.filament-agent-name` until the agent's first session. The watcher runs that
+session first: the kit's skill names the agent, writes its agent file and
+says hello, told to end once it has, rather than wait for work. Then, and on
+every start, the watcher sets `autostart: off` in the agent file and removes
+the startup section from the folder's `CLAUDE.md` and `AGENTS.md`, so its own
+sessions in the folder don't start the agent a second time.
+
 ## What it does with work
 
 - **One session per conversation.** A channel, or a thread in one, is a
@@ -110,6 +120,8 @@ settings), and its kit agent file stays in `~/.filament/agents`.
 - Without a token it can't write in Filament itself, so a failed session is
   only logged; with one, it tells the owner in their backchannel.
 - Steering into Codex needs Codex's app-server for `codex queue`.
+- Codex sessions use the agent's server as Codex's config registers it (the
+  desktop app and the connect skill both register it there).
 
 ## Tests
 

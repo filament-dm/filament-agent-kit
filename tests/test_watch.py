@@ -34,7 +34,16 @@ def value(flag):
     return args[args.index(flag) + 1] if flag in args else None
 
 prompt = value("-p") or ""
-if value("--output-format") == "stream-json":
+if prompt == "Start my Filament agent.":
+    # The kit's first run: names the agent, writes its agent file, says hello.
+    name_file = Path(".filament-agent-name")
+    if os.environ.get("FAKE_FIRST_RUN") != "fail" and name_file.exists():
+        slug = name_file.read_text().strip().lower().replace(" ", "-")
+        Path(os.environ["FILAMENT_AGENTS_DIR"], slug + ".md").write_text(
+            f"---\nserver: filament-{slug}\ndir: {os.getcwd()}\n---\n# {slug}\n")
+        name_file.unlink()
+    print(json.dumps({"type": "result", "is_error": False}))
+elif value("--output-format") == "stream-json":
     tool = (value("--allowedTools") or "").split("__")[-1]
     queue = sorted((fake / "fetch" / tool).glob("*.json")) if (fake / "fetch" / tool).is_dir() else []
     text = queue[0].read_text() if queue else json.dumps({"work": [], "cursor": None})
@@ -263,6 +272,25 @@ class WatchTests(unittest.TestCase):
         self.run_watch(self.token_env())
         notes = self.value(self.claude_calls("work")[0], "--append-system-prompt")
         self.assertIn("get_self", notes)
+
+    def test_a_new_agent_has_its_first_session_then_its_work(self):
+        (self.agents / "tester.md").unlink()
+        (self.folder / ".filament-agent-name").write_text("Tester\n")
+        (self.folder / "CLAUDE.md").write_text(
+            "# Mine\n\n<!-- filament-agent:start -->\nstart it\n<!-- filament-agent:end -->\n")
+        self.server.batches = [{"result": {"work": [message_item("$e1")], "cursor": "c1"}}]
+        self.run_watch(self.token_env())
+        calls = self.claude_calls()
+        self.assertEqual(self.value(calls[0], "-p"), "Start my Filament agent.", self.log)
+        self.assertIn("never start a waiter", self.value(calls[0], "--append-system-prompt"))
+        self.assertEqual(len(self.claude_calls("work")), 2)  # the first run, then the work
+        self.assertIn("$e1", self.value(calls[1], "-p"))
+        agent_file = (self.agents / "tester.md").read_text()
+        self.assertIn("autostart: off", agent_file)
+        self.assertEqual((self.folder / "CLAUDE.md").read_text(), "# Mine\n")
+        self.assertIn(f"cat '{self.agents / 'tester.md'}'", self.value(calls[1], "--append-system-prompt"))
+        # No poll waited on the agent's work before its first session was done.
+        self.assertTrue(self.server.calls)
 
     def test_settings_without_a_name_take_it_from_the_agent_file(self):
         self.conf.write_text("engine=claude\n")
