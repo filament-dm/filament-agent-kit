@@ -31,12 +31,18 @@ def sources(root: Path) -> dict[str, str]:
     return {p.stem: p.read_text() for p in sorted((root / SHARED).glob("*.md"))}
 
 
+# Files other than guides and skills that carry shared text.
+OTHER_CARRIERS = ("filament-watch/filament-watch",)
+
+
 def carriers(root: Path) -> list[Path]:
-    return sorted(
+    guides = [
         p
         for p in root.rglob("*.md")
         if ".git" not in p.parts and p.relative_to(root).parts[0] != SHARED
-    )
+    ]
+    others = [root / rel for rel in OTHER_CARRIERS if (root / rel).is_file()]
+    return sorted(guides + others)
 
 
 def render(text: str, shared: dict[str, str], where: str) -> str:
