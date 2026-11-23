@@ -318,6 +318,15 @@ class WatchTests(unittest.TestCase):
         self.assertIn("belongs to another folder", self.log)
         self.assertEqual(self.claude_calls(), [])
 
+    def test_a_discarded_agent_never_has_a_first_session(self):
+        (self.agents / "tester.md").unlink()
+        (self.folder / ".filament-agent-name").write_text("Tester\n")
+        env = {**self.token_env(), "FILAMENT_AGENT_TOKEN": "fmcp_revoked"}
+        proc = self.run_watch(env)
+        self.assertEqual(proc.returncode, 0, self.log)
+        self.assertIn("refused this agent's sign-in", self.log)
+        self.assertEqual(self.claude_calls(), [])
+
     def test_settings_without_a_name_take_it_from_the_agent_file(self):
         self.conf.write_text("engine=claude\n")
         self.run_watch(self.token_env())

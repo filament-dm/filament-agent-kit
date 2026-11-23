@@ -888,8 +888,18 @@ codex_write_args() {
 
 # Returns 0 once the agent has had its first session, or needs none.
 first_run() {
-  local bin started cmd=()
+  local bin started rc cmd=()
   [ -f "$AGENT_DIR/.filament-agent-name" ] || return 0
+  # Discarded or deleted before its first session: never start one.
+  if [ "$TRANSPORT" = token ]; then
+    mcp_tool get_self '{}' 30
+    rc=$?
+    if [ $rc = 2 ]; then
+      log "Filament refused this agent's sign-in, or it was deleted or disconnected; stopping"
+      shutdown
+    fi
+    [ $rc = 0 ] || return 1
+  fi
   bin=$(engine_bin)
   [ -n "$bin" ] || { log "no $ENGINE command found"; return 1; }
   case $ENGINE in
