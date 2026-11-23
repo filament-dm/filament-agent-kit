@@ -526,7 +526,9 @@ The primary is a claude process with OS pid $(cat "$STATE/runs/$h.pid" 2>/dev/nu
 After delivering it, print exactly DELIVERED. Never post to Filament and never do the work yourself.
 
 $text" \
-        --model "$FETCH_MODEL" --permission-mode auto --output-format text \
+        --model "$FETCH_MODEL" --output-format text \
+        --permission-mode dontAsk --tools "ListAgents,SendMessage" \
+        --allowedTools "ListAgents,SendMessage" \
         --strict-mcp-config --no-session-persistence
       ;;
     codex)
@@ -665,8 +667,11 @@ handle_item() {
     message | reaction) key=$(printf '%s' "$item" | jq -r '"\(.channel_id)|\(.thread_id // "main")"') ;;
     *) key="loops" ;;
   esac
+  # The owner's only when every message from others in it is the owner's: a
+  # batch mixing in someone else's runs restricted.
   mode=$(printf '%s' "$item" | jq -r '
-    if ((.messages // .reactions // []) | last | .is_from_principal) == true
+    [(.messages // .reactions // [])[] | select(.is_from_self != true)] as $m
+    | if ($m | length) > 0 and ($m | all(.is_from_principal == true))
     then "principal" else "restricted" end')
   h=$(hash_key "$key")
   printf '%s\n' "$key" > "$STATE/tasks/$h.key"
@@ -889,7 +894,11 @@ codex_write_args() {
 # Returns 0 once the agent has had its first session, or needs none.
 first_run() {
   local bin started rc cmd=()
-  [ -f "$AGENT_DIR/.filament-agent-name" ] || return 0
+  # Needed while setup's marker is there, or when a first session ran here
+  # before but never wrote the agent file (it was stopped partway).
+  if [ ! -f "$AGENT_DIR/.filament-agent-name" ]; then
+    { [ -n "$AGENT_FILE" ] || [ ! -f "$STATE/first-run.out" ]; } && return 0
+  fi
   # Discarded or deleted before its first session: never start one.
   if [ "$TRANSPORT" = token ]; then
     mcp_tool get_self '{}' 30
@@ -934,11 +943,11 @@ first_run() {
   done
   wait "$FIRST_PID"
   FIRST_PID=""
-  if [ -f "$AGENT_DIR/.filament-agent-name" ]; then
+  AGENT_FILE=$(agent_file_for "$AGENT_DIR") || AGENT_FILE=""
+  if [ -f "$AGENT_DIR/.filament-agent-name" ] || [ -z "$AGENT_FILE" ]; then
     log "the first session ended before setup finished: $(tail -n 3 "$STATE/first-run.err" 2>/dev/null | tr '\n' ' ' | head -c 300)"
     return 1
   fi
-  AGENT_FILE=$(agent_file_for "$AGENT_DIR") || AGENT_FILE=""
   log "first session done"
   return 0
 }
@@ -960,16 +969,27 @@ own_the_start() {
 
 # --- The watcher ---------------------------------------------------------------
 
+# Whether pid is a running filament-watch (not a pid reused by something else).
+is_watcher() {
+  [ -n "$1" ] && kill -0 "$1" 2>/dev/null &&
+    ps -p "$1" -o command= 2>/dev/null | grep -q filament-watch
+}
+
 acquire_lock() {
-  local old
-  if ! mkdir "$STATE/lock" 2>/dev/null; then
+  local old tries=0
+  while ! mkdir "$STATE/lock" 2>/dev/null; do
     old=$(cat "$STATE/lock/pid" 2>/dev/null)
-    if [ -n "$old" ] && kill -0 "$old" 2>/dev/null; then
-      die "a watcher for $NAME already runs (pid $old)"
+    is_watcher "$old" && die "a watcher for $NAME already runs (pid $old)"
+    # No pid yet: another watcher may be between its mkdir and its pid; a
+    # lock left that way stays only until it is a minute old.
+    if [ -z "$old" ] && [ -z "$(find "$STATE/lock" -maxdepth 0 -mmin +1 2>/dev/null)" ]; then
+      tries=$((tries + 1))
+      [ $tries -lt 5 ] || die "another watcher for $NAME is starting"
+      sleep 1
+      continue
     fi
     rm -rf "$STATE/lock"
-    mkdir "$STATE/lock" || die "can't lock $STATE"
-  fi
+  done
   echo $$ > "$STATE/lock/pid"
 }
 
@@ -1077,14 +1097,16 @@ watch_loop() {
       0)
         delay=1
         saved=$(jq -r '.cursor // empty' "$STATE/.result")
-        if [ -n "$saved" ]; then
-          CURSOR=$saved
-          printf '%s\n' "$CURSOR" > "$STATE/cursor"
-        fi
         [ "$(jq '.work // [] | length' "$STATE/.result")" = 0 ] && rc=1
         while IFS= read -r item; do
           [ -n "$item" ] && handle_item "$item"
         done < <(jq -c '.work[]?' "$STATE/.result")
+        # Saved once the work is handed off: a crash before then leaves it
+        # unacknowledged on the server, never skipped.
+        if [ -n "$saved" ]; then
+          CURSOR=$saved
+          printf '%s\n' "$CURSOR" > "$STATE/cursor"
+        fi
         ;;
       1) delay=1 ;;
       2)
