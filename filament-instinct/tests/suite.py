@@ -173,6 +173,15 @@ class Connector(unittest.TestCase):
         self.assertEqual(self.server.unacknowledged, {'e1'})
         self.wait(lambda: bool(self.read('hb.pid')))
 
+    def test_03a_addressed_without_a_mention(self):
+        batch = self.deliver(
+            item('implied', messages=[message('implied', is_mention=False,
+                                              is_implicitly_mentioned=True, reply_expected=False)]),
+            item('remark', messages=[message('remark', is_from_agent=True, is_mention=False,
+                                             is_implicitly_mentioned=True, reply_expected=False)]))
+        self.assertEqual([it['messages'][0]['event_id'] for it in batch['items']], ['implied'])
+        self.assertEqual(set(self.read('pending_acks').split()), {'remark'})
+
     def test_03_classification_and_next_poll_ack_snapshot(self):
         rows = [item('self', messages=[message('self', is_from_self=True)]),
                 item('system', messages=[message('system', is_system=True)]),
