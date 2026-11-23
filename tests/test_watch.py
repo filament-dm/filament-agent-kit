@@ -34,11 +34,11 @@ def value(flag):
     return args[args.index(flag) + 1] if flag in args else None
 
 prompt = value("-p") or ""
-if prompt == "Start my Filament agent.":
+if prompt.startswith("/filament:filament-agent "):
     # The kit's first run: names the agent, writes its agent file, says hello.
     name_file = Path(".filament-agent-name")
     if os.environ.get("FAKE_FIRST_RUN") != "fail" and name_file.exists():
-        slug = name_file.read_text().strip().lower().replace(" ", "-")
+        slug = prompt.split(" ", 1)[1].strip()
         Path(os.environ["FILAMENT_AGENTS_DIR"], slug + ".md").write_text(
             f"---\nserver: filament-{slug}\ndir: {os.getcwd()}\n---\n# {slug}\n")
         name_file.unlink()
@@ -285,7 +285,7 @@ class WatchTests(unittest.TestCase):
         self.server.batches = [{"result": {"work": [message_item("$e1")], "cursor": "c1"}}]
         self.run_watch(self.token_env())
         calls = self.claude_calls()
-        self.assertEqual(self.value(calls[0], "-p"), "Start my Filament agent.", self.log)
+        self.assertEqual(self.value(calls[0], "-p"), "/filament:filament-agent tester", self.log)
         self.assertIn("never start a waiter", self.value(calls[0], "--append-system-prompt"))
         self.assertEqual(len(self.claude_calls("work")), 2)  # the first run, then the work
         self.assertIn("$e1", self.value(calls[1], "-p"))
@@ -295,6 +295,37 @@ class WatchTests(unittest.TestCase):
         self.assertIn(f"cat '{self.agents / 'tester.md'}'", self.value(calls[1], "--append-system-prompt"))
         # No poll waited on the agent's work before its first session was done.
         self.assertTrue(self.server.calls)
+
+    def test_another_folders_agent_file_is_never_this_agents(self):
+        other = self.folder.parent / "Other"
+        other.mkdir()
+        (self.agents / "tester.md").write_text(
+            f"---\nserver: filament-tester\ndir: {other}\n---\n# Someone else\n")
+        self.server.batches = [{"result": {"work": [message_item("$e1")], "cursor": "c1"}}]
+        self.run_watch(self.token_env())
+        notes = self.value(self.claude_calls("work")[0], "--append-system-prompt")
+        self.assertIn("get_self", notes, self.log)
+        self.assertNotIn("autostart", (self.agents / "tester.md").read_text())
+
+    def test_a_first_run_never_takes_another_folders_agent_file(self):
+        other = self.folder.parent / "Other"
+        other.mkdir()
+        (self.agents / "tester.md").write_text(
+            f"---\nserver: filament-tester\ndir: {other}\n---\n# Someone else\n")
+        (self.folder / ".filament-agent-name").write_text("Tester\n")
+        proc = self.run_watch(self.token_env())
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertIn("belongs to another folder", self.log)
+        self.assertEqual(self.claude_calls(), [])
+
+    def test_a_discarded_agent_never_has_a_first_session(self):
+        (self.agents / "tester.md").unlink()
+        (self.folder / ".filament-agent-name").write_text("Tester\n")
+        env = {**self.token_env(), "FILAMENT_AGENT_TOKEN": "fmcp_revoked"}
+        proc = self.run_watch(env)
+        self.assertEqual(proc.returncode, 0, self.log)
+        self.assertIn("refused this agent's sign-in", self.log)
+        self.assertEqual(self.claude_calls(), [])
 
     def test_settings_without_a_name_take_it_from_the_agent_file(self):
         self.conf.write_text("engine=claude\n")
@@ -322,6 +353,21 @@ class WatchTests(unittest.TestCase):
         first, second = self.claude_calls("work")
         self.assertEqual(self.value(second, "--resume"), self.value(first, "--session-id"))
         self.assertIn("Session: resumed", self.value(second, "-p"))
+
+    def test_someone_elses_turn_never_resumes_the_owners_session(self):
+        self.server.batches = [
+            {"result": {"work": [message_item("$e1")], "cursor": "c1"}},
+            {"after_sessions": 1, "result": {"work": [
+                message_item("$e2", principal=False)], "cursor": "c2"}},
+            {"after_sessions": 2, "result": {"work": [message_item("$e3")], "cursor": "c3"}},
+        ]
+        self.run_watch(self.token_env())
+        owner, other, owner_again = self.claude_calls("work")
+        self.assertIn("--session-id", other, self.log)
+        self.assertNotEqual(self.value(other, "--session-id"), self.value(owner, "--session-id"))
+        self.assertIn("Session: fresh", self.value(other, "-p"))
+        # The owner's next turn picks their own session back up.
+        self.assertEqual(self.value(owner_again, "--resume"), self.value(owner, "--session-id"))
 
     def test_another_thread_gets_its_own_session(self):
         self.server.batches = [{"result": {"work": [
