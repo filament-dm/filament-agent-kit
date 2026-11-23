@@ -34,11 +34,11 @@ def value(flag):
     return args[args.index(flag) + 1] if flag in args else None
 
 prompt = value("-p") or ""
-if prompt == "Start my Filament agent.":
+if prompt.startswith("/filament:filament-agent "):
     # The kit's first run: names the agent, writes its agent file, says hello.
     name_file = Path(".filament-agent-name")
     if os.environ.get("FAKE_FIRST_RUN") != "fail" and name_file.exists():
-        slug = name_file.read_text().strip().lower().replace(" ", "-")
+        slug = prompt.split(" ", 1)[1].strip()
         Path(os.environ["FILAMENT_AGENTS_DIR"], slug + ".md").write_text(
             f"---\nserver: filament-{slug}\ndir: {os.getcwd()}\n---\n# {slug}\n")
         name_file.unlink()
@@ -285,7 +285,7 @@ class WatchTests(unittest.TestCase):
         self.server.batches = [{"result": {"work": [message_item("$e1")], "cursor": "c1"}}]
         self.run_watch(self.token_env())
         calls = self.claude_calls()
-        self.assertEqual(self.value(calls[0], "-p"), "Start my Filament agent.", self.log)
+        self.assertEqual(self.value(calls[0], "-p"), "/filament:filament-agent tester", self.log)
         self.assertIn("never start a waiter", self.value(calls[0], "--append-system-prompt"))
         self.assertEqual(len(self.claude_calls("work")), 2)  # the first run, then the work
         self.assertIn("$e1", self.value(calls[1], "-p"))
@@ -295,6 +295,28 @@ class WatchTests(unittest.TestCase):
         self.assertIn(f"cat '{self.agents / 'tester.md'}'", self.value(calls[1], "--append-system-prompt"))
         # No poll waited on the agent's work before its first session was done.
         self.assertTrue(self.server.calls)
+
+    def test_another_folders_agent_file_is_never_this_agents(self):
+        other = self.folder.parent / "Other"
+        other.mkdir()
+        (self.agents / "tester.md").write_text(
+            f"---\nserver: filament-tester\ndir: {other}\n---\n# Someone else\n")
+        self.server.batches = [{"result": {"work": [message_item("$e1")], "cursor": "c1"}}]
+        self.run_watch(self.token_env())
+        notes = self.value(self.claude_calls("work")[0], "--append-system-prompt")
+        self.assertIn("get_self", notes, self.log)
+        self.assertNotIn("autostart", (self.agents / "tester.md").read_text())
+
+    def test_a_first_run_never_takes_another_folders_agent_file(self):
+        other = self.folder.parent / "Other"
+        other.mkdir()
+        (self.agents / "tester.md").write_text(
+            f"---\nserver: filament-tester\ndir: {other}\n---\n# Someone else\n")
+        (self.folder / ".filament-agent-name").write_text("Tester\n")
+        proc = self.run_watch(self.token_env())
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertIn("belongs to another folder", self.log)
+        self.assertEqual(self.claude_calls(), [])
 
     def test_settings_without_a_name_take_it_from_the_agent_file(self):
         self.conf.write_text("engine=claude\n")
