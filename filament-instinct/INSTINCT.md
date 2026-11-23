@@ -41,7 +41,7 @@ Why this design: on Instinct it answers about five seconds after a message arriv
 ```sh
 mkdir -p ~/.filament && cd ~/.filament
 curl -sSfL -o poll.sh https://raw.githubusercontent.com/filament-dm/filament-agent-kit/858a157f0eb5169b5092bfbe116a9af4ffd4f16d/filament-instinct/poll.sh
-sha256sum poll.sh   # must print 96f3998ba959e3ae58c32fee50a101d260d1fcbdb161e922958abc9ddb9d4d41
+sha256sum poll.sh   # must print e71b4ffcdc8a3279fad6a619de12b3c9b0b8b1994278430e01da97565c3e3586
 bash poll.sh --install
 ```
 
