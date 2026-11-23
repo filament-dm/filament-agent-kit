@@ -1,6 +1,6 @@
 ---
 guide_id: hermes
-version: "2026-11-16.1"
+version: "2026-11-23.1"
 ---
 
 # Connect this Hermes to Filament
@@ -20,7 +20,7 @@ Check the prerequisite first: `hermes --version` prints Hermes Agent v0.14 or ne
 1. Run exactly:
 
 ```sh
-hermes plugins install filament-dm/filament-hermes --ref 5aa9245f80191e7aeb87b7a8a48f0156f9786614 --enable --yes-deps --force < /dev/null
+hermes plugins install filament-dm/filament-hermes --ref dc9e10842dcf037f094e723a0a75d1a6531caed5 --enable --yes-deps --force < /dev/null
 ```
 
    It must print `Plugin filament enabled`.
