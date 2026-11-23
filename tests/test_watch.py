@@ -323,7 +323,8 @@ class WatchTests(unittest.TestCase):
         (self.folder / ".filament-agent-name").write_text("Tester\n")
         env = {**self.token_env(), "FILAMENT_AGENT_TOKEN": "fmcp_revoked"}
         proc = self.run_watch(env)
-        self.assertEqual(proc.returncode, 0, self.log)
+        # Refusal has its own exit status: the desktop app stops running it.
+        self.assertEqual(proc.returncode, 3, self.log)
         self.assertIn("refused this agent's sign-in", self.log)
         self.assertEqual(self.claude_calls(), [])
 
@@ -439,7 +440,7 @@ class WatchTests(unittest.TestCase):
     def test_a_refused_sign_in_stops_the_watcher(self):
         self.server.status_for_poll = 401
         proc = self.run_watch(self.token_env())
-        self.assertEqual(proc.returncode, 0)
+        self.assertEqual(proc.returncode, 3)
         self.assertIn("refused", self.log)
         self.assertFalse((self.state / "lock").exists())
 
@@ -551,6 +552,7 @@ class PiTests(unittest.TestCase):
         proc = subprocess.run([BASH, str(self.watch), "run"], env={**self.env, "FAKE_PI_REFUSED": "1"},
                               capture_output=True, text=True, timeout=30)
         self.assertIn("refused", proc.stderr)
+        self.assertEqual(proc.returncode, 3)
         self.assertEqual(len(self.started()), 1)
         self.assertFalse((self.folder / ".filament-watch/lock").exists())
         # Started again, it stops before starting Pi.

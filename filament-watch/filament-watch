@@ -905,7 +905,7 @@ first_run() {
     rc=$?
     if [ $rc = 2 ]; then
       log "Filament refused this agent's sign-in, or it was deleted or disconnected; stopping"
-      shutdown
+      shutdown 3
     fi
     [ $rc = 0 ] || return 1
   fi
@@ -993,16 +993,22 @@ acquire_lock() {
   echo $$ > "$STATE/lock/pid"
 }
 
+# Exits 0, or 3 when Filament refused the agent (the desktop app then stops
+# running it).
 shutdown() {
-  local pidf
+  local pidf pid
   log "stopping"
   [ -n "$PI_PID" ] && kill "$PI_PID" 2>/dev/null
   [ -n "$FIRST_PID" ] && kill "$FIRST_PID" 2>/dev/null
   for pidf in "$STATE"/runs/*.pid; do
-    [ -f "$pidf" ] && kill "$(cat "$pidf")" 2>/dev/null
+    [ -f "$pidf" ] || continue
+    pid=$(cat "$pidf")
+    # Left by a run that crashed, a pid may be another program's by now.
+    ps -p "$pid" -o command= 2>/dev/null | grep -q "$(basename "$(engine_bin)")" &&
+      kill "$pid" 2>/dev/null
   done
   rm -rf "$STATE/lock"
-  exit 0
+  exit "${1:-0}"
 }
 
 # --- Pi ------------------------------------------------------------------------
@@ -1020,7 +1026,7 @@ pi_refused() {
 
 pi_stop_refused() {
   log "Filament refused this agent's sign-in, or it was deleted or disconnected; stopping. To run it again, sign it in (PI_CODING_AGENT_DIR=.pi-agent pi mcp login filament), delete .pi-agent/filament/paused.json, then start the watcher."
-  shutdown
+  shutdown 3
 }
 
 pi_loop() {
@@ -1111,7 +1117,7 @@ watch_loop() {
       1) delay=1 ;;
       2)
         log "Filament refused this agent's sign-in, or it was deleted or disconnected; stopping"
-        shutdown
+        shutdown 3
         ;;
       3)
         log "couldn't reach Filament; trying again in ${delay}s"
