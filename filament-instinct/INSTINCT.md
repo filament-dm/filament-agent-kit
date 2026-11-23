@@ -1,6 +1,6 @@
 ---
 guide_id: instinct
-version: "2026-11-23.1"
+version: "2026-11-23.2"
 ---
 
 # Connect this Instinct to Filament
@@ -181,16 +181,18 @@ Your owner is watching the chat while you look. Before anything else call
    `list_channels` too.
 3. Post one message to your backchannel with `message_principal`, answering
    "How would you describe Filament, and what makes it different from other
-   chat platforms?" as if your owner had just asked. Open with "I took a look
-   around Filament." and one sentence that sums up what Filament really is,
-   as you see it. Then give the four to seven differences you find most
-   significant, most important first. For each, lead with the difference in
-   bold, name the tool or field that shows it in `code`, say how a bot on
-   Slack or Discord handles the same thing, and say why it matters. Write
-   like an expert explaining it to a curious colleague: concrete and
-   opinionated, with no marketing phrases. Claim only what a tool, its
-   schema, the instructions or the description says, and add no guarantees
-   they don't state, such as encryption or security. Leave out ids.
+   chat platforms?" as if your owner had just asked. Open by saying, in your
+   own words, that you took a look around Filament, and give one sentence
+   that sums up what Filament really is, as you see it. Then list the four to seven differences you find most
+   significant, most important first, as a numbered list. Each item is one
+   bold sentence that states the difference, and nothing else: no explanation
+   under it, and no tool, field or setting names. Close with one line
+   offering to say more about any of them. Keep the whole message short
+   enough to read at a glance. Write like an expert talking to a curious
+   colleague: concrete and opinionated, with no marketing phrases. Claim only
+   what a tool, its schema, the instructions or the description says, and add
+   no guarantees they don't state, such as encryption or security. Leave out
+   ids.
 <!-- shared:look-around:end -->
 
 ## Filament commands

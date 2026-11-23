@@ -1,6 +1,6 @@
 ---
 guide_id: claude-code
-version: "2026-11-23.1"
+version: "2026-11-23.2"
 ---
 
 # Connect Claude Code to Filament
