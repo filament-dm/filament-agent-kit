@@ -453,22 +453,22 @@ start_primary() {
   rm -f "$@"
   t=$(now)
   key=$(cat "$STATE/tasks/$h.key" 2>/dev/null)
-  sid=$(tget "$task" session)
-  created=$(tget "$task" created)
-  used=$(tget "$task" used)
+  sid=$(tget "$task" "session_$mode")
+  created=$(tget "$task" "created_$mode")
+  used=$(tget "$task" "used_$mode")
   if [ -z "$sid" ] || [ $((t - ${used:-0})) -gt "$IDLE" ] || [ $((t - ${created:-0})) -gt "$MAX_AGE" ]; then
     fresh=yes
     sid=""
-    tset "$task" created "$t"
+    tset "$task" "created_$mode" "$t"
   fi
-  tset "$task" used "$t"
+  tset "$task" "used_$mode" "$t"
   prompt=$(work_prompt "$mode" "$fresh" "$items")
   local cmd=()
   case $ENGINE in
     claude)
       if [ "$fresh" = yes ]; then
         sid=$(new_uuid)
-        tset "$task" session "$sid"
+        tset "$task" "session_$mode" "$sid"
         cmd=(--session-id "$sid")
       else
         cmd=(--resume "$sid")
@@ -483,7 +483,7 @@ start_primary() {
       fi
       ;;
     codex)
-      [ "$fresh" = yes ] && { tset "$task" session ""; prompt="$(session_notes)
+      [ "$fresh" = yes ] && { tset "$task" "session_$mode" ""; prompt="$(session_notes)
 
 $prompt"; }
       cmd=(env -u FILAMENT_AGENT_TOKEN "$bin" exec)
@@ -584,12 +584,12 @@ finish_run() {
     primary)
       h=$id
       key=$(cat "$STATE/tasks/$h.key" 2>/dev/null)
-      tset "$STATE/tasks/$h" used "$t"
+      tset "$STATE/tasks/$h" "used_$mode" "$t"
       is_error=false
       cost=null
       if [ "$ENGINE" = codex ]; then
         tid=$(jq -r 'select(.type == "thread.started") | .thread_id' "$base.out" 2>/dev/null | head -1)
-        [ -n "$tid" ] && tset "$STATE/tasks/$h" session "$tid"
+        [ -n "$tid" ] && tset "$STATE/tasks/$h" "session_$mode" "$tid"
         jq -e 'select(.type == "turn.failed")' "$base.out" >/dev/null 2>&1 && is_error=true
       else
         is_error=$(jq -r '.is_error // false' "$base.out" 2>/dev/null || echo true)
@@ -600,7 +600,7 @@ finish_run() {
       else
         log "session for $key failed (exit $rc): $(tail -n 3 "$base.err" 2>/dev/null | tr '\n' ' ' | head -c 300)"
         # A session that failed starts fresh next time.
-        tset "$STATE/tasks/$h" session ""
+        tset "$STATE/tasks/$h" "session_$mode" ""
         failure_note "$key" "exit $rc"
       fi
       audit "$(jq -nc --arg key "$key" --argjson rc "$rc" --argjson t "$t" --argjson cost "${cost:-null}" \

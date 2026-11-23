@@ -345,6 +345,21 @@ class WatchTests(unittest.TestCase):
         self.assertEqual(self.value(second, "--resume"), self.value(first, "--session-id"))
         self.assertIn("Session: resumed", self.value(second, "-p"))
 
+    def test_someone_elses_turn_never_resumes_the_owners_session(self):
+        self.server.batches = [
+            {"result": {"work": [message_item("$e1")], "cursor": "c1"}},
+            {"after_sessions": 1, "result": {"work": [
+                message_item("$e2", principal=False)], "cursor": "c2"}},
+            {"after_sessions": 2, "result": {"work": [message_item("$e3")], "cursor": "c3"}},
+        ]
+        self.run_watch(self.token_env())
+        owner, other, owner_again = self.claude_calls("work")
+        self.assertIn("--session-id", other, self.log)
+        self.assertNotEqual(self.value(other, "--session-id"), self.value(owner, "--session-id"))
+        self.assertIn("Session: fresh", self.value(other, "-p"))
+        # The owner's next turn picks their own session back up.
+        self.assertEqual(self.value(owner_again, "--resume"), self.value(owner, "--session-id"))
+
     def test_another_thread_gets_its_own_session(self):
         self.server.batches = [{"result": {"work": [
             message_item("$e1"), message_item("$e2", thread="$root")], "cursor": "c1"}}]
