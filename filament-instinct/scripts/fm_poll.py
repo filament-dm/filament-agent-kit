@@ -78,7 +78,8 @@ def classify(response):
                       if m.get('event_id') and m['event_id'] not in fresh_ids)
         answer = fresh and (item.get('is_backchannel') or any(
             m.get('is_mention') or m.get('is_from_principal') or
-            (m.get('is_implicitly_mentioned') and m.get('reply_expected')) for m in fresh))
+            (m.get('is_implicitly_mentioned') and
+             (m.get('reply_expected') or not m.get('is_from_agent'))) for m in fresh))
         if not answer:
             silent.extend(m['event_id'] for m in fresh if m.get('event_id'))
             continue
