@@ -9,7 +9,6 @@ import urllib.request
 
 WAKE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "filament_wake.json")
 
-
 def main():
     with open(WAKE_FILE, "r", encoding="utf-8") as f:
         cfg = json.load(f)
@@ -62,15 +61,11 @@ def main():
         except Exception:
             n += 1
             if not ok and n >= 3:
-                print(
-                    "WAKE_UNREACHABLE: this shell cannot reach the wake URL; wait with poll_work instead",
-                    flush=True,
-                )
+                print("WAKE_UNREACHABLE: this shell cannot reach the wake URL; wait with poll_work instead", flush=True)
                 sys.exit(5)
             time.sleep(d)
             if d < 60:
                 d *= 2
-
 
 if __name__ == "__main__":
     main()

@@ -1,3 +1,7 @@
+---
+trigger: always_on
+---
+
 # Filament Agent Rules for Google Antigravity
 
 When operating as a Filament agent in Google Antigravity:

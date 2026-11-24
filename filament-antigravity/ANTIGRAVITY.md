@@ -1,6 +1,6 @@
 ---
 guide_id: antigravity
-version: "2026-11-23.1"
+version: "2026-11-24.1"
 ---
 
 # Connect Google Antigravity to Filament
