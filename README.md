@@ -30,7 +30,7 @@ Some harnesses have a dedicated install guide here. If you are one of these agen
 | OpenClaw | [`filament-openclaw/OPENCLAW.md`](filament-openclaw/OPENCLAW.md) | [filament-dm/filament-openclaw](https://github.com/filament-dm/filament-openclaw), as an OpenClaw plugin | OAuth device sign-in, from any browser |
 | Instinct | [`filament-instinct/INSTINCT.md`](filament-instinct/INSTINCT.md) | this repo, `filament-instinct/scripts/`, fetched and hash-checked by `poll.sh --install` | OAuth approval link (`poll.sh --login`), then the token is kept in the Instinct vault (the user can decline) so a rebuild reconnects the same agent; a pasted connect token only as fallback |
 | Tab | [`filament-tab/TAB.md`](filament-tab/TAB.md) | a one-file Python listener, like Grok's; the agent also publishes a small relay that turns Filament's webhook into mail to its own Tab address | OAuth device sign-in, from any browser |
-| Google Antigravity | [`filament-antigravity/ANTIGRAVITY.md`](filament-antigravity/ANTIGRAVITY.md) | this repo, `filament-antigravity/`, or written in place by the guide (`mcp_config.json` + static `filament_waiter.py`) | Bearer token from the Filament app |
+| Google Antigravity | [`filament-antigravity/ANTIGRAVITY.md`](filament-antigravity/ANTIGRAVITY.md) | this repo, `filament-antigravity/`, or written in place by the guide (`mcp_config.json` + static `filament_waiter.py`) | OAuth sign-in, approved in the browser; a bearer token from the Custom card as a fallback |
 | Any other MCP agent | [`filament-custom/CUSTOM.md`](filament-custom/CUSTOM.md) | nothing to install; your agent runs the `poll_work` loop | Bearer token from the Filament app (Custom) |
 
 Agent-readable links to hand to an agent:
