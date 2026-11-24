@@ -23,11 +23,11 @@ import urllib.request
 
 # PINNED_BEGIN
 PINNED = {
-    'fm_lib.py': ['https://raw.githubusercontent.com/filament-dm/filament-agent-kit/b613d81ac64a31c32a4231b586b284b7b1bb7d8d/filament-instinct/scripts/fm_lib.py', 'f42ec9f17ab5891d492a6424e172275d6ab26bd2055b96465b1d18f91f275910'],
-    'fm_poll.py': ['https://raw.githubusercontent.com/filament-dm/filament-agent-kit/b613d81ac64a31c32a4231b586b284b7b1bb7d8d/filament-instinct/scripts/fm_poll.py', '16c5d4dad08a321839c8ec1c586eed5abd48b59b39d26cd126619185a9b49324'],
-    'fm_reply.py': ['https://raw.githubusercontent.com/filament-dm/filament-agent-kit/b613d81ac64a31c32a4231b586b284b7b1bb7d8d/filament-instinct/scripts/fm_reply.py', '804c1e36b1adce0e2a9f816e1f667f558fefc07247fd351e935caada89110943'],
-    'fm_hb.py': ['https://raw.githubusercontent.com/filament-dm/filament-agent-kit/b613d81ac64a31c32a4231b586b284b7b1bb7d8d/filament-instinct/scripts/fm_hb.py', 'fd74307f2889ed5a2d4ea0caafcfb51faa59a992e834a569986f2d0ab9d7031b'],
-    'fm_media.py': ['https://raw.githubusercontent.com/filament-dm/filament-agent-kit/b613d81ac64a31c32a4231b586b284b7b1bb7d8d/filament-instinct/scripts/fm_media.py', '9644c7b46f17c3416492951ee9cb01aeb7de1ee2f74cf6ebee89cb541126954a'],
+    'fm_lib.py': ['https://raw.githubusercontent.com/filament-dm/filament-agent-kit/ae5e677eff6327a4188484c2ff026bb87da3cabd/filament-instinct/scripts/fm_lib.py', 'f42ec9f17ab5891d492a6424e172275d6ab26bd2055b96465b1d18f91f275910'],
+    'fm_poll.py': ['https://raw.githubusercontent.com/filament-dm/filament-agent-kit/ae5e677eff6327a4188484c2ff026bb87da3cabd/filament-instinct/scripts/fm_poll.py', '314fee9b7e34cb1f6fcc695f1d816d15f7bc5ee70afafa3dc45f70f9225d7f6b'],
+    'fm_reply.py': ['https://raw.githubusercontent.com/filament-dm/filament-agent-kit/ae5e677eff6327a4188484c2ff026bb87da3cabd/filament-instinct/scripts/fm_reply.py', '804c1e36b1adce0e2a9f816e1f667f558fefc07247fd351e935caada89110943'],
+    'fm_hb.py': ['https://raw.githubusercontent.com/filament-dm/filament-agent-kit/ae5e677eff6327a4188484c2ff026bb87da3cabd/filament-instinct/scripts/fm_hb.py', 'fd74307f2889ed5a2d4ea0caafcfb51faa59a992e834a569986f2d0ab9d7031b'],
+    'fm_media.py': ['https://raw.githubusercontent.com/filament-dm/filament-agent-kit/ae5e677eff6327a4188484c2ff026bb87da3cabd/filament-instinct/scripts/fm_media.py', '9644c7b46f17c3416492951ee9cb01aeb7de1ee2f74cf6ebee89cb541126954a'],
 }
 # PINNED_END
 STATE = Path(os.environ.get('FM_STATE', '~/.filament')).expanduser().absolute()
