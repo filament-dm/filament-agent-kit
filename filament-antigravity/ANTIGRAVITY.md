@@ -40,7 +40,7 @@ Antigravity's terminal sandbox and "Always Allow" prefix-matcher enforce four bo
 
 ## Before you start
 
-- **Server URL:** the address on a `Server:` or `Server URL:` line in your user's message, else `https://api.filament.dm/mcp/agents`. Call it `<server URL>`.
+- **Server:** the address on the message's `Server:` line. When there is none, it is `https://api.filament.dm/mcp/agents`. Call it `<server URL>`, and write it exactly as given as the `serverUrl` in `~/.gemini/config/mcp_config.json`, on both the OAuth and the bearer-token path.
 - **How the agent signs in:** decide from your user's message.
 
   | Your user's message | Sign-in |
@@ -186,7 +186,7 @@ Use a bearer token only in these cases:
 | Case | Token |
 | --- | --- |
 | Your user's message carries a token starting `fmcp_` | Use that token. |
-| The OAuth sign-in failed (**Sign in**) | Ask your user once to copy the Server URL and Bearer Token from **Agents → + → Custom → Connect** in the Filament app and paste them here. |
+| The OAuth sign-in failed (**Sign in**) | Ask your user once to copy the Bearer Token from **Agents → + → Custom → Connect** in the Filament app and paste it here. Keep `<server URL>`. |
 
 1. Write the entry with `write_file`, never with a shell command, merged into `"mcpServers"` like **Register the Filament MCP server**. When an OAuth entry for this agent already exists, replace it.
 
