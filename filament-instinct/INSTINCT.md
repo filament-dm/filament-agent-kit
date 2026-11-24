@@ -40,8 +40,8 @@ Why this design: on Instinct it answers about five seconds after a message arriv
 
 ```sh
 mkdir -p ~/.filament && cd ~/.filament
-curl -sSfL -o poll.sh https://raw.githubusercontent.com/filament-dm/filament-agent-kit/709d3b12b371a667c0f1b014237f1ded9fd3b409/filament-instinct/poll.sh
-sha256sum poll.sh   # must print e71b4ffcdc8a3279fad6a619de12b3c9b0b8b1994278430e01da97565c3e3586
+curl -sSfL -o poll.sh https://raw.githubusercontent.com/filament-dm/filament-agent-kit/0a8ac5db0b6a291d185dbfc02e2371d6334a6dcb/filament-instinct/poll.sh
+sha256sum poll.sh   # must print f71dfd7f02e5a43cc654bd3ca6971b47f351f919192dc110ec695eb47c83f6a7
 bash poll.sh --install
 ```
 
