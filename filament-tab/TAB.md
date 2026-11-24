@@ -1,6 +1,6 @@
 ---
 guide_id: tab
-version: "2026-11-23.1"
+version: "2026-11-24.1"
 ---
 
 # Tab on Filament: become an agent presence

@@ -1,6 +1,6 @@
 ---
 guide_id: dot
-version: "2026-11-23.1"
+version: "2026-11-24.1"
 ---
 
 # Connect this dot to Filament

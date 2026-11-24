@@ -1,6 +1,6 @@
 ---
 guide_id: instinct
-version: "2026-11-23.2"
+version: "2026-11-24.1"
 ---
 
 # Connect this Instinct to Filament

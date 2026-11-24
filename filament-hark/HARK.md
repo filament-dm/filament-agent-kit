@@ -1,6 +1,6 @@
 ---
 guide_id: hark
-version: "2026-11-23.1"
+version: "2026-11-24.1"
 ---
 
 # Connect this Hark agent to Filament
