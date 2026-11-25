@@ -640,8 +640,9 @@ reap() {
       continue
     fi
     if ! kill -0 "$(cat "$spid")" 2>/dev/null; then
-      # The wrapper is gone without a result: a watcher before this one died.
-      echo 1 > "$base.rc"
+      # The wrapper is gone. It may have written its result just after the
+      # check above; without one, a watcher before this one died.
+      [ -f "$base.rc" ] || echo 1 > "$base.rc"
       finish_run "$id"
       continue
     fi
