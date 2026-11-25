@@ -143,8 +143,20 @@ read_config() {
   MAX_AGE=$(conf_n session_max_age_s 86400)
   STEER=$(conf steer on)
   REACTIONS=$(conf reactions off)
-  CLAUDE_BIN=${FILAMENT_WATCH_CLAUDE:-$(command -v claude || true)}
+  CLAUDE_BIN=${FILAMENT_WATCH_CLAUDE:-$(command -v claude || desktop_claude || true)}
   CODEX_BIN=${FILAMENT_WATCH_CODEX:-$(command -v codex || true)}
+}
+
+# The Claude Code inside the Claude desktop app, which puts no `claude` on the
+# path. Its folder is named for its version, so the newest is looked up each
+# time rather than kept.
+desktop_claude() {
+  local root=${FILAMENT_WATCH_CLAUDE_DESKTOP:-$HOME/Library/Application Support/Claude/claude-code}
+  local bin
+  for bin in $(cd "$root" 2>/dev/null && ls -t -- */*/claude.app/Contents/MacOS/claude 2>/dev/null); do
+    [ -x "$root/$bin" ] && { printf '%s' "$root/$bin"; return 0; }
+  done
+  return 1
 }
 
 engine_bin() {

@@ -340,6 +340,45 @@ class WatchTests(unittest.TestCase):
         self.assertIn("agent=tester\n", conf, self.log)
         self.assertIn("server=filament-tester\n", conf)
 
+    def desktop_claude(self, version, age):
+        """A Claude Code as the Claude desktop app keeps it, `age` seconds old."""
+        home = self.fake_dir.parent / "desktop"
+        bin_dir = home / version / "abc123" / "claude.app" / "Contents" / "MacOS"
+        bin_dir.mkdir(parents=True)
+        shutil.copy(self.claude, bin_dir / "claude")
+        os.utime(bin_dir / "claude", (time.time() - age,) * 2)
+        return home, bin_dir / "claude"
+
+    def test_without_claude_on_the_path_it_runs_the_desktop_apps(self):
+        # An older version left behind by an update is never the one run.
+        _, older = self.desktop_claude("2.1.330", age=3600)
+        older.write_text("#!/bin/sh\nexit 9\n")
+        os.utime(older, (time.time() - 3600,) * 2)
+        home, _ = self.desktop_claude("2.1.331", age=60)
+        env = {**self.token_env(), "FILAMENT_WATCH_CLAUDE_DESKTOP": str(home)}
+        del env["FILAMENT_WATCH_CLAUDE"]
+        # A path with jq and curl but no claude.
+        tools = self.fake_dir.parent / "tools"
+        tools.mkdir()
+        for name in ("jq", "curl"):
+            os.symlink(shutil.which(name), tools / name)
+        env["PATH"] = f"{tools}:/usr/bin:/bin"
+        self.assertIsNone(shutil.which("claude", path=env["PATH"]))
+        self.server.batches = [{"result": {"work": [message_item("$e1")], "cursor": "c1"}}]
+        self.run_watch(env)
+        self.assertEqual(len(self.claude_calls("work")), 1, self.log)
+        self.assertNotIn("no claude command found", self.log)
+
+    def test_without_any_claude_it_says_so(self):
+        env = {**self.token_env(),
+               "FILAMENT_WATCH_CLAUDE_DESKTOP": str(self.fake_dir / "none")}
+        del env["FILAMENT_WATCH_CLAUDE"]
+        env["PATH"] = "/usr/bin:/bin:" + os.path.dirname(shutil.which("jq"))
+        if shutil.which("claude", path=env["PATH"]):
+            self.skipTest("a claude sits beside jq")
+        proc = self.run_watch(env)
+        self.assertIn("no claude command found", proc.stderr)
+
     def test_someone_else_gets_only_filament_tools(self):
         item = message_item("$e1", principal=False, backchannel=False)
         self.server.batches = [{"result": {"work": [item], "cursor": "c1"}}]
