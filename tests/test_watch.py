@@ -516,6 +516,10 @@ class WatchTests(unittest.TestCase):
                          ["mcp__filament-tester__get_wake_url", "mcp__filament-tester__poll_work"],
                          self.log)
         self.assertEqual(self.value(fetches[0], "--tools"), "")
+        # A tool that takes nothing is asked for in words, never as `{}`.
+        self.assertIn("no arguments at all", self.value(fetches[0], "-p"))
+        self.assertNotIn("{}", self.value(fetches[0], "-p"))
+        self.assertIn('"wait_seconds":0', self.value(fetches[1], "-p").replace(" ", ""))
         work = self.claude_calls("work")
         self.assertEqual(len(work), 1)
         self.assertIn("$e1", self.value(work[0], "-p"))
