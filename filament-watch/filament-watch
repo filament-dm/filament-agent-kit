@@ -396,11 +396,13 @@ run_bg() {
   printf '%s\n' "$mode" > "$base.mode"
   now > "$base.started"
   (
-    cd "$AGENT_DIR" || { echo 1 > "$base.rc"; exit 1; }
+    cd "$AGENT_DIR" || { echo 1 > "$base.rc.new"; mv "$base.rc.new" "$base.rc"; exit 1; }
     "$@" < /dev/null > "$base.out" 2> "$base.err" &
     echo $! > "$base.pid"
     wait $!
-    echo $? > "$base.rc"
+    # In one step: a result seen before it is written reads as a failure.
+    echo $? > "$base.rc.new"
+    mv "$base.rc.new" "$base.rc"
   ) &
   echo $! > "$base.spid"
 }
