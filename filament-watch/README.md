@@ -16,7 +16,11 @@ cd "<agent folder>" && ./filament-watch
 runs the agent, and `start`, `stop` and `status` do the same in the
 background. On a Mac, `install` also starts it at each login, with a
 LaunchAgent (`~/Library/LaunchAgents/dm.filament.watch.<agent>.plist`) that
-holds the installer's `PATH` and no credential; `uninstall` removes it. It is
+holds the installer's `PATH` and no credential; `uninstall` removes it.
+macOS keeps login items out of Desktop, Documents and Downloads, and launchd
+reports nothing when one can't run, so `install` waits for the watcher to come
+up (`login_wait_s`, 10 seconds) and otherwise removes the LaunchAgent, starts
+it as `start` does and prints `NOT_AT_LOGIN`. It is
 not for an agent the desktop app runs, which the app starts itself.
 
 ## How it waits

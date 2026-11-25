@@ -82,7 +82,10 @@ folder must not start it too.
 | Otherwise | `cd "<dir>" && ./filament-watch start` |
 
 `install` starts it now and each time your user logs in. `start` runs it
-until the computer restarts.
+until the computer restarts. When `install` prints a line beginning
+`NOT_AT_LOGIN`, macOS would not run it at login from this folder (Desktop,
+Documents and Downloads are closed to login items): it runs now, as `start`
+would have left it.
 
 Wait about 20 seconds, then check it:
 
@@ -105,7 +108,7 @@ Send this, filled in:
 **<name>** now waits in the background and starts a session only when a message arrives. It comes back by itself when you log in.
 ````
 
-When you ran `start`, the message's second sentence is instead: "After your
+When you ran `start`, or `install` printed `NOT_AT_LOGIN`, the message's second sentence is instead: "After your
 computer restarts, bring it back from its folder:", then
 `cd "<dir>" && ./filament-watch start` in its own code block.
 

@@ -521,11 +521,19 @@ class WatchTests(unittest.TestCase):
         self.assertIn("$e1", self.value(work[0], "-p"))
         self.assertEqual((self.state / "cursor").read_text().strip(), "c1")
 
-    def fake_launchctl(self):
+    def fake_launchctl(self, runs=True):
+        """A launchctl that records its calls and, like launchd, runs the
+        watcher on bootstrap, unless macOS would not let it (`runs` False)."""
         path = self.fake_dir / "launchctl"
-        path.write_text('#!/bin/sh\necho "$@" >> "$FAKE_DIR/launchctl.log"\n')
+        launch = (f'if [ "$1" = bootstrap ]; then nohup {BASH} "{self.watch}" run "{self.folder}" '
+                  f'>> "{self.state}/log" 2>&1 < /dev/null & fi\n') if runs else ""
+        path.write_text('#!/bin/sh\necho "$@" >> "$FAKE_DIR/launchctl.log"\n' + launch)
         path.chmod(0o755)
-        return {**self.env, "FILAMENT_WATCH_LAUNCHCTL": str(path)}
+        self.conf.write_text(self.conf.read_text() + "login_wait_s=3\n")
+        env = {**self.env, "FILAMENT_WATCH_LAUNCHCTL": str(path)}
+        del env["FILAMENT_WATCH_EXIT_IDLE"]
+        self.addCleanup(lambda: self.run_watch(env, "uninstall"))
+        return env
 
     def test_install_starts_it_at_login_from_its_folder(self):
         env = self.fake_launchctl()
@@ -556,6 +564,19 @@ class WatchTests(unittest.TestCase):
         calls = (self.fake_dir / "launchctl.log").read_text().splitlines()
         self.assertEqual(calls[-1], f"bootout gui/{os.getuid()}/dm.filament.watch.tester")
         self.assertNotIn("starts at login", self.run_watch(env, "status").stdout)
+
+    def test_where_macos_will_not_run_it_at_login_it_runs_until_a_restart(self):
+        env = self.fake_launchctl(runs=False)
+        proc = self.run_watch(env, "install")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertTrue(proc.stdout.startswith("NOT_AT_LOGIN"), proc.stdout)
+        plist = Path(env["HOME"]) / "Library/LaunchAgents/dm.filament.watch.tester.plist"
+        self.assertFalse(plist.exists())
+        calls = (self.fake_dir / "launchctl.log").read_text().splitlines()
+        self.assertEqual(calls[-1], f"bootout gui/{os.getuid()}/dm.filament.watch.tester")
+        status = self.run_watch(env, "status").stdout
+        self.assertIn("running", status)
+        self.assertNotIn("starts at login", status)
 
     def test_an_agent_the_desktop_app_runs_is_not_installed(self):
         env = {**self.fake_launchctl(), "FILAMENT_AGENT_TOKEN": "fmcp_testtoken"}

@@ -1178,12 +1178,13 @@ launchctl_bin() { printf '%s' "${FILAMENT_WATCH_LAUNCHCTL:-launchctl}"; }
 xml() { printf '%s' "$1" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g'; }
 
 # Stops a running watcher and waits for it to let go of the folder. The poll
-# it waits on is ended too: bash runs its trap only once that returns.
+# or pause it waits on is ended too: bash runs its trap only once that returns.
 stop_and_wait() {
   local pid tries=0
   pid=$(watch_pid) || return 0
   kill "$pid" 2>/dev/null
-  pkill -TERM -P "$pid" curl 2>/dev/null
+  pkill -TERM -P "$pid" -x curl 2>/dev/null
+  pkill -TERM -P "$pid" -x sleep 2>/dev/null
   while kill -0 "$pid" 2>/dev/null && [ $tries -lt 30 ]; do
     sleep 1
     tries=$((tries + 1))
@@ -1228,7 +1229,41 @@ PLIST
   "$(launchctl_bin)" bootout "$domain/$(login_label)" 2>/dev/null
   "$(launchctl_bin)" bootstrap "$domain" "$plist" ||
     die "launchd wouldn't take $plist"
-  echo "filament-watch for $NAME runs now and each time you log in; log: $STATE/log"
+  # launchd reports nothing when the watcher can't run: only its coming up
+  # shows it did. macOS keeps a login item out of Desktop, Documents and
+  # Downloads, so one whose folder is there never starts.
+  if came_up "$(conf_n login_wait_s 10)"; then
+    echo "filament-watch for $NAME runs now and each time you log in; log: $STATE/log"
+    return 0
+  fi
+  "$(launchctl_bin)" bootout "$domain/$(login_label)" 2>/dev/null
+  rm -f "$plist"
+  start_bg >/dev/null || die "it stopped right away"
+  echo "NOT_AT_LOGIN: macOS wouldn't run filament-watch for $NAME from $AGENT_DIR at login. It runs now, until the computer restarts; log: $STATE/log"
+}
+
+# Whether a watcher holds the folder within `$1` seconds.
+came_up() {
+  local left=$1
+  while [ "$left" -gt 0 ]; do
+    watch_pid >/dev/null && return 0
+    sleep 1
+    left=$((left - 1))
+  done
+  watch_pid >/dev/null
+}
+
+# Starts the watcher in the background. Prints how it went.
+start_bg() {
+  local pid
+  nohup "$SELF" run "$AGENT_DIR" >> "$STATE/log" 2>&1 < /dev/null &
+  sleep 1
+  if pid=$(watch_pid); then
+    echo "filament-watch for $NAME started (pid $pid); log: $STATE/log"
+    return 0
+  fi
+  tail -n 5 "$STATE/log" >&2
+  return 1
 }
 
 uninstall_login() {
@@ -1257,14 +1292,7 @@ main() {
         echo "filament-watch for $NAME already runs (pid $pid)"
         exit 0
       fi
-      nohup "$SELF" run "$AGENT_DIR" >> "$STATE/log" 2>&1 < /dev/null &
-      sleep 1
-      if pid=$(watch_pid); then
-        echo "filament-watch for $NAME started (pid $pid); log: $STATE/log"
-      else
-        tail -n 5 "$STATE/log" >&2
-        die "it stopped right away"
-      fi
+      start_bg || die "it stopped right away"
       ;;
     stop)
       if pid=$(watch_pid); then
