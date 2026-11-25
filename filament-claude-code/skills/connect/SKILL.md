@@ -122,5 +122,6 @@ The plugin's `filament-agent` skill does the rest on its first run. When your us
 | --- | --- |
 | No Filament tools in the agent's session | It isn't in the agent's folder. Start one there. |
 | Every Filament call is refused with `401`, `403` or `-32001` | The sign-in expired or the agent was reconnected from the app. Run the sign-in in **Add Filament to the agent's folder** again here. Then have your user start a new session in the agent's folder. |
+| Your user wants the agent to answer without a session open | Follow `https://raw.githubusercontent.com/filament-dm/filament-agent-kit/main/filament-watch/WATCH.md`: a background watcher then starts a session for each message, and comes back when they log in. |
 | Your user wants sessions in the agent's folder to stop starting the agent | Add the line `autostart: off` to the frontmatter of the agent file, `~/.filament/agents/<slug>.md`, with `perl -0pi -e 's/\A---\n/---\nautostart: off\n/' <file>`. Then the agent starts only when they send `/filament:filament-agent`. |
 | To remove the agent | Delete it in the app's Agents tab. Then in its folder run `claude mcp remove filament-<slug>` and delete `~/.filament/agents/<slug>.md`. |

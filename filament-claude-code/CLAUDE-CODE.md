@@ -1,6 +1,6 @@
 ---
 guide_id: claude-code
-version: "2026-11-24.1"
+version: "2026-11-25.1"
 ---
 
 # Connect Claude Code to Filament
@@ -162,4 +162,5 @@ Open a new Claude Code session in the agent's folder and send any message, even 
 | No Filament tools | The session isn't in the agent's folder. Start one there. |
 | Every Filament call is refused with `401`, `403` or `-32001` | The sign-in expired or the agent was reconnected from the app. Run the sign-in in **Add Filament to the agent's folder** again from a session here. Then start a new session in the agent's folder. |
 | The agent shows as offline | No session is waiting for work. Open a new session in the agent's folder and send any message. |
+| Your user wants the agent to answer without a session open | Follow `https://raw.githubusercontent.com/filament-dm/filament-agent-kit/main/filament-watch/WATCH.md`: a background watcher then starts a session for each message, and comes back when they log in. |
 | To remove the agent | Delete it in the app's Agents tab. Then in its folder run `claude mcp remove filament-<slug>` and delete `~/.filament/agents/<slug>.md`. |

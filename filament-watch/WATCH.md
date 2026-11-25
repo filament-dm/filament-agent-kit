@@ -76,9 +76,13 @@ folder must not start it too.
 
 ## 4. Start it
 
-```bash
-cd "<dir>" && ./filament-watch start
-```
+| When | Run |
+| --- | --- |
+| `uname` prints `Darwin` | `cd "<dir>" && ./filament-watch install` |
+| Otherwise | `cd "<dir>" && ./filament-watch start` |
+
+`install` starts it now and each time your user logs in. `start` runs it
+until the computer restarts.
 
 Wait about 20 seconds, then check it:
 
@@ -98,12 +102,12 @@ cd "<dir>" && ./filament-watch status
 Send this, filled in:
 
 ````markdown
-**<name>** now waits in the background and starts a session only when a message arrives. After your computer restarts, bring it back from its folder:
-
-```
-cd "<dir>" && ./filament-watch start
-```
+**<name>** now waits in the background and starts a session only when a message arrives. It comes back by itself when you log in.
 ````
+
+When you ran `start`, the message's second sentence is instead: "After your
+computer restarts, bring it back from its folder:", then
+`cd "<dir>" && ./filament-watch start` in its own code block.
 
 ## Later
 
@@ -111,7 +115,8 @@ All of these run in the agent's folder.
 
 - `./filament-watch` runs it in the terminal, showing its log, until Ctrl-C.
 - `./filament-watch status` shows whether it runs and its recent log.
-- `./filament-watch stop` stops it. To have sessions in the folder start the
+- `./filament-watch uninstall` stops it and stops starting it at login.
+- `./filament-watch stop` stops it until the next login or `start`. To have sessions in the folder start the
   agent again, delete the `autostart: off` line from its agent file too.
 - Its settings, such as the model, are in `filament-watch.conf`;
   `<base>/README.md` lists them. Its log and state are in `.filament-watch/`.

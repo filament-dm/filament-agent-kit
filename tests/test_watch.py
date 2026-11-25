@@ -521,6 +521,48 @@ class WatchTests(unittest.TestCase):
         self.assertIn("$e1", self.value(work[0], "-p"))
         self.assertEqual((self.state / "cursor").read_text().strip(), "c1")
 
+    def fake_launchctl(self):
+        path = self.fake_dir / "launchctl"
+        path.write_text('#!/bin/sh\necho "$@" >> "$FAKE_DIR/launchctl.log"\n')
+        path.chmod(0o755)
+        return {**self.env, "FILAMENT_WATCH_LAUNCHCTL": str(path)}
+
+    def test_install_starts_it_at_login_from_its_folder(self):
+        env = self.fake_launchctl()
+        proc = self.run_watch(env, "install")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        plist = Path(env["HOME"]) / "Library/LaunchAgents/dm.filament.watch.tester.plist"
+        text = plist.read_text()
+        if shutil.which("plutil"):
+            subprocess.run(["plutil", "-lint", str(plist)], check=True, capture_output=True)
+        for part in ("/bin/bash", str(self.watch), "<string>run</string>", str(self.folder),
+                     "RunAtLoad", env["PATH"]):
+            self.assertIn(part, text)
+        # No credential is ever written there.
+        self.assertNotIn("TOKEN", text)
+        calls = (self.fake_dir / "launchctl.log").read_text().splitlines()
+        uid = os.getuid()
+        self.assertEqual(calls, [f"bootout gui/{uid}/dm.filament.watch.tester",
+                                 f"bootstrap gui/{uid} {plist}"])
+        self.assertIn("starts at login", self.run_watch(env, "status").stdout)
+
+    def test_uninstall_stops_starting_it_at_login(self):
+        env = self.fake_launchctl()
+        self.run_watch(env, "install")
+        proc = self.run_watch(env, "uninstall")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        plist = Path(env["HOME"]) / "Library/LaunchAgents/dm.filament.watch.tester.plist"
+        self.assertFalse(plist.exists())
+        calls = (self.fake_dir / "launchctl.log").read_text().splitlines()
+        self.assertEqual(calls[-1], f"bootout gui/{os.getuid()}/dm.filament.watch.tester")
+        self.assertNotIn("starts at login", self.run_watch(env, "status").stdout)
+
+    def test_an_agent_the_desktop_app_runs_is_not_installed(self):
+        env = {**self.fake_launchctl(), "FILAMENT_AGENT_TOKEN": "fmcp_testtoken"}
+        proc = self.run_watch(env, "install")
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertFalse((self.fake_dir / "launchctl.log").exists())
+
     def test_start_twice_runs_one_watcher(self):
         env = {**self.token_env()}
         env.pop("FILAMENT_WATCH_EXIT_IDLE")

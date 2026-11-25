@@ -14,7 +14,10 @@ cd "<agent folder>" && ./filament-watch
 ```
 
 runs the agent, and `start`, `stop` and `status` do the same in the
-background.
+background. On a Mac, `install` also starts it at each login, with a
+LaunchAgent (`~/Library/LaunchAgents/dm.filament.watch.<agent>.plist`) that
+holds the installer's `PATH` and no credential; `uninstall` removes it. It is
+not for an agent the desktop app runs, which the app starts itself.
 
 ## How it waits
 

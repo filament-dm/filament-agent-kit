@@ -10,7 +10,7 @@
 
 set -u
 
-WATCH_VERSION="2026-11-25.1"
+WATCH_VERSION="2026-11-25.2"
 HERE=$(cd "$(dirname "$0")" && pwd -P)
 SELF="$HERE/$(basename "$0")"
 AGENTS_DIR=${FILAMENT_AGENTS_DIR:-$HOME/.filament/agents}
@@ -36,6 +36,8 @@ Usage: filament-watch [command] [folder]
   start    Watch in the background; does nothing when one already runs.
   stop     Stop the background watcher.
   status   Say whether it runs, and show its recent log.
+  install  Start it now and each time you log in (macOS).
+  uninstall  Stop starting it at login, and stop it.
   version  Print this watcher's version.
 
 [folder] is the agent's folder, by default the one this script is in. Its
@@ -1166,12 +1168,84 @@ watch_pid() {
   [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null && printf '%s' "$pid"
 }
 
+# --- Starting at login (macOS) ---------------------------------------------
+# A LaunchAgent runs the watcher from the agent's folder at each login. It
+# holds no credential: the sign-in stays inside Claude Code or Codex.
+
+login_label() { printf 'dm.filament.watch.%s' "$NAME"; }
+login_plist() { printf '%s/Library/LaunchAgents/%s.plist' "$HOME" "$(login_label)"; }
+launchctl_bin() { printf '%s' "${FILAMENT_WATCH_LAUNCHCTL:-launchctl}"; }
+xml() { printf '%s' "$1" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g'; }
+
+# Stops a running watcher and waits for it to let go of the folder. The poll
+# it waits on is ended too: bash runs its trap only once that returns.
+stop_and_wait() {
+  local pid tries=0
+  pid=$(watch_pid) || return 0
+  kill "$pid" 2>/dev/null
+  pkill -TERM -P "$pid" curl 2>/dev/null
+  while kill -0 "$pid" 2>/dev/null && [ $tries -lt 30 ]; do
+    sleep 1
+    tries=$((tries + 1))
+  done
+  ! kill -0 "$pid" 2>/dev/null
+}
+
+install_login() {
+  local plist domain
+  [ "$(uname)" = Darwin ] || [ -n "${FILAMENT_WATCH_LAUNCHCTL:-}" ] ||
+    die "starting at login is for macOS; here, run ./filament-watch start after a restart"
+  [ -n "${FILAMENT_AGENT_TOKEN:-}" ] && die "the desktop app runs this agent; it has no need to start at login"
+  plist=$(login_plist)
+  domain="gui/$(id -u)"
+  mkdir -p "$(dirname "$plist")" || die "can't write $(dirname "$plist")"
+  stop_and_wait || die "the running watcher didn't stop; try again"
+  # The path of whoever installs it: launchd's own has no claude or codex.
+  cat > "$plist" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>$(xml "$(login_label)")</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>$(xml "$SELF")</string>
+    <string>run</string>
+    <string>$(xml "$AGENT_DIR")</string>
+  </array>
+  <key>WorkingDirectory</key><string>$(xml "$AGENT_DIR")</string>
+  <key>RunAtLoad</key><true/>
+  <key>StandardOutPath</key><string>$(xml "$STATE/log")</string>
+  <key>StandardErrorPath</key><string>$(xml "$STATE/log")</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key><string>$(xml "$PATH")</string>
+  </dict>
+</dict>
+</plist>
+PLIST
+  "$(launchctl_bin)" bootout "$domain/$(login_label)" 2>/dev/null
+  "$(launchctl_bin)" bootstrap "$domain" "$plist" ||
+    die "launchd wouldn't take $plist"
+  echo "filament-watch for $NAME runs now and each time you log in; log: $STATE/log"
+}
+
+uninstall_login() {
+  local plist
+  plist=$(login_plist)
+  "$(launchctl_bin)" bootout "gui/$(id -u)/$(login_label)" 2>/dev/null
+  rm -f "$plist"
+  stop_and_wait
+  echo "filament-watch for $NAME no longer starts at login, and is stopped"
+}
+
 main() {
   local cmd=${1:-run} pid
   case $cmd in
     version) echo "filament-watch $WATCH_VERSION"; exit 0 ;;
     -h | --help | help) usage; exit 0 ;;
-    run | start | stop | status) ;;
+    run | start | stop | status | install | uninstall) ;;
     *) usage >&2; exit 2 ;;
   esac
   [ $# -le 2 ] || { usage >&2; exit 2; }
@@ -1199,8 +1273,11 @@ main() {
         echo "filament-watch for $NAME isn't running"
       fi
       ;;
+    install) install_login ;;
+    uninstall) uninstall_login ;;
     status)
       if pid=$(watch_pid); then echo "running (pid $pid)"; else echo "not running"; fi
+      [ -f "$(login_plist)" ] && echo "starts at login"
       [ -f "$STATE/log" ] && tail -n 10 "$STATE/log"
       ;;
   esac
