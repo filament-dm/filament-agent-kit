@@ -150,13 +150,16 @@ read_config() {
 }
 
 # The Claude Code inside the Claude desktop app, which puts no `claude` on the
-# path. Its folder is named for its version, so the newest is looked up each
-# time rather than kept.
+# path. Its folder is named for its version: the highest is looked up each
+# time rather than kept, as the desktop app's own scan picks it.
 desktop_claude() {
   local root=${FILAMENT_WATCH_CLAUDE_DESKTOP:-$HOME/Library/Application Support/Claude/claude-code}
-  local bin
-  for bin in $(cd "$root" 2>/dev/null && ls -t -- */*/claude.app/Contents/MacOS/claude 2>/dev/null); do
-    [ -x "$root/$bin" ] && { printf '%s' "$root/$bin"; return 0; }
+  local version bin
+  for version in $(cd "$root" 2>/dev/null && ls -d -- */ 2>/dev/null | tr -d / |
+    grep -E '^[0-9]+(\.[0-9]+)*$' | sort -t. -k1,1nr -k2,2nr -k3,3nr -k4,4nr); do
+    for bin in "$root/$version"/*/claude.app/Contents/MacOS/claude; do
+      [ -x "$bin" ] && { printf '%s' "$bin"; return 0; }
+    done
   done
   return 1
 }
@@ -652,7 +655,7 @@ finish_run() {
   esac
   mv -f "$base.out" "$base.last.out" 2>/dev/null
   mv -f "$base.err" "$base.last.err" 2>/dev/null
-  rm -f "$base.kind" "$base.mode" "$base.started" "$base.spid" "$base.pid" "$base.rc"
+  rm -f "$base.kind" "$base.mode" "$base.started" "$base.spid" "$base.pid" "$base.rc" "$base.rc.new"
 }
 
 # Finishes ended runs and stops ones past their time limit.
@@ -1184,14 +1187,44 @@ login_plist() { printf '%s/Library/LaunchAgents/%s.plist' "$HOME" "$(login_label
 launchctl_bin() { printf '%s' "${FILAMENT_WATCH_LAUNCHCTL:-launchctl}"; }
 xml() { printf '%s' "$1" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g'; }
 
+# Whether the plist at the login label is this folder's: another folder's
+# agent with the same name would have the same label.
+login_ours() {
+  grep -qF "<key>WorkingDirectory</key><string>$(xml "$AGENT_DIR")</string>" "$(login_plist)" 2>/dev/null
+}
+
+# Whether the desktop app runs the agent in this folder. Each flavor of the
+# app lists the folders it runs in its own data folder.
+desktop_app_runs() {
+  local f d
+  for f in "$HOME/Library/Application Support"/{electron-app,"Filament Alpha","Filament Beta"}/{local-agent-sessions,claude-agents}.json; do
+    [ -f "$f" ] || continue
+    while IFS= read -r d; do
+      [ -n "$d" ] && [ "$(cd "$d" 2>/dev/null && pwd -P)" = "$AGENT_DIR" ] && return 0
+    done < <(jq -r '.[]?.dir // empty' "$f" 2>/dev/null)
+  done
+  return 1
+}
+
+# A process's descendants, one pid a line.
+descendants() {
+  local child
+  for child in $(pgrep -P "$1" 2>/dev/null); do
+    printf '%s\n' "$child"
+    descendants "$child"
+  done
+}
+
 # Stops a running watcher and waits for it to let go of the folder. The poll
-# or pause it waits on is ended too: bash runs its trap only once that returns.
+# or pause it waits on is ended too: bash runs its trap only once that returns,
+# and a poll's curl runs in subshells below the watcher.
 stop_and_wait() {
-  local pid tries=0
+  local pid parents tries=0
   pid=$(watch_pid) || return 0
   kill "$pid" 2>/dev/null
-  pkill -TERM -P "$pid" -x curl 2>/dev/null
-  pkill -TERM -P "$pid" -x sleep 2>/dev/null
+  parents=$( { echo "$pid"; descendants "$pid"; } | paste -sd, -)
+  pkill -TERM -P "$parents" -x curl 2>/dev/null
+  pkill -TERM -P "$parents" -x sleep 2>/dev/null
   while kill -0 "$pid" 2>/dev/null && [ $tries -lt 30 ]; do
     sleep 1
     tries=$((tries + 1))
@@ -1203,8 +1236,11 @@ install_login() {
   local plist domain
   [ "$(uname)" = Darwin ] || [ -n "${FILAMENT_WATCH_LAUNCHCTL:-}" ] ||
     die "starting at login is for macOS; here, run ./filament-watch start after a restart"
-  [ -n "${FILAMENT_AGENT_TOKEN:-}" ] && die "the desktop app runs this agent; it has no need to start at login"
+  { [ -n "${FILAMENT_AGENT_TOKEN:-}" ] || desktop_app_runs; } &&
+    die "the desktop app runs this agent; it has no need to start at login"
   plist=$(login_plist)
+  [ -f "$plist" ] && ! login_ours &&
+    die "another folder's agent named $NAME already starts at login ($plist); run ./filament-watch uninstall in that folder first"
   domain="gui/$(id -u)"
   mkdir -p "$(dirname "$plist")" || die "can't write $(dirname "$plist")"
   stop_and_wait || die "the running watcher didn't stop; try again"
@@ -1276,6 +1312,12 @@ start_bg() {
 uninstall_login() {
   local plist
   plist=$(login_plist)
+  if [ -f "$plist" ] && ! login_ours; then
+    # Another folder's agent of the same name: its login item stays.
+    stop_and_wait
+    echo "filament-watch for $NAME is stopped; it didn't start at login from this folder"
+    return 0
+  fi
   "$(launchctl_bin)" bootout "gui/$(id -u)/$(login_label)" 2>/dev/null
   rm -f "$plist"
   stop_and_wait
@@ -1312,7 +1354,13 @@ main() {
     uninstall) uninstall_login ;;
     status)
       if pid=$(watch_pid); then echo "running (pid $pid)"; else echo "not running"; fi
-      [ -f "$(login_plist)" ] && echo "starts at login"
+      if login_ours; then
+        if "$(launchctl_bin)" print "gui/$(id -u)/$(login_label)" >/dev/null 2>&1; then
+          echo "starts at login"
+        else
+          echo "set to start at login, but launchd hasn't loaded it; run ./filament-watch install again"
+        fi
+      fi
       [ -f "$STATE/log" ] && tail -n 10 "$STATE/log"
       ;;
   esac

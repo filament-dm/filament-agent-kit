@@ -102,6 +102,8 @@ class FakeFilament:
         self.fake_dir = fake_dir
         self.batches = []
         self.wakes = []
+        self.wake_hold = 0
+        self.wake_requests = 0
         self.calls = []
         self.status_for_poll = 200
         handler = self._handler()
@@ -145,6 +147,9 @@ class FakeFilament:
                     return self._send(404, {})
                 if self.headers.get("authorization") != "Wake tok":
                     return self._send(401, {})
+                fake.wake_requests += 1
+                # Held like a long poll that has nothing yet.
+                time.sleep(fake.wake_hold)
                 pending = fake.wakes.pop(0) if fake.wakes else 0
                 self._send(200, {"pending": pending})
 
@@ -350,11 +355,14 @@ class WatchTests(unittest.TestCase):
         return home, bin_dir / "claude"
 
     def test_without_claude_on_the_path_it_runs_the_desktop_apps(self):
-        # An older version left behind by an update is never the one run.
+        # The highest version is run, as the desktop app's scan picks it: not
+        # an older one left behind, nor a lower one written more recently.
         _, older = self.desktop_claude("2.1.330", age=3600)
         older.write_text("#!/bin/sh\nexit 9\n")
         os.utime(older, (time.time() - 3600,) * 2)
         home, _ = self.desktop_claude("2.1.331", age=60)
+        _, lower = self.desktop_claude("2.1.99", age=0)
+        lower.write_text("#!/bin/sh\nexit 9\n")
         env = {**self.token_env(), "FILAMENT_WATCH_CLAUDE_DESKTOP": str(home)}
         del env["FILAMENT_WATCH_CLAUDE"]
         # A path with jq and curl but no claude.
@@ -581,6 +589,49 @@ class WatchTests(unittest.TestCase):
         status = self.run_watch(env, "status").stdout
         self.assertIn("running", status)
         self.assertNotIn("starts at login", status)
+
+    def test_install_stops_a_watcher_waiting_on_the_wake_url(self):
+        env = self.fake_launchctl()
+        fetch = self.fake_dir / "fetch"
+        (fetch / "get_wake_url").mkdir(parents=True)
+        (fetch / "get_wake_url/1.json").write_text(json.dumps(
+            {"wake_url": f"{self.server.url}/wake", "wake_token": "tok"}))
+        self.server.wake_hold = 45
+        self.assertEqual(self.run_watch(env, "start").returncode, 0, self.log)
+        deadline = time.time() + 15
+        while self.server.wake_requests == 0 and time.time() < deadline:
+            time.sleep(0.1)
+        self.assertEqual(self.server.wake_requests, 1, self.log)
+        began = time.time()
+        proc = self.run_watch(env, "install")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertLess(time.time() - began, 25)
+
+    def test_another_folders_agent_of_the_same_name_keeps_its_login_item(self):
+        env = self.fake_launchctl()
+        plist = Path(env["HOME"]) / "Library/LaunchAgents/dm.filament.watch.tester.plist"
+        plist.parent.mkdir(parents=True)
+        theirs = "<plist><key>WorkingDirectory</key><string>/elsewhere</string></plist>\n"
+        plist.write_text(theirs)
+        proc = self.run_watch(env, "install")
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertIn("another folder", proc.stderr)
+        self.assertEqual(plist.read_text(), theirs)
+        self.assertFalse((self.fake_dir / "launchctl.log").exists())
+        self.run_watch(env, "uninstall")
+        self.assertEqual(plist.read_text(), theirs)
+        self.assertNotIn("starts at login", self.run_watch(env, "status").stdout)
+
+    def test_an_agent_the_desktop_app_lists_is_not_installed(self):
+        env = self.fake_launchctl()
+        listing = Path(env["HOME"]) / "Library/Application Support/electron-app"
+        listing.mkdir(parents=True)
+        (listing / "local-agent-sessions.json").write_text(json.dumps(
+            [{"dir": str(self.folder), "runtime": "claude"}]))
+        proc = self.run_watch(env, "install")
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertIn("desktop app runs this agent", proc.stderr)
+        self.assertFalse((self.fake_dir / "launchctl.log").exists())
 
     def test_an_agent_the_desktop_app_runs_is_not_installed(self):
         env = {**self.fake_launchctl(), "FILAMENT_AGENT_TOKEN": "fmcp_testtoken"}
