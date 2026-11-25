@@ -114,6 +114,11 @@ class FakeFilament:
         return len(list(done.iterdir())) if done.is_dir() else 0
 
     def next_batch(self, cursor):
+        # A batch with `hold` keeps the poll waiting, as a long poll does.
+        deadline = time.time() + 10
+        while (self.batches and self.batches[0].get("hold") and time.time() < deadline
+               and self.finished_sessions() < self.batches[0].get("after_sessions", 0)):
+            time.sleep(0.05)
         if self.batches and self.finished_sessions() >= self.batches[0].get("after_sessions", 0):
             return self.batches.pop(0)["result"]
         return {"work": [], "cursor": cursor}
@@ -354,6 +359,19 @@ class WatchTests(unittest.TestCase):
         first, second = self.claude_calls("work")
         self.assertEqual(self.value(second, "--resume"), self.value(first, "--session-id"))
         self.assertIn("Session: resumed", self.value(second, "-p"))
+
+    def test_a_session_that_ended_during_the_poll_is_recorded(self):
+        # The poll that waited through the first session brings the next work.
+        self.server.batches = [
+            {"result": {"work": [message_item("$e1")], "cursor": "c1"}},
+            {"after_sessions": 1, "hold": True,
+             "result": {"work": [message_item("$e2")], "cursor": "c2"}},
+        ]
+        self.run_watch(self.token_env())
+        self.assertEqual(len(self.claude_calls("work")), 2, self.log)
+        audit = [json.loads(line) for line in (self.state / "audit.jsonl").read_text().splitlines()]
+        self.assertEqual([e["event"] for e in audit],
+                         ["session", "session_end", "session", "session_end"], self.log)
 
     def test_someone_elses_turn_never_resumes_the_owners_session(self):
         self.server.batches = [

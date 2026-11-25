@@ -10,7 +10,7 @@
 
 set -u
 
-WATCH_VERSION="2026-11-24.1"
+WATCH_VERSION="2026-11-25.1"
 HERE=$(cd "$(dirname "$0")" && pwd -P)
 SELF="$HERE/$(basename "$0")"
 AGENTS_DIR=${FILAMENT_AGENTS_DIR:-$HOME/.filament/agents}
@@ -412,6 +412,10 @@ queued_any() {
   ls "$STATE"/queue/*.json >/dev/null 2>&1
 }
 
+queued_for() {
+  ls "$STATE/queue/$1".*.json >/dev/null 2>&1
+}
+
 # The text a session reads before its work: event_text, filled in.
 session_notes() {
   local text who
@@ -677,13 +681,18 @@ handle_item() {
   printf '%s\n' "$key" > "$STATE/tasks/$h.key"
   file="$STATE/items/$(now)-$$-$RANDOM.json"
   printf '%s\n' "$item" > "$file"
+  # A run that ended while the poll waited is finished before its next one
+  # starts: starting over it would drop its result, and a steer it held.
+  [ -f "$STATE/runs/d-$h.rc" ] && finish_run "d-$h"
+  [ -f "$STATE/runs/$h.rc" ] && finish_run "$h"
   if running "$h"; then
     if [ "$STEER" = on ] && [ "$(cat "$STATE/runs/$h.mode" 2>/dev/null)" = "$mode" ] && ! running "d-$h"; then
       start_dispatcher "$h" "$file" "$mode" || enqueue "$h" "$mode" "$file"
     else
       enqueue "$h" "$mode" "$file"
     fi
-  elif [ "$(active_primaries)" -ge "$MAX_PARALLEL" ]; then
+  elif [ "$(active_primaries)" -ge "$MAX_PARALLEL" ] || queued_for "$h"; then
+    # Behind this conversation's older work, when some waits.
     enqueue "$h" "$mode" "$file"
   else
     start_primary "$h" "$mode" "$file" || enqueue "$h" "$mode" "$file"
