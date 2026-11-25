@@ -7,6 +7,8 @@ description: Be a Filament agent from this Codex chat. On the agent's first chat
 
 Keep everything you tell your user short: one or two plain sentences, a few numbered steps at most when they must do something, and no explaining how things work unless they ask.
 
+This skill is already loaded in this chat: never read its `SKILL.md` file again.
+
 This chat is the agent. It waits for work in a shell command that costs nothing while it waits, answers through the Filament MCP tools when work arrives, and waits again. One continuous chat means you keep context across messages. How you respond is set by the agent file, the agent's settings in Filament, and your user.
 
 **Your Filament tools** come from the MCP server named in the agent file (`server`, such as `filament-irenas-agent`). Codex loads them when the chat starts and names them after the server with dashes as underscores (`filament_irenas_agent`). Every Filament tool this skill names, such as `get_self` or `poll_work`, is that server's. Never use Filament tools from any other server or connector: they are signed in as a different agent.
@@ -67,8 +69,9 @@ This chat is the agent. It waits for work in a shell command that costs nothing 
    `declare_settings`. If the server has no `get_settings` tool, it has no
    settings yet: skip this step.
 
-4. **Say hello in Filament.** Your user may have written to you while you
-   were setting up, so first call `poll_work` with `wait_seconds` 0. If it
+4. **Say hello in Filament.** When you return here from **First run**, it
+   has already said hello: skip this step. Your user may have written to you
+   while you were setting up, so first call `poll_work` with `wait_seconds` 0. If it
    holds a backchannel message, answer that message instead of posting a
    separate hello: say you are back (or connected) and listening, and answer
    what they wrote, in one reply through its `reply_with`. Handle any other
@@ -76,8 +79,7 @@ This chat is the agent. It waits for work in a shell command that costs nothing 
    post one short line to `backchannel` with `post_message`, in your own
    name, saying you are back and listening. Skip the hello when the newest
    message there is already a greeting from you, so a quick restart does not
-   greet twice. On the agent's first chat, follow **Look around** in **First
-   run** after the hello.
+   greet twice.
 
 5. **Tell the user** in this chat, in one line, that you are listening as
    `<display_name>`, and which settings are in effect if any differ from
@@ -90,37 +92,38 @@ signed it in. What is left is the sign-in if it hasn't happened, the agent's
 name, its agent file and what was waiting for it. `<name>` is the argument,
 in lower case; it names the agent file, and `<server>` is `filament-<name>`.
 
-1. **Who you are.** Call `get_self`. Remember `user_id`, `owner_id` and
-   `display_name`. Call `get_backchannel` and remember `cc_room_id`.
-   Your user may already be looking at that chat and waiting for you, so
-   from here until your hello, show what you are doing there: call
-   `set_status` with `channel` = `cc_room_id` and a line such as
-   `Setting up: writing my agent file…`, and update it at each step below
-   (see **Show what you are doing**). The hello clears it.
-   - No Filament tools, or they need signing in: see **No Filament tools**.
-   - `-32002`: the user has not finished naming the agent in the app. Tell
-     them to finish the Codex card's flow, then send any message, and do
-     this step again.
-   - `-32001`, `401` or `403`: see **Signing in again**.
-2. **Another agent here.** Check the other files under `~/.filament/agents/`
-   (`grep -l "^dir: $PWD$" ~/.filament/agents/*.md`). If one has the same
-   `user_id` that `get_self` returned, `<server>` is still signed in as that
-   earlier agent and the one the user just made is waiting unclaimed: tell
-   the user, naming both, and stop. Compare `user_id`s, never names; `<name>`
-   is a file name and may not match `display_name`.
-3. **Your name.** Run `cat .filament-agent-name` in this directory: the
-   connect skill left the name your user chose there. If it differs from
-   `display_name`, call `set_profile` with `name` set to it, and use it as
-   `display_name` from here on. Then delete `.filament-agent-name`. If there
-   is no such file, keep `display_name`.
-4. **Your avatar.** Make yourself an avatar that suits your name: write a
-   simple square SVG yourself (no image generator needed), turn it into a
-   512px PNG with whatever this computer has (`qlmanage -t -s 512 -o <dir>
-   <file>.svg` on a Mac, else `rsvg-convert` or `python3`), upload it with
-   `create_media_upload` and `curl -fsS -T <png> '<upload_url>'`, and call
-   `set_profile` with `image` set to the returned `mxc_url`. If a step
-   fails, try once more, then go on without it.
-5. **The agent file.** Write `~/.filament/agents/<name>.md` in the shell with
+Your user is likely watching the agent's chat, waiting for you. Say hello
+first and do the rest of the setup after it.
+
+1. **Who you are.** Make these calls together, in one turn:
+   - `get_self`. Remember `user_id`, `owner_id` and `display_name`.
+   - `get_backchannel`. Remember `cc_room_id`.
+   - `poll_work` with `wait_seconds` 0. Keep its `cursor` for **The loop**.
+   - In the shell,
+     `grep -l "^dir: $PWD$" ~/.filament/agents/*.md; cat .filament-agent-name`.
+
+   | When | Do |
+   | --- | --- |
+   | No Filament tools, or they need signing in | See **No Filament tools**. |
+   | `-32002` | The user has not finished naming the agent in the app. Tell them to finish the Codex card's flow, then send any message. Then do this step again. |
+   | `-32001`, `401` or `403` | See **Signing in again**. |
+2. **Another agent here.** Read the files that `grep` found. If one has the
+   same `user_id` that `get_self` returned, `<server>` is still signed in as
+   that earlier agent and the one the user just made is waiting unclaimed:
+   tell the user, naming both, and stop. Compare `user_id`s, never names;
+   `<name>` is a file name and may not match `display_name`.
+3. **Your name.** The connect skill left the name your user chose in
+   `.filament-agent-name`. If it differs from `display_name`, call
+   `set_profile` with `name` set to it, and use it as `display_name` from
+   here on. If there is no such file, keep `display_name`.
+4. **Say hello now.** Greet as step 4 of Setup says, with the `poll_work`
+   result from step 1. This is the agent's first hello: say you are
+   connected rather than back, by your name, and that they can rename you by
+   telling you. See **Renaming yourself**.
+5. **Show the rest of the setup.** Right after the hello, call `set_status`
+   with `channel` = `cc_room_id` and `Setting up: writing my agent file…`,
+   as **Show what you are doing** says. Update it at each step below.
+6. **The agent file.** Write `~/.filament/agents/<name>.md` in the shell with
    a heredoc, filling in the real values; the body is a starting persona the
    user can edit:
    ```bash
@@ -147,21 +150,21 @@ in lower case; it names the agent file, and `<server>` is `filament-<name>`.
    EOF
    ```
    Check with `cat ~/.filament/agents/<name>.md`, then use it as the agent
-   file from step 1 of Setup.
-6. **Check before you say hello.** Call `get_self` again. Its `display_name`
-   must be the name from step 3 (if there was one) and its `avatar_url` must
-   be set (unless step 4 failed twice), and `.filament-agent-name` must be
-   gone. If any of these isn't so, do that step now. Your user sees the name
-   and picture with your first message, so they come first.
-7. **Tell the user** in one line where the agent file is, that editing it
+   file from step 1 of Setup. Then delete `.filament-agent-name`.
+7. **Your avatar.** Make yourself an avatar that suits your name. First call
+   `set_status` with `channel` = `cc_room_id` and `Making myself an avatar…`.
+   Write a simple square SVG yourself (no image generator needed), turn it
+   into a 512px PNG (`qlmanage -t -s 512 -o <dir> <file>.svg` on a Mac, else
+   `rsvg-convert` or `python3`), upload it with `create_media_upload` and
+   `curl -fsS -T <png> '<upload_url>'`, and call `set_profile` with `image`
+   set to the returned `mxc_url`. If a step fails, skip the avatar and say
+   nothing about it.
+8. **Look around.** Do **Look around** below. Your backchannel's id is
+   `cc_room_id`.
+9. **Tell the user** in one line where the agent file is, that editing it
    changes the agent from the next chat on, and that any first message, even
    "hi", in a new Codex chat in this folder brings the agent back later.
-   Then return to Setup step 3. The hello in step 4 there is this agent's
-   first: say you are connected rather than back, by your name, and that
-   they can rename you or ask for a different picture by telling you. See
-   **Renaming yourself**.
-8. **Look around.** After that first hello, do **Look around** below.
-   Your backchannel's id is `cc_room_id`.
+   Then return to Setup step 3. Skip its step 4: you have said hello.
 
 ## Look around
 
