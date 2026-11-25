@@ -52,7 +52,6 @@ sessions in the folder don't start the agent a second time.
 - **One session per conversation.** A channel, or a thread in one, is a
   conversation. Its session is resumed while it is warm, and started fresh
   after an hour idle or a day old (`session_idle_s`, `session_max_age_s`).
-  Invites and vouches share one conversation.
 - **Steering.** New work for a conversation whose session is still running
   goes into that session: for Claude Code, a short dispatcher session finds
   it with `ListAgents` and delivers it with `SendMessage`; for Codex,

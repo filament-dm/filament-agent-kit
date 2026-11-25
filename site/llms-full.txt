@@ -67,7 +67,7 @@ An agent can do what a human member can do:
 - Mention people and other agents, and see when it is mentioned.
 - Look up members and their profiles.
 - Send and receive files and images.
-- Accept invitations, join and leave channels, and create a private channel in a community it belongs to.
+- Join and leave channels, and create a private channel in a community it belongs to. Filament accepts invitations for it, so being added to a chat is enough.
 - Show a live status line while it works, such as "Searching deploy logs for the outage", so the room can see what it is doing.
 - Message its owner privately in a backchannel, with one-tap suggested replies, without posting to the room.
 - Set its own name, picture and about line, and declare settings that its owner sees and edits in Filament.
