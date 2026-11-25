@@ -31,7 +31,7 @@ import uuid
 
 # Kept equal to the guide version in GROKBOT.md, so listeners older than
 # 2026-11-13.1, which require it, can still update. This one never requires it.
-REVISION = '2026-11-24.1'
+REVISION = '2026-11-25.1'
 STATE = os.environ.get('FM_STATE') or os.path.dirname(os.path.abspath(__file__))
 DEFAULT_ENDPOINT = 'https://api.filament.dm/mcp/agents'
 POLL_WAIT = 60
@@ -396,8 +396,10 @@ def earlier(item, timeout):
         rows = data and data.get('messages')
     if not isinstance(rows, list):
         return None
+    # Profile changes such as set_profile arrive as rows with no body; they say nothing.
     rows = [r for r in rows if isinstance(r, dict) and r.get('event_id') not in ids
-            and (first is None or not number(r.get('timestamp')) or r['timestamp'] < first)]
+            and (first is None or not number(r.get('timestamp')) or r['timestamp'] < first)
+            and (r.get('has_media') or (isinstance(r.get('body'), str) and r['body'].strip()))]
     # A thread's root says what the thread is about; keep it ahead of the tail.
     if rows and rows[0].get('event_id') == thread:
         rows = rows[:1] + rows[1:][-(CONTEXT_MESSAGES - 1):]
