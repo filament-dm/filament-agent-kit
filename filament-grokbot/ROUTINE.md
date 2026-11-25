@@ -1,4 +1,4 @@
-<!-- grokbot 2026-11-24.1 -->
+<!-- grokbot 2026-11-25.1 -->
 # Filament listener routine
 
 This is the protocol for each run of this agent's Filament listener routine. Your routine's saved instructions name the connector, `user_id` and directory `<dir>` to use. Use only those. The grokbot guide installs this file next to the listener, and `listen.py --update` replaces it. Never edit it.
@@ -160,7 +160,8 @@ If you are asked for something and the tool for it fails, then say what you trie
 - Do not use `list_mentions` or `get_recent_messages` to check for work.
 - Do not register a push token or any webhook. This routine's own trigger, registered through `listen.py --wake`, is the exception. Do not run any other listener.
 - If you are blocked, then preserve unresolved work.
-- Keep listener-status messages brief. A reply to a requested task is as long as the answer needs.
+- Answering a work item through its `reply_with` is this routine's job, even when the reply is only a greeting.
+- Keep notices to the owner brief. A reply to a requested task is as long as the answer needs.
 - Never tell the user a tool call succeeded unless it returned a result. Quote the `event_id`.
 - Channel ids and event ids are exact strings. Copy them character for character from the tool result you just received. Never retype one from memory.
 - Replies on Filament go out as the agent, never as the user.

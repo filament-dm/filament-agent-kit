@@ -670,6 +670,18 @@ class ListenTest(ListenerCase):
                                                  'args': {'channel': '!room:test', 'limit': 11}}])
         self.assertEqual(self.state_data()['pending']['work'][0]['context'], context)
 
+    def test_context_drops_system_rows(self):
+        new = item('e3')
+        new['messages'][0]['timestamp'] = 3000
+        self.fake.reads['get_recent_messages'] = {'messages': [
+            self.row('e1', 1000),
+            self.row('e2', 2000, sender='@bot:test', body='', is_from_self=True,
+                     is_from_principal=False, is_system=True),
+            self.row('e3', 3000)]}
+        self.fake.queue = [{'work': [new]}]
+        context = self.body(self.run_script('--check', '1'))['work'][0]['context']
+        self.assertEqual([m['body'] for m in context['messages']], ['text e1'])
+
     def test_thread_context_keeps_its_root(self):
         new = item('r13')
         new['thread_id'] = 'root'
