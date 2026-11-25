@@ -10,7 +10,7 @@
 
 set -u
 
-WATCH_VERSION="2026-11-24.1"
+WATCH_VERSION="2026-11-25.2"
 HERE=$(cd "$(dirname "$0")" && pwd -P)
 SELF="$HERE/$(basename "$0")"
 AGENTS_DIR=${FILAMENT_AGENTS_DIR:-$HOME/.filament/agents}
@@ -36,6 +36,8 @@ Usage: filament-watch [command] [folder]
   start    Watch in the background; does nothing when one already runs.
   stop     Stop the background watcher.
   status   Say whether it runs, and show its recent log.
+  install  Start it now and each time you log in (macOS).
+  uninstall  Stop starting it at login, and stop it.
   version  Print this watcher's version.
 
 [folder] is the agent's folder, by default the one this script is in. Its
@@ -143,8 +145,23 @@ read_config() {
   MAX_AGE=$(conf_n session_max_age_s 86400)
   STEER=$(conf steer on)
   REACTIONS=$(conf reactions off)
-  CLAUDE_BIN=${FILAMENT_WATCH_CLAUDE:-$(command -v claude || true)}
+  CLAUDE_BIN=${FILAMENT_WATCH_CLAUDE:-$(command -v claude || desktop_claude || true)}
   CODEX_BIN=${FILAMENT_WATCH_CODEX:-$(command -v codex || true)}
+}
+
+# The Claude Code inside the Claude desktop app, which puts no `claude` on the
+# path. Its folder is named for its version: the highest is looked up each
+# time rather than kept, as the desktop app's own scan picks it.
+desktop_claude() {
+  local root=${FILAMENT_WATCH_CLAUDE_DESKTOP:-$HOME/Library/Application Support/Claude/claude-code}
+  local version bin
+  for version in $(cd "$root" 2>/dev/null && ls -d -- */ 2>/dev/null | tr -d / |
+    grep -E '^[0-9]+(\.[0-9]+)*$' | sort -t. -k1,1nr -k2,2nr -k3,3nr -k4,4nr); do
+    for bin in "$root/$version"/*/claude.app/Contents/MacOS/claude; do
+      [ -x "$bin" ] && { printf '%s' "$bin"; return 0; }
+    done
+  done
+  return 1
 }
 
 engine_bin() {
@@ -258,13 +275,20 @@ FETCH_NOTE="filament-watch started this session only to make one Filament tool c
 # Has the engine call one Filament tool. Leaves its result in $STATE/.result.
 # Returns 0 when it answered, 2 when the sign-in is refused, 1 otherwise.
 fetch_tool() {
-  local name=$1 args=$2 out text bin
+  local name=$1 args=$2 out text bin how
   bin=$(engine_bin)
   [ -n "$bin" ] || { log "no $ENGINE command found"; return 1; }
+  # Said in words for a tool that takes nothing: shown `{}`, a model passes
+  # it along as an argument of its own, which the server refuses.
+  if [ "$args" = '{}' ]; then
+    how="with no arguments at all: its input is an empty object"
+  else
+    how="with exactly these fields as its input, and no others: $args"
+  fi
   case $ENGINE in
     claude)
       out=$(cd "$AGENT_DIR" && MAX_MCP_OUTPUT_TOKENS=200000 env -u FILAMENT_AGENT_TOKEN \
-        "$bin" -p "Call mcp__${SERVER}__${name} once, with exactly these arguments: $args" \
+        "$bin" -p "Call mcp__${SERVER}__${name} once, $how" \
         --model "$FETCH_MODEL" --output-format stream-json --verbose \
         --permission-mode dontAsk --tools "" --allowedTools "mcp__${SERVER}__${name}" \
         --no-session-persistence --append-system-prompt "$FETCH_NOTE" \
@@ -279,7 +303,7 @@ fetch_tool() {
         -c 'sandbox_mode="read-only"' -c 'model_reasoning_effort="low"' \
         "$FETCH_NOTE
 
-Call the MCP tool $name on the server $SERVER once, with exactly these arguments: $args" \
+Call the MCP tool $name on the server $SERVER once, $how" \
         < /dev/null 2>> "$STATE/engine.err")
       text=$(printf '%s\n' "$out" | jq -rs '[.[] | select(.type == "item.completed" and .item.type == "mcp_tool_call")
         | .item.result.content[]? | select(.type == "text") | .text] | first // empty' 2>/dev/null)
@@ -384,11 +408,13 @@ run_bg() {
   printf '%s\n' "$mode" > "$base.mode"
   now > "$base.started"
   (
-    cd "$AGENT_DIR" || { echo 1 > "$base.rc"; exit 1; }
+    cd "$AGENT_DIR" || { echo 1 > "$base.rc.new"; mv "$base.rc.new" "$base.rc"; exit 1; }
     "$@" < /dev/null > "$base.out" 2> "$base.err" &
     echo $! > "$base.pid"
     wait $!
-    echo $? > "$base.rc"
+    # In one step: a result seen before it is written reads as a failure.
+    echo $? > "$base.rc.new"
+    mv "$base.rc.new" "$base.rc"
   ) &
   echo $! > "$base.spid"
 }
@@ -410,6 +436,10 @@ active_primaries() {
 
 queued_any() {
   ls "$STATE"/queue/*.json >/dev/null 2>&1
+}
+
+queued_for() {
+  ls "$STATE/queue/$1".*.json >/dev/null 2>&1
 }
 
 # The text a session reads before its work: event_text, filled in.
@@ -625,7 +655,7 @@ finish_run() {
   esac
   mv -f "$base.out" "$base.last.out" 2>/dev/null
   mv -f "$base.err" "$base.last.err" 2>/dev/null
-  rm -f "$base.kind" "$base.mode" "$base.started" "$base.spid" "$base.pid" "$base.rc"
+  rm -f "$base.kind" "$base.mode" "$base.started" "$base.spid" "$base.pid" "$base.rc" "$base.rc.new"
 }
 
 # Finishes ended runs and stops ones past their time limit.
@@ -640,8 +670,10 @@ reap() {
       continue
     fi
     if ! kill -0 "$(cat "$spid")" 2>/dev/null; then
-      # The wrapper is gone without a result: a watcher before this one died.
-      echo 1 > "$base.rc"
+      # The wrapper is gone. It may have written its result since the check
+      # above; only one gone without a result (a watcher before this one died)
+      # counts as a failure.
+      [ -f "$base.rc" ] || echo 1 > "$base.rc"
       finish_run "$id"
       continue
     fi
@@ -677,13 +709,18 @@ handle_item() {
   printf '%s\n' "$key" > "$STATE/tasks/$h.key"
   file="$STATE/items/$(now)-$$-$RANDOM.json"
   printf '%s\n' "$item" > "$file"
+  # A run that ended while the poll waited is finished before its next one
+  # starts: starting over it would drop its result, and a steer it held.
+  [ -f "$STATE/runs/d-$h.rc" ] && finish_run "d-$h"
+  [ -f "$STATE/runs/$h.rc" ] && finish_run "$h"
   if running "$h"; then
     if [ "$STEER" = on ] && [ "$(cat "$STATE/runs/$h.mode" 2>/dev/null)" = "$mode" ] && ! running "d-$h"; then
       start_dispatcher "$h" "$file" "$mode" || enqueue "$h" "$mode" "$file"
     else
       enqueue "$h" "$mode" "$file"
     fi
-  elif [ "$(active_primaries)" -ge "$MAX_PARALLEL" ]; then
+  elif [ "$(active_primaries)" -ge "$MAX_PARALLEL" ] || queued_for "$h"; then
+    # Behind this conversation's older work, when some waits.
     enqueue "$h" "$mode" "$file"
   else
     start_primary "$h" "$mode" "$file" || enqueue "$h" "$mode" "$file"
@@ -1143,12 +1180,158 @@ watch_pid() {
   [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null && printf '%s' "$pid"
 }
 
+# --- Starting at login (macOS) ---------------------------------------------
+# A LaunchAgent runs the watcher from the agent's folder at each login. It
+# holds no credential: the sign-in stays inside Claude Code or Codex.
+
+login_label() { printf 'dm.filament.watch.%s' "$NAME"; }
+login_plist() { printf '%s/Library/LaunchAgents/%s.plist' "$HOME" "$(login_label)"; }
+launchctl_bin() { printf '%s' "${FILAMENT_WATCH_LAUNCHCTL:-launchctl}"; }
+xml() { printf '%s' "$1" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g'; }
+
+# Whether the plist at the login label is this folder's: another folder's
+# agent with the same name would have the same label.
+login_ours() {
+  grep -qF "<key>WorkingDirectory</key><string>$(xml "$AGENT_DIR")</string>" "$(login_plist)" 2>/dev/null
+}
+
+# Whether the desktop app runs the agent in this folder. Each flavor of the
+# app lists the folders it runs in its own data folder.
+desktop_app_runs() {
+  local f d
+  for f in "$HOME/Library/Application Support"/{electron-app,"Filament Alpha","Filament Beta"}/{local-agent-sessions,claude-agents}.json; do
+    [ -f "$f" ] || continue
+    while IFS= read -r d; do
+      [ -n "$d" ] && [ "$(cd "$d" 2>/dev/null && pwd -P)" = "$AGENT_DIR" ] && return 0
+    done < <(jq -r '.[]?.dir // empty' "$f" 2>/dev/null)
+  done
+  return 1
+}
+
+# A process's descendants, one pid a line.
+descendants() {
+  local child
+  for child in $(pgrep -P "$1" 2>/dev/null); do
+    printf '%s\n' "$child"
+    descendants "$child"
+  done
+}
+
+# Stops a running watcher and waits for it to let go of the folder. The poll
+# or pause it waits on is ended too: bash runs its trap only once that returns,
+# and a poll's curl runs in subshells below the watcher.
+stop_and_wait() {
+  local pid parents tries=0
+  pid=$(watch_pid) || return 0
+  kill "$pid" 2>/dev/null
+  parents=$( { echo "$pid"; descendants "$pid"; } | paste -sd, -)
+  pkill -TERM -P "$parents" -x curl 2>/dev/null
+  pkill -TERM -P "$parents" -x sleep 2>/dev/null
+  while kill -0 "$pid" 2>/dev/null && [ $tries -lt 30 ]; do
+    sleep 1
+    tries=$((tries + 1))
+  done
+  ! kill -0 "$pid" 2>/dev/null
+}
+
+install_login() {
+  local plist domain
+  [ "$(uname)" = Darwin ] || [ -n "${FILAMENT_WATCH_LAUNCHCTL:-}" ] ||
+    die "starting at login is for macOS; here, run ./filament-watch start after a restart"
+  { [ -n "${FILAMENT_AGENT_TOKEN:-}" ] || desktop_app_runs; } &&
+    die "the desktop app runs this agent; it has no need to start at login"
+  plist=$(login_plist)
+  [ -f "$plist" ] && ! login_ours &&
+    die "another folder's agent named $NAME already starts at login ($plist); run ./filament-watch uninstall in that folder first"
+  domain="gui/$(id -u)"
+  mkdir -p "$(dirname "$plist")" || die "can't write $(dirname "$plist")"
+  stop_and_wait || die "the running watcher didn't stop; try again"
+  # The path of whoever installs it: launchd's own has no claude or codex.
+  cat > "$plist" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>$(xml "$(login_label)")</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>$(xml "$SELF")</string>
+    <string>run</string>
+    <string>$(xml "$AGENT_DIR")</string>
+  </array>
+  <key>WorkingDirectory</key><string>$(xml "$AGENT_DIR")</string>
+  <key>RunAtLoad</key><true/>
+  <key>StandardOutPath</key><string>$(xml "$STATE/log")</string>
+  <key>StandardErrorPath</key><string>$(xml "$STATE/log")</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key><string>$(xml "$PATH")</string>
+  </dict>
+</dict>
+</plist>
+PLIST
+  "$(launchctl_bin)" bootout "$domain/$(login_label)" 2>/dev/null
+  "$(launchctl_bin)" bootstrap "$domain" "$plist" ||
+    die "launchd wouldn't take $plist"
+  # launchd reports nothing when the watcher can't run: only its coming up
+  # shows it did. macOS keeps a login item out of Desktop, Documents and
+  # Downloads, so one whose folder is there never starts.
+  if came_up "$(conf_n login_wait_s 10)"; then
+    echo "filament-watch for $NAME runs now and each time you log in; log: $STATE/log"
+    return 0
+  fi
+  "$(launchctl_bin)" bootout "$domain/$(login_label)" 2>/dev/null
+  rm -f "$plist"
+  start_bg >/dev/null || die "it stopped right away"
+  echo "NOT_AT_LOGIN: macOS wouldn't run filament-watch for $NAME from $AGENT_DIR at login. It runs now, until the computer restarts; log: $STATE/log"
+}
+
+# Whether a watcher holds the folder within `$1` seconds.
+came_up() {
+  local left=$1
+  while [ "$left" -gt 0 ]; do
+    watch_pid >/dev/null && return 0
+    sleep 1
+    left=$((left - 1))
+  done
+  watch_pid >/dev/null
+}
+
+# Starts the watcher in the background. Prints how it went.
+start_bg() {
+  local pid
+  nohup "$SELF" run "$AGENT_DIR" >> "$STATE/log" 2>&1 < /dev/null &
+  sleep 1
+  if pid=$(watch_pid); then
+    echo "filament-watch for $NAME started (pid $pid); log: $STATE/log"
+    return 0
+  fi
+  tail -n 5 "$STATE/log" >&2
+  return 1
+}
+
+uninstall_login() {
+  local plist
+  plist=$(login_plist)
+  if [ -f "$plist" ] && ! login_ours; then
+    # Another folder's agent of the same name: its login item stays.
+    stop_and_wait
+    echo "filament-watch for $NAME is stopped; it didn't start at login from this folder"
+    return 0
+  fi
+  "$(launchctl_bin)" bootout "gui/$(id -u)/$(login_label)" 2>/dev/null
+  rm -f "$plist"
+  stop_and_wait
+  echo "filament-watch for $NAME no longer starts at login, and is stopped"
+}
+
 main() {
   local cmd=${1:-run} pid
   case $cmd in
     version) echo "filament-watch $WATCH_VERSION"; exit 0 ;;
     -h | --help | help) usage; exit 0 ;;
-    run | start | stop | status) ;;
+    run | start | stop | status | install | uninstall) ;;
     *) usage >&2; exit 2 ;;
   esac
   [ $# -le 2 ] || { usage >&2; exit 2; }
@@ -1160,14 +1343,7 @@ main() {
         echo "filament-watch for $NAME already runs (pid $pid)"
         exit 0
       fi
-      nohup "$SELF" run "$AGENT_DIR" >> "$STATE/log" 2>&1 < /dev/null &
-      sleep 1
-      if pid=$(watch_pid); then
-        echo "filament-watch for $NAME started (pid $pid); log: $STATE/log"
-      else
-        tail -n 5 "$STATE/log" >&2
-        die "it stopped right away"
-      fi
+      start_bg || die "it stopped right away"
       ;;
     stop)
       if pid=$(watch_pid); then
@@ -1176,8 +1352,17 @@ main() {
         echo "filament-watch for $NAME isn't running"
       fi
       ;;
+    install) install_login ;;
+    uninstall) uninstall_login ;;
     status)
       if pid=$(watch_pid); then echo "running (pid $pid)"; else echo "not running"; fi
+      if login_ours; then
+        if "$(launchctl_bin)" print "gui/$(id -u)/$(login_label)" >/dev/null 2>&1; then
+          echo "starts at login"
+        else
+          echo "set to start at login, but launchd hasn't loaded it; run ./filament-watch install again"
+        fi
+      fi
       [ -f "$STATE/log" ] && tail -n 10 "$STATE/log"
       ;;
   esac

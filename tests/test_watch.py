@@ -102,6 +102,8 @@ class FakeFilament:
         self.fake_dir = fake_dir
         self.batches = []
         self.wakes = []
+        self.wake_hold = 0
+        self.wake_requests = 0
         self.calls = []
         self.status_for_poll = 200
         handler = self._handler()
@@ -114,6 +116,11 @@ class FakeFilament:
         return len(list(done.iterdir())) if done.is_dir() else 0
 
     def next_batch(self, cursor):
+        # A batch with `hold` keeps the poll waiting, as a long poll does.
+        deadline = time.time() + 10
+        while (self.batches and self.batches[0].get("hold") and time.time() < deadline
+               and self.finished_sessions() < self.batches[0].get("after_sessions", 0)):
+            time.sleep(0.05)
         if self.batches and self.finished_sessions() >= self.batches[0].get("after_sessions", 0):
             return self.batches.pop(0)["result"]
         return {"work": [], "cursor": cursor}
@@ -140,6 +147,9 @@ class FakeFilament:
                     return self._send(404, {})
                 if self.headers.get("authorization") != "Wake tok":
                     return self._send(401, {})
+                fake.wake_requests += 1
+                # Held like a long poll that has nothing yet.
+                time.sleep(fake.wake_hold)
                 pending = fake.wakes.pop(0) if fake.wakes else 0
                 self._send(200, {"pending": pending})
 
@@ -335,6 +345,48 @@ class WatchTests(unittest.TestCase):
         self.assertIn("agent=tester\n", conf, self.log)
         self.assertIn("server=filament-tester\n", conf)
 
+    def desktop_claude(self, version, age):
+        """A Claude Code as the Claude desktop app keeps it, `age` seconds old."""
+        home = self.fake_dir.parent / "desktop"
+        bin_dir = home / version / "abc123" / "claude.app" / "Contents" / "MacOS"
+        bin_dir.mkdir(parents=True)
+        shutil.copy(self.claude, bin_dir / "claude")
+        os.utime(bin_dir / "claude", (time.time() - age,) * 2)
+        return home, bin_dir / "claude"
+
+    def test_without_claude_on_the_path_it_runs_the_desktop_apps(self):
+        # The highest version is run, as the desktop app's scan picks it: not
+        # an older one left behind, nor a lower one written more recently.
+        _, older = self.desktop_claude("2.1.330", age=3600)
+        older.write_text("#!/bin/sh\nexit 9\n")
+        os.utime(older, (time.time() - 3600,) * 2)
+        home, _ = self.desktop_claude("2.1.331", age=60)
+        _, lower = self.desktop_claude("2.1.99", age=0)
+        lower.write_text("#!/bin/sh\nexit 9\n")
+        env = {**self.token_env(), "FILAMENT_WATCH_CLAUDE_DESKTOP": str(home)}
+        del env["FILAMENT_WATCH_CLAUDE"]
+        # A path with jq and curl but no claude.
+        tools = self.fake_dir.parent / "tools"
+        tools.mkdir()
+        for name in ("jq", "curl"):
+            os.symlink(shutil.which(name), tools / name)
+        env["PATH"] = f"{tools}:/usr/bin:/bin"
+        self.assertIsNone(shutil.which("claude", path=env["PATH"]))
+        self.server.batches = [{"result": {"work": [message_item("$e1")], "cursor": "c1"}}]
+        self.run_watch(env)
+        self.assertEqual(len(self.claude_calls("work")), 1, self.log)
+        self.assertNotIn("no claude command found", self.log)
+
+    def test_without_any_claude_it_says_so(self):
+        env = {**self.token_env(),
+               "FILAMENT_WATCH_CLAUDE_DESKTOP": str(self.fake_dir / "none")}
+        del env["FILAMENT_WATCH_CLAUDE"]
+        env["PATH"] = "/usr/bin:/bin:" + os.path.dirname(shutil.which("jq"))
+        if shutil.which("claude", path=env["PATH"]):
+            self.skipTest("a claude sits beside jq")
+        proc = self.run_watch(env)
+        self.assertIn("no claude command found", proc.stderr)
+
     def test_someone_else_gets_only_filament_tools(self):
         item = message_item("$e1", principal=False, backchannel=False)
         self.server.batches = [{"result": {"work": [item], "cursor": "c1"}}]
@@ -354,6 +406,19 @@ class WatchTests(unittest.TestCase):
         first, second = self.claude_calls("work")
         self.assertEqual(self.value(second, "--resume"), self.value(first, "--session-id"))
         self.assertIn("Session: resumed", self.value(second, "-p"))
+
+    def test_a_session_that_ended_during_the_poll_is_recorded(self):
+        # The poll that waited through the first session brings the next work.
+        self.server.batches = [
+            {"result": {"work": [message_item("$e1")], "cursor": "c1"}},
+            {"after_sessions": 1, "hold": True,
+             "result": {"work": [message_item("$e2")], "cursor": "c2"}},
+        ]
+        self.run_watch(self.token_env())
+        self.assertEqual(len(self.claude_calls("work")), 2, self.log)
+        audit = [json.loads(line) for line in (self.state / "audit.jsonl").read_text().splitlines()]
+        self.assertEqual([e["event"] for e in audit],
+                         ["session", "session_end", "session", "session_end"], self.log)
 
     def test_someone_elses_turn_never_resumes_the_owners_session(self):
         self.server.batches = [
@@ -459,10 +524,120 @@ class WatchTests(unittest.TestCase):
                          ["mcp__filament-tester__get_wake_url", "mcp__filament-tester__poll_work"],
                          self.log)
         self.assertEqual(self.value(fetches[0], "--tools"), "")
+        # A tool that takes nothing is asked for in words, never as `{}`.
+        self.assertIn("no arguments at all", self.value(fetches[0], "-p"))
+        self.assertNotIn("{}", self.value(fetches[0], "-p"))
+        self.assertIn('"wait_seconds":0', self.value(fetches[1], "-p").replace(" ", ""))
         work = self.claude_calls("work")
         self.assertEqual(len(work), 1)
         self.assertIn("$e1", self.value(work[0], "-p"))
         self.assertEqual((self.state / "cursor").read_text().strip(), "c1")
+
+    def fake_launchctl(self, runs=True):
+        """A launchctl that records its calls and, like launchd, runs the
+        watcher on bootstrap, unless macOS would not let it (`runs` False)."""
+        path = self.fake_dir / "launchctl"
+        launch = (f'if [ "$1" = bootstrap ]; then nohup {BASH} "{self.watch}" run "{self.folder}" '
+                  f'>> "{self.state}/log" 2>&1 < /dev/null & fi\n') if runs else ""
+        path.write_text('#!/bin/sh\necho "$@" >> "$FAKE_DIR/launchctl.log"\n' + launch)
+        path.chmod(0o755)
+        self.conf.write_text(self.conf.read_text() + "login_wait_s=3\n")
+        env = {**self.env, "FILAMENT_WATCH_LAUNCHCTL": str(path)}
+        del env["FILAMENT_WATCH_EXIT_IDLE"]
+        self.addCleanup(lambda: self.run_watch(env, "uninstall"))
+        return env
+
+    def test_install_starts_it_at_login_from_its_folder(self):
+        env = self.fake_launchctl()
+        proc = self.run_watch(env, "install")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        plist = Path(env["HOME"]) / "Library/LaunchAgents/dm.filament.watch.tester.plist"
+        text = plist.read_text()
+        if shutil.which("plutil"):
+            subprocess.run(["plutil", "-lint", str(plist)], check=True, capture_output=True)
+        for part in ("/bin/bash", str(self.watch), "<string>run</string>", str(self.folder),
+                     "RunAtLoad", env["PATH"]):
+            self.assertIn(part, text)
+        # No credential is ever written there.
+        self.assertNotIn("TOKEN", text)
+        calls = (self.fake_dir / "launchctl.log").read_text().splitlines()
+        uid = os.getuid()
+        self.assertEqual(calls, [f"bootout gui/{uid}/dm.filament.watch.tester",
+                                 f"bootstrap gui/{uid} {plist}"])
+        self.assertIn("starts at login", self.run_watch(env, "status").stdout)
+
+    def test_uninstall_stops_starting_it_at_login(self):
+        env = self.fake_launchctl()
+        self.run_watch(env, "install")
+        proc = self.run_watch(env, "uninstall")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        plist = Path(env["HOME"]) / "Library/LaunchAgents/dm.filament.watch.tester.plist"
+        self.assertFalse(plist.exists())
+        calls = (self.fake_dir / "launchctl.log").read_text().splitlines()
+        self.assertEqual(calls[-1], f"bootout gui/{os.getuid()}/dm.filament.watch.tester")
+        self.assertNotIn("starts at login", self.run_watch(env, "status").stdout)
+
+    def test_where_macos_will_not_run_it_at_login_it_runs_until_a_restart(self):
+        env = self.fake_launchctl(runs=False)
+        proc = self.run_watch(env, "install")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertTrue(proc.stdout.startswith("NOT_AT_LOGIN"), proc.stdout)
+        plist = Path(env["HOME"]) / "Library/LaunchAgents/dm.filament.watch.tester.plist"
+        self.assertFalse(plist.exists())
+        calls = (self.fake_dir / "launchctl.log").read_text().splitlines()
+        self.assertEqual(calls[-1], f"bootout gui/{os.getuid()}/dm.filament.watch.tester")
+        status = self.run_watch(env, "status").stdout
+        self.assertIn("running", status)
+        self.assertNotIn("starts at login", status)
+
+    def test_install_stops_a_watcher_waiting_on_the_wake_url(self):
+        env = self.fake_launchctl()
+        fetch = self.fake_dir / "fetch"
+        (fetch / "get_wake_url").mkdir(parents=True)
+        (fetch / "get_wake_url/1.json").write_text(json.dumps(
+            {"wake_url": f"{self.server.url}/wake", "wake_token": "tok"}))
+        self.server.wake_hold = 45
+        self.assertEqual(self.run_watch(env, "start").returncode, 0, self.log)
+        deadline = time.time() + 15
+        while self.server.wake_requests == 0 and time.time() < deadline:
+            time.sleep(0.1)
+        self.assertEqual(self.server.wake_requests, 1, self.log)
+        began = time.time()
+        proc = self.run_watch(env, "install")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertLess(time.time() - began, 25)
+
+    def test_another_folders_agent_of_the_same_name_keeps_its_login_item(self):
+        env = self.fake_launchctl()
+        plist = Path(env["HOME"]) / "Library/LaunchAgents/dm.filament.watch.tester.plist"
+        plist.parent.mkdir(parents=True)
+        theirs = "<plist><key>WorkingDirectory</key><string>/elsewhere</string></plist>\n"
+        plist.write_text(theirs)
+        proc = self.run_watch(env, "install")
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertIn("another folder", proc.stderr)
+        self.assertEqual(plist.read_text(), theirs)
+        self.assertFalse((self.fake_dir / "launchctl.log").exists())
+        self.run_watch(env, "uninstall")
+        self.assertEqual(plist.read_text(), theirs)
+        self.assertNotIn("starts at login", self.run_watch(env, "status").stdout)
+
+    def test_an_agent_the_desktop_app_lists_is_not_installed(self):
+        env = self.fake_launchctl()
+        listing = Path(env["HOME"]) / "Library/Application Support/electron-app"
+        listing.mkdir(parents=True)
+        (listing / "local-agent-sessions.json").write_text(json.dumps(
+            [{"dir": str(self.folder), "runtime": "claude"}]))
+        proc = self.run_watch(env, "install")
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertIn("desktop app runs this agent", proc.stderr)
+        self.assertFalse((self.fake_dir / "launchctl.log").exists())
+
+    def test_an_agent_the_desktop_app_runs_is_not_installed(self):
+        env = {**self.fake_launchctl(), "FILAMENT_AGENT_TOKEN": "fmcp_testtoken"}
+        proc = self.run_watch(env, "install")
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertFalse((self.fake_dir / "launchctl.log").exists())
 
     def test_start_twice_runs_one_watcher(self):
         env = {**self.token_env()}
