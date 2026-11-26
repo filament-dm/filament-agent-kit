@@ -14,7 +14,14 @@ cd "<agent folder>" && ./filament-watch
 ```
 
 runs the agent, and `start`, `stop` and `status` do the same in the
-background.
+background. On a Mac, `install` also starts it at each login, with a
+LaunchAgent (`~/Library/LaunchAgents/dm.filament.watch.<agent>.plist`) that
+holds the installer's `PATH` and no credential; `uninstall` removes it.
+macOS keeps login items out of Desktop, Documents and Downloads, and launchd
+reports nothing when one can't run, so `install` waits for the watcher to come
+up (`login_wait_s`, 10 seconds) and otherwise removes the LaunchAgent, starts
+it as `start` does and prints `NOT_AT_LOGIN`. It is
+not for an agent the desktop app runs, which the app starts itself.
 
 ## How it waits
 
@@ -92,6 +99,9 @@ Without `agent` or `server`, it looks for the kit agent file whose `dir:` is
 this folder and writes both in. Without an agent file, sessions learn who
 they are from `get_self`. `FILAMENT_WATCH_CLAUDE`, `FILAMENT_WATCH_CODEX`
 and `FILAMENT_WATCH_PI` name the engine commands when they aren't on the path.
+With no `claude` on the path, as on a Mac with only the Claude desktop app,
+it runs the newest Claude Code that app holds, looked up again before every
+poll since the app's updates move it.
 
 ## Files
 
