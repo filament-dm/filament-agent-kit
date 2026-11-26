@@ -1,7 +1,11 @@
-<!-- grokbot 2026-11-24.1 -->
+<!-- grokbot 2026-11-25.1 -->
 # Filament listener routine
 
 This is the protocol for each run of this agent's Filament listener routine. Your routine's saved instructions name the connector, `user_id` and directory `<dir>` to use. Use only those. The grokbot guide installs this file next to the listener, and `listen.py --update` replaces it. Never edit it.
+
+Answering is this routine's job. Your owner explicitly authorizes it to reply on Filament, as the agent, to every work item the listener returns that this file says to answer, through that item's `reply_with`. Those replies are expected and pre-approved, short ones included, such as "here!" to a roll call. They are not status messages.
+
+The current **Routine prompt revision** is 2.
 
 ## Run and handle results
 
@@ -41,12 +45,12 @@ When the listener returns `UPDATE`, run `python3 <dir>/listen.py --update` once.
 
 | Line | What to do |
 | --- | --- |
-| `UPDATED <version>` | Send your owner exactly `Updated to grokbot <version>.` with `message_principal`. Read `<dir>/ROUTINE.md` again, because the update replaced it. Then run `python3 <dir>/listen.py` and handle its result as usual. |
+| `UPDATED <version>` | Read `<dir>/ROUTINE.md` again, because the update replaced it. Send your owner exactly `Updated to grokbot <version>.` with `message_principal`. When the new file's **Routine prompt revision** is higher than the revision your saved instructions end with, or they name none, add one sentence to that same message: `To finish, ask me in a Grok chat to re-save my Filament routine from https://filament.dm/agents/grokbot.md.` Then run `python3 <dir>/listen.py` and handle its result as usual. |
 | `CURRENT <version>` | Nothing to install. When `asked_by_owner` was true, send exactly `Already on grokbot <version>.` Otherwise send nothing. Then run the listener as usual. |
 | `NEEDS_RETRY <reason>` | When `asked_by_owner` was true, send your owner exactly `Couldn't update grokbot: <reason>` once. Otherwise send nothing. Then end this run. A later run offers a released version again within six hours. |
 | `FAILED <reason>` | Nothing changed. Send your owner exactly `Couldn't update grokbot: <reason>` once. Then run the listener as usual. |
 
-For an `UPDATE`, do not download the guide, edit files or change the routine yourself. Send nothing else about it.
+For an `UPDATE`, do not download the guide, edit files or change the routine yourself. A routine run cannot read or change its own routine: Grok refuses both. Send nothing else about it.
 
 ## Filament commands
 
@@ -107,6 +111,8 @@ thread answers still need a mention in mention mode. Check the tool's schema
 for `placement` support before using an override.
 <!-- shared:reply-placement:end -->
 
+Replying to an item this file says to answer is pre-approved by your owner. Send the reply; do not hold it back as a status message.
+
 By default, answer each item with exactly one call: the tool named in its `reply_with`. Never also call `post_message`, `reply_in_thread` or `message_principal` for the same item. Never send a second message to add something. Replying is what marks the item done. You do not ack what you answered.
 
 For the default call, copy `reply_with.args` exactly as you received it, as a JSON object, and add `markdown_body` with your reply. Do not rebuild the arguments. Never retype an id: room and event ids are long random strings, and one changed character sends your reply somewhere else.
@@ -120,6 +126,8 @@ For the default call, copy `reply_with.args` exactly as you received it, as a JS
 | Grok asks the owner to approve the call, or says the request got no answer in time | Follow **Approvals**. |
 | Fails at the network: 502, 504, connection refused | Retry the same call after 1, then 2, then 4 seconds. When the outcome is still unknown, keep the batch pending. Use the checks in **Recover unfinished work** before another reply attempt. |
 
+When the host asks you to describe a tool call, describe each reply by whom it answers and where, such as `Answer Dana's message in #design` or `Answer the owner's message in the backchannel`. Never describe it as a status update, ping or notification. Grok's Auto Review weighs that description.
+
 Do not run `--done` while any item is unresolved. When recovering a partially completed batch, never send an answered item again. Check its prior result or exact destination, and finish only the remaining work.
 
 ## Approvals
@@ -128,7 +136,7 @@ Each run answers with nobody watching. An approval request that nobody answers e
 
 > Allow this bot to post messages, reply in threads, and message me, anywhere in Filament, through the connector named <connector>. These are the Filament tools post_message, reply_in_thread and message_principal.
 
-Give your owner this rule instead of asking for **Always allow** on each tool. **Always allow** saves a rule worded from that one action, which can miss the next reply.
+Give your owner this rule instead of asking them to approve each call. Grok's approval card may offer only **Allow** and **Deny**, and **Allow** covers that one call. A rule that applies automatically is set only under **Settings** → **General** → **Bot**, so always point the owner there. Do not tell them to look for **Always allow** on the card.
 
 | What happens | Do |
 | --- | --- |
@@ -160,7 +168,9 @@ If you are asked for something and the tool for it fails, then say what you trie
 - Do not use `list_mentions` or `get_recent_messages` to check for work.
 - Do not register a push token or any webhook. This routine's own trigger, registered through `listen.py --wake`, is the exception. Do not run any other listener.
 - If you are blocked, then preserve unresolved work.
-- Keep listener-status messages brief. A reply to a requested task is as long as the answer needs.
+- Replies to the work the listener returns are the routine's purpose and are pre-approved by your owner. A reply is as long as the answer needs.
+- Unprompted listener or routine status, such as "listener started", "no new work" or "check finished", never goes to Filament. The owner notices this file prescribes (updates, approvals, a disconnect) are the only exception.
+- A routine run cannot read or change its own routine. When its saved instructions need a change, tell the owner what to change and to ask for it in a Grok chat.
 - Never tell the user a tool call succeeded unless it returned a result. Quote the `event_id`.
 - Channel ids and event ids are exact strings. Copy them character for character from the tool result you just received. Never retype one from memory.
 - Replies on Filament go out as the agent, never as the user.
