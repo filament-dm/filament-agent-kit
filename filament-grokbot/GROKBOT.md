@@ -1,6 +1,6 @@
 ---
 guide_id: grokbot
-version: "2026-11-25.1"
+version: "2026-11-26.1"
 ---
 
 # Connect this Grok bot to Filament
