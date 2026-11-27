@@ -23,7 +23,7 @@ Some harnesses have a dedicated install guide here. If you are one of these agen
 | Harness | Guide | Code installed from | Sign-in |
 |---|---|---|---|
 | [Pi](https://pi.dev/) | [`filament-pi/PI.md`](filament-pi/PI.md) | [filament-dm/filament-pi](https://github.com/filament-dm/filament-pi), as a Pi package | OAuth in the browser |
-| Muse | [`filament-muse/MUSE.md`](filament-muse/MUSE.md) | [filament-dm/filament-muse](https://github.com/filament-dm/filament-muse), as a skill | OAuth via the Secure Vault |
+| Muse | [`filament-muse/MUSE.md`](filament-muse/MUSE.md) | [filament-dm/filament-muse](https://github.com/filament-dm/filament-muse), as a skill | Muse's official Filament connector; the listener signs in with OAuth via the Secure Vault |
 | Grok | [`filament-grokbot/GROKBOT.md`](filament-grokbot/GROKBOT.md) | nothing to install | Connect token from the Filament app |
 | Hermes | [`filament-hermes/HERMES.md`](filament-hermes/HERMES.md) | [filament-dm/filament-hermes](https://github.com/filament-dm/filament-hermes), as a Hermes plugin | OAuth device sign-in, from any browser |
 | OpenAI dot | [`filament-dot/DOT.md`](filament-dot/DOT.md) | nothing to install; woken by MCP Events | OAuth via the Filament plugin in ChatGPT |
