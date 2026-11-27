@@ -31,7 +31,7 @@ import uuid
 
 # Kept equal to the guide version in GROKBOT.md, so listeners older than
 # 2026-11-13.1, which require it, can still update. This one never requires it.
-REVISION = '2026-11-25.1'
+REVISION = '2026-11-26.1'
 STATE = os.environ.get('FM_STATE') or os.path.dirname(os.path.abspath(__file__))
 DEFAULT_ENDPOINT = 'https://api.filament.dm/mcp/agents'
 POLL_WAIT = 60
@@ -578,6 +578,27 @@ def report_version(version):
         raise Transient('report refused')
 
 
+def report_runtime(call_id):
+    """Tell Filament which listener revision runs, once per revision; never blocks listening.
+
+    Filament keeps it in agent_runtime and get_self returns it, like the
+    plugin version Claude Code, Codex and OpenClaw agents report.
+    """
+    if read('runtime') == REVISION:
+        return
+    try:
+        reply = rpc('tools/call', {'name': 'report_runtime',
+                                   'arguments': {'harness': GUIDE_ID, 'version': REVISION}}, 15)
+    except (AuthFailed, Transient) as exc:
+        event('RUNTIME_REPORT_FAILED', call_id=call_id, reason=str(exc))
+        return
+    result = reply.get('result') if isinstance(reply, dict) else None
+    if not isinstance(result, dict) or 'error' in reply or result.get('isError'):
+        event('RUNTIME_REPORT_FAILED', call_id=call_id, reason='report refused')
+        return
+    write('runtime', REVISION)
+
+
 def install(script):
     """Replace this script, once the new one has read the current state."""
     target = os.path.abspath(__file__)
@@ -988,6 +1009,7 @@ def main():
     event('CALL_START', call_id=call_id, mode=mode, budget=args.budget, check=args.check,
           follow=args.follow, session_limit=args.session)
     result, body = 'ERROR', None
+    report_runtime(call_id)
     metrics = {'poll_attempts': 0, 'empty_polls': 0, 'work_items': 0, 'poll_errors': 0}
     try:
         result, body = execute(args, call_id, metrics)

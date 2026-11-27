@@ -34,6 +34,7 @@ class Fake:
         # get_self and report_guide_version, and files served for --update.
         self.guide = {'reported': None, 'update': None}
         self.tool_calls, self.files = [], {}
+        self.refuse_runtime = False
         self.lock = threading.Lock()
         self.stopped = False
         fake = self
@@ -73,11 +74,13 @@ class Fake:
                     self.wfile.write(raw)
                     return
                 name = body['params'].get('name')
-                if name in ('get_self', 'report_guide_version'):
+                if name in ('get_self', 'report_guide_version', 'report_runtime'):
                     with fake.lock:
                         fake.tool_calls.append({'name': name, 'args': body['params']['arguments']})
                         data = {'guide': fake.guide} if name == 'get_self' else {'ok': True}
                     result = {'content': [{'type': 'text', 'text': json.dumps(data)}]}
+                    if name == 'report_runtime' and fake.refuse_runtime:
+                        result = {'isError': True, 'content': [{'type': 'text', 'text': 'unknown tool'}]}
                     self.reply(200, json.dumps({'jsonrpc': '2.0', 'id': 1, 'result': result}).encode())
                     return
                 if name in ('get_recent_messages', 'get_thread'):
@@ -211,6 +214,26 @@ class ListenTest(ListenerCase):
                                     capture_output=True, text=True, env=env, timeout=10)
             self.assertEqual(result.stdout.strip(), 'TOKEN_SET')
             self.assertEqual((Path(directory) / 'token').read_text(), TOKEN)
+
+    def runtime_reports(self):
+        return [c['args'] for c in self.fake.tool_calls if c['name'] == 'report_runtime']
+
+    def test_reports_the_listener_revision_once_per_revision(self):
+        revision = re.search(r"^REVISION = '([^']+)'$", Path(SCRIPT).read_text(), re.M).group(1)
+        self.run_script('--check', '1')
+        self.run_script('--check', '1')
+        self.assertEqual(self.runtime_reports(), [{'harness': 'grokbot', 'version': revision}])
+        self.assertEqual((self.state / 'runtime').read_text(), revision)
+
+    def test_a_refused_runtime_report_keeps_listening_and_retries_next_run(self):
+        self.fake.refuse_runtime = True
+        self.fake.queue = [{'work': [item('e1')]}]
+        self.assertEqual(self.run_script('--check', '1')[0], 'WORK 1')
+        self.assertFalse((self.state / 'runtime').exists())
+        self.fake.refuse_runtime = False
+        self.run_script('--resume', self.state_data()['pending']['batch_id'])
+        self.assertEqual(len(self.runtime_reports()), 2)
+        self.assertTrue((self.state / 'runtime').exists())
 
     def test_rejects_non_token(self):
         self.assertEqual(self.run_script('--token', stdin='nope\n')[0], 'ERROR the token must start with fmcp_')

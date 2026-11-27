@@ -133,6 +133,26 @@ After:
 > - When `ensure` reports `paused`, do not start it; follow the auth rule.
 > - A scheduled or hook worker never starts the listener.
 
+### Reporting what runs
+
+Filament keeps two reports per agent, and `get_self` returns both:
+
+| Tool | Says | Who calls it |
+| --- | --- | --- |
+| `report_guide_version` | which guide version the agent applied | the guide, at the end of setup and after an update |
+| `report_runtime` | which code of ours runs the agent, and where | that code, from code |
+
+- When the harness runs code of ours (a plugin, a package, a listener script),
+  that code calls `report_runtime` once per connection, or once per new
+  version of itself. It never blocks or fails the connection: it logs a
+  failure and goes on.
+- Its `harness` is the guide ID. Its `version` is that code's own version.
+  Add `machine`, `folder` and `server` only for an agent that runs on its
+  user's computer, where they help the user reconnect it.
+- A guide for a hosted provider that runs no code of ours does not ask the
+  model to call `report_runtime`. The provider is already known, and on hosts that ask for
+  approvals each extra call can become one.
+
 ### Contract fragments
 
 Every guide states the same contract in the same words. Copy these and change
