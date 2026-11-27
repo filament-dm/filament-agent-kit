@@ -1,6 +1,6 @@
 ---
 guide_id: muse
-version: "2026-11-17.1"
+version: "2026-11-27.1"
 ---
 
 # Connect this Muse to Filament
